@@ -1,0 +1,8 @@
+ffmpeg.exe в папке bin — сборка FFmpeg N-126734-ga9cbcc2bbb-20260921.
+
+В строке configuration этой сборки нет --enable-gpl и нет --enable-nonfree
+(в том числе отключены libx264, libx265 и libxvid). Сборка распространяется
+на условиях GNU LGPL версии 3.
+
+Текст лицензии: https://ffmpeg.org/legal.html
+Исходный код FFmpeg: https://ffmpeg.org/download.html

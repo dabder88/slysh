@@ -1,0 +1,48 @@
+:root {
+  color-scheme: light;
+  --on-background: #121c2c;
+  --on-secondary-container: #11278e;
+  --inverse-on-surface: #ebf1ff;
+  --surface-tint: #4c56af;
+  --error-container: #ffdad6;
+  --surface-container-high: #dee8ff;
+  --surface-dim: #d0daf0;
+  --on-primary-container: #8690ee;
+  --surface-container-low: #f0f3ff;
+  --outline-variant: #c6c5d4;
+  --surface-container-lowest: #ffffff;
+  --tertiary-container: #2c3039;
+  --error: #ba1a1a;
+  --tertiary: #181b23;
+  --inverse-primary: #bdc2ff;
+  --on-error: #ffffff;
+  --background: #f9f9ff;
+  --primary-container: #1a237e;
+  --primary: #000666;
+  --primary-fixed-dim: #bdc2ff;
+  --on-surface: #121c2c;
+  --outline: #767683;
+  --surface-bright: #f9f9ff;
+  --on-tertiary: #ffffff;
+  --secondary-container: #8596ff;
+  --surface-variant: #d9e3f9;
+  --on-secondary: #ffffff;
+  --secondary: #4355b9;
+  --on-surface-variant: #454652;
+  --on-error-container: #93000a;
+  --on-tertiary-container: #9597a2;
+  --surface-container-highest: #d9e3f9;
+  --surface: #f9f9ff;
+  --primary-fixed: #e0e0ff;
+  --surface-container: #e7eeff;
+  --on-primary: #ffffff;
+
+  --sidebar-width: 256px;
+  --topbar-height: 64px;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.08);
+  --font-sans: "Segoe UI", system-ui, -apple-system, sans-serif;
+}

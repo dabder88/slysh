@@ -1,0 +1,35 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+/dist/
+wheels/
+*.egg-info
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Local secrets and env (never commit)
+.env
+.env.*
+
+# Node / frontend deps (npm install)
+node_modules/
+
+# Python wheels accidentally committed
+*.whl
+
+# Virtual environments
+.venv/
+venv/
+
+# Local ASR weights (copied into this folder; not committed)
+models/*
+!models/.gitkeep
+
+# Shipped ffmpeg binary (LGPL build, not committed)
+bin/ffmpeg.exe
+bin/ffprobe.exe
+

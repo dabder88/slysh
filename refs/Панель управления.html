@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Панель управления - Sonic Intelligence</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-background": "#121c2c",
+                        "on-secondary-container": "#11278e",
+                        "inverse-on-surface": "#ebf1ff",
+                        "surface-tint": "#4c56af",
+                        "error-container": "#ffdad6",
+                        "surface-container-high": "#dee8ff",
+                        "surface-dim": "#d0daf0",
+                        "tertiary-fixed": "#e0e2ee",
+                        "on-primary-container": "#8690ee",
+                        "surface-container-low": "#f0f3ff",
+                        "on-primary-fixed": "#000767",
+                        "outline-variant": "#c6c5d4",
+                        "secondary-fixed-dim": "#bac3ff",
+                        "surface-container-lowest": "#ffffff",
+                        "tertiary-container": "#2c3039",
+                        "on-primary-fixed-variant": "#343d96",
+                        "on-secondary-fixed-variant": "#293ca0",
+                        "error": "#ba1a1a",
+                        "tertiary": "#181b23",
+                        "inverse-primary": "#bdc2ff",
+                        "on-error": "#ffffff",
+                        "background": "#f9f9ff",
+                        "secondary-fixed": "#dee0ff",
+                        "primary-container": "#1a237e",
+                        "primary": "#000666",
+                        "primary-fixed-dim": "#bdc2ff",
+                        "on-surface": "#121c2c",
+                        "outline": "#767683",
+                        "surface-bright": "#f9f9ff",
+                        "inverse-surface": "#273141",
+                        "on-tertiary": "#ffffff",
+                        "on-secondary-fixed": "#00105c",
+                        "secondary-container": "#8596ff",
+                        "surface-variant": "#d9e3f9",
+                        "on-secondary": "#ffffff",
+                        "on-primary": "#ffffff",
+                        "tertiary-fixed-dim": "#c4c6d2",
+                        "secondary": "#4355b9",
+                        "on-surface-variant": "#454652",
+                        "on-error-container": "#93000a",
+                        "on-tertiary-fixed-variant": "#434750",
+                        "on-tertiary-container": "#9597a2",
+                        "surface-container-highest": "#d9e3f9",
+                        "on-tertiary-fixed": "#181b24",
+                        "surface": "#f9f9ff",
+                        "primary-fixed": "#e0e0ff",
+                        "surface-container": "#e7eeff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "xs": "4px",
+                        "2xl": "48px",
+                        "sm": "8px",
+                        "base": "4px",
+                        "gutter": "24px",
+                        "xl": "32px",
+                        "margin": "32px",
+                        "grid_columns": "12",
+                        "lg": "24px",
+                        "md": "16px"
+                    },
+                    "fontFamily": {
+                        "headline-md": ["Inter"],
+                        "headline-sm": ["Inter"],
+                        "display-lg": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "headline-md-mobile": ["Inter"],
+                        "label-md": ["Inter"],
+                        "body-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-md": ["24px", { "lineHeight": "1.3", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "headline-sm": ["18px", { "lineHeight": "1.4", "fontWeight": "600" }],
+                        "display-lg": ["32px", { "lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-lg": ["16px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                        "headline-md-mobile": ["20px", { "lineHeight": "1.3", "fontWeight": "600" }],
+                        "label-md": ["12px", { "lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "body-md": ["14px", { "lineHeight": "1.5", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md min-h-screen flex antialiased">
+<!-- SideNavBar (Shared Component) -->
+<nav class="w-64 h-screen fixed left-0 top-0 bg-surface-container-lowest dark:bg-tertiary-container shadow-[0px_4px_12px_rgba(0,0,0,0.05)] shadow-sm dark:shadow-none flex flex-col h-full py-xl px-md z-40 hidden md:flex">
+<!-- Header -->
+<div class="flex items-center gap-sm mb-xl px-md">
+<div class="w-10 h-10 rounded-full bg-primary-container flex items-center justify-center overflow-hidden flex-shrink-0">
+<span class="material-symbols-outlined text-on-primary-container" style="font-variation-settings: 'FILL' 1;">account_circle</span>
+</div>
+<div class="flex flex-col">
+<span class="font-headline-sm text-headline-sm font-bold text-primary dark:text-primary-fixed-dim leading-none">Sonic Intelligence</span>
+<span class="font-label-md text-label-md text-on-surface-variant dark:text-on-tertiary-container mt-1">AI Transcriber</span>
+</div>
+</div>
+<!-- CTA -->
+<button class="w-full bg-primary text-on-primary rounded-lg py-sm px-md mb-lg font-headline-sm text-headline-sm active:scale-95 transition-transform duration-150 flex items-center justify-center gap-sm shadow-[0px_4px_12px_rgba(0,0,0,0.05)]">
+<span class="material-symbols-outlined text-on-primary">upload</span>
+            Загрузить аудио
+        </button>
+<!-- Main Nav -->
+<ul class="flex flex-col gap-xs flex-grow font-body-md text-body-md">
+<li>
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-primary dark:text-inverse-primary font-bold border-r-4 border-primary dark:border-inverse-primary bg-surface-container-low dark:bg-tertiary active:scale-95 transition-transform duration-150" href="#">
+<span class="material-symbols-outlined text-primary dark:text-inverse-primary">dashboard</span>
+                    Панель управления
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant dark:text-on-tertiary-container hover:bg-surface-container dark:hover:bg-tertiary-fixed-dim/10 transition-colors duration-200 active:scale-95 transition-transform duration-150" href="#">
+<span class="material-symbols-outlined text-on-surface-variant dark:text-on-tertiary-container">pending_actions</span>
+                    Очередь
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant dark:text-on-tertiary-container hover:bg-surface-container dark:hover:bg-tertiary-fixed-dim/10 transition-colors duration-200 active:scale-95 transition-transform duration-150" href="#">
+<span class="material-symbols-outlined text-on-surface-variant dark:text-on-tertiary-container">description</span>
+                    Расшифровки
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant dark:text-on-tertiary-container hover:bg-surface-container dark:hover:bg-tertiary-fixed-dim/10 transition-colors duration-200 active:scale-95 transition-transform duration-150" href="#">
+<span class="material-symbols-outlined text-on-surface-variant dark:text-on-tertiary-container">folder_shared</span>
+                    Архив
+                </a>
+</li>
+</ul>
+<!-- Footer Nav -->
+<ul class="flex flex-col gap-xs mt-auto font-body-md text-body-md border-t border-outline-variant pt-sm">
+<li>
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant dark:text-on-tertiary-container hover:bg-surface-container dark:hover:bg-tertiary-fixed-dim/10 transition-colors duration-200 active:scale-95 transition-transform duration-150" href="#">
+<span class="material-symbols-outlined text-on-surface-variant dark:text-on-tertiary-container">settings</span>
+                    Настройки
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant dark:text-on-tertiary-container hover:bg-surface-container dark:hover:bg-tertiary-fixed-dim/10 transition-colors duration-200 active:scale-95 transition-transform duration-150" href="#">
+<span class="material-symbols-outlined text-on-surface-variant dark:text-on-tertiary-container">help</span>
+                    Поддержка
+                </a>
+</li>
+</ul>
+</nav>
+<!-- Main Content Area -->
+<main class="flex-1 ml-0 md:ml-64 flex flex-col min-h-screen">
+<!-- TopAppBar (Shared Component adapted for context) -->
+<header class="h-16 w-full sticky top-0 z-30 bg-surface dark:bg-background flex items-center justify-between px-lg border-b border-outline-variant/30">
+<div class="flex items-center gap-lg">
+<span class="font-headline-md text-headline-md font-bold text-primary md:hidden">Sonic Intelligence</span>
+<nav class="hidden lg:flex items-center gap-md font-headline-sm text-headline-sm">
+<a class="text-primary dark:text-inverse-primary font-semibold border-b-2 border-primary py-xs" href="#">Прямая загрузка</a>
+<a class="text-on-surface-variant dark:text-on-tertiary-container hover:text-primary transition-colors py-xs cursor-pointer" href="#">Пакетная обработка</a>
+</nav>
+</div>
+<div class="flex items-center gap-sm">
+<button class="hidden md:flex items-center gap-xs px-md py-sm bg-surface-container-lowest text-primary border border-primary rounded-lg font-headline-sm text-headline-sm hover:bg-surface-container transition-colors shadow-[0px_4px_12px_rgba(0,0,0,0.05)]">
+<span class="material-symbols-outlined text-primary text-base">add</span>
+                    New Project
+                </button>
+<button class="hidden md:flex items-center gap-xs px-md py-sm text-on-surface-variant hover:text-primary transition-colors font-headline-sm text-headline-sm">
+<span class="material-symbols-outlined text-on-surface-variant">download</span>
+                    Export
+                </button>
+<div class="w-px h-6 bg-outline-variant mx-sm hidden md:block"></div>
+<button class="p-xs text-on-surface-variant hover:text-primary transition-colors rounded-full hover:bg-surface-container">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="p-xs text-on-surface-variant hover:text-primary transition-colors rounded-full hover:bg-surface-container md:hidden">
+<span class="material-symbols-outlined">account_circle</span>
+</button>
+</div>
+</header>
+<!-- Dashboard Content Canvas -->
+<div class="p-lg md:p-xl flex-1 flex flex-col gap-xl max-w-[1200px] mx-auto w-full">
+<!-- Upload Split View -->
+<section class="grid grid-cols-1 lg:grid-cols-12 gap-lg items-stretch">
+<!-- Single File Upload Area (Bento Left) -->
+<div class="lg:col-span-7 bg-surface-container-lowest rounded-xl p-lg shadow-[0px_4px_12px_rgba(0,0,0,0.05)] flex flex-col relative overflow-hidden group border border-outline-variant/20">
+<div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary to-secondary"></div>
+<div class="flex items-center justify-between mb-md">
+<h2 class="font-headline-sm text-headline-sm text-on-background">Загрузка одиночного файла</h2>
+<span class="bg-surface-container-low text-primary px-sm py-xs rounded text-xs font-semibold tracking-wider">АУДИО / ВИДЕО</span>
+</div>
+<!-- Drag & Drop Zone -->
+<div class="border-2 border-dashed border-outline-variant rounded-lg p-xl flex-1 flex flex-col items-center justify-center text-center bg-surface-bright hover:border-primary hover:bg-surface-container transition-all duration-300 cursor-pointer mb-md relative overflow-hidden">
+<div class="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
+<div class="w-16 h-16 bg-surface-container-high rounded-full flex items-center justify-center mb-md text-primary">
+<span class="material-symbols-outlined text-4xl">cloud_upload</span>
+</div>
+<p class="font-headline-sm text-headline-sm mb-xs text-on-background">Перетащите файл сюда</p>
+<p class="font-body-md text-body-md text-on-surface-variant mb-md">Supported formats: .mp3, .wav, .mp4 (Max 2GB)</p>
+<button class="bg-surface-container-lowest text-primary border border-primary font-headline-sm text-headline-sm px-lg py-sm rounded-lg hover:bg-surface-container transition-colors shadow-sm">
+                            Выбрать файлы
+                        </button>
+</div>
+<!-- Processing Settings Inline -->
+<div class="bg-surface-container-low rounded-lg p-md border border-outline-variant/30 flex items-center justify-between flex-wrap gap-md">
+<div class="flex items-center gap-sm">
+<span class="material-symbols-outlined text-on-surface-variant text-sm">memory</span>
+<span class="font-body-md text-body-md text-on-surface-variant">Processing Engine:</span>
+</div>
+<div class="flex bg-surface-container-highest rounded-lg p-xs gap-xs">
+<button class="px-md py-xs rounded bg-surface-container-lowest text-primary font-label-md text-label-md shadow-sm border border-outline-variant/20">Авто</button>
+<button class="px-md py-xs rounded text-on-surface-variant font-label-md text-label-md hover:text-on-background">GPU (Быстро)</button>
+<button class="px-md py-xs rounded text-on-surface-variant font-label-md text-label-md hover:text-on-background">CPU (Стандарт)</button>
+</div>
+</div>
+</div>
+<!-- Batch Processing Area (Bento Right) -->
+<div class="lg:col-span-5 bg-surface-container-lowest rounded-xl p-lg shadow-[0px_4px_12px_rgba(0,0,0,0.05)] flex flex-col border border-outline-variant/20">
+<div class="flex items-center justify-between mb-md">
+<h2 class="font-headline-sm text-headline-sm text-on-background">Пакетная обработка</h2>
+<span class="bg-surface-container-low text-secondary px-sm py-xs rounded text-xs font-semibold tracking-wider">НЕСКОЛЬКО ФАЙЛОВ</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant mb-lg">Process entire folders or multiple files simultaneously with customized output settings.</p>
+<div class="flex-1 flex flex-col gap-md">
+<!-- Select Folder Button Area -->
+<div class="border border-outline-variant rounded-lg p-md bg-surface-bright flex items-center gap-md cursor-pointer hover:border-secondary hover:shadow-sm transition-all">
+<div class="w-12 h-12 bg-surface-container-high rounded flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined text-2xl">folder_open</span>
+</div>
+<div class="flex-1">
+<p class="font-headline-sm text-headline-sm text-on-background">Выбрать папку</p>
+<p class="font-body-md text-body-md text-on-surface-variant">Choose a folder to scan for media</p>
+</div>
+<span class="material-symbols-outlined text-outline-variant">chevron_right</span>
+</div>
+<!-- Or Multi-select -->
+<div class="border border-outline-variant rounded-lg p-md bg-surface-bright flex items-center gap-md cursor-pointer hover:border-secondary hover:shadow-sm transition-all">
+<div class="w-12 h-12 bg-surface-container-high rounded flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined text-2xl">library_music</span>
+</div>
+<div class="flex-1">
+<p class="font-headline-sm text-headline-sm text-on-background">Добавить файлы</p>
+<p class="font-body-md text-body-md text-on-surface-variant">Ctrl/Cmd + Click to select</p>
+</div>
+<span class="material-symbols-outlined text-outline-variant">chevron_right</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Recent Files Section -->
+<section class="mt-lg">
+<div class="flex items-center justify-between mb-md">
+<h3 class="font-headline-sm text-headline-sm text-on-background">Недавние загрузки и пакеты</h3>
+<a class="font-body-md text-body-md text-primary hover:underline" href="#">Посмотреть все</a>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-md">
+<!-- File Card 1 (Processing) -->
+<div class="bg-surface-container-lowest rounded-xl p-md shadow-[0px_4px_12px_rgba(0,0,0,0.05)] border border-outline-variant/20 flex flex-col hover:shadow-[0px_8px_24px_rgba(0,0,0,0.08)] transition-shadow">
+<div class="flex items-start justify-between mb-md">
+<div class="flex items-center gap-sm">
+<div class="w-10 h-10 rounded bg-primary-container/20 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">graphic_eq</span>
+</div>
+<div>
+<p class="font-headline-sm text-headline-sm text-on-background truncate w-32 md:w-40" title="Interview_Q3_Marketing.wav">Interview_Q3_Ma...</p>
+<p class="font-body-md text-body-md text-on-surface-variant text-sm">Today, 10:42 AM</p>
+</div>
+</div>
+<span class="bg-surface-container-highest text-on-background px-xs py-xs rounded text-[10px] font-bold uppercase tracking-wide">Processing</span>
+</div>
+<div class="mt-auto">
+<div class="w-full bg-surface-container-highest h-1 rounded-full overflow-hidden">
+<div class="bg-primary h-full w-[45%] rounded-full animate-pulse"></div>
+</div>
+<div class="flex justify-between items-center mt-xs">
+<span class="font-label-md text-label-md text-on-surface-variant">Расшифровка...</span>
+<span class="font-label-md text-label-md text-on-surface-variant">45%</span>
+</div>
+</div>
+</div>
+<!-- Package Card (Completed) -->
+<div class="bg-surface-container-lowest rounded-xl p-md shadow-[0px_4px_12px_rgba(0,0,0,0.05)] border border-outline-variant/20 flex flex-col hover:shadow-[0px_8px_24px_rgba(0,0,0,0.08)] transition-shadow">
+<div class="flex items-start justify-between mb-md">
+<div class="flex items-center gap-sm">
+<div class="w-10 h-10 rounded bg-secondary-container/20 flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">folder_zip</span>
+</div>
+<div>
+<p class="font-headline-sm text-headline-sm text-on-background truncate w-32 md:w-40" title="Product_Launch_Recordings">Product_Launch_...</p>
+<p class="font-body-md text-body-md text-on-surface-variant text-sm">Yesterday, 4:15 PM</p>
+</div>
+</div>
+<span class="bg-primary-container/10 text-primary px-xs py-xs rounded text-[10px] font-bold uppercase tracking-wide flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px]">check_circle</span> ГОТОВО
+                            </span>
+</div>
+<div class="mt-auto pt-sm border-t border-outline-variant/20 flex items-center justify-between text-on-surface-variant">
+<div class="flex items-center gap-xs font-body-md text-body-md text-sm">
+<span class="material-symbols-outlined text-sm">description</span> 12 Files
+                            </div>
+<div class="flex items-center gap-xs font-body-md text-body-md text-sm">
+<span class="material-symbols-outlined text-sm">schedule</span> 3h 14m total
+                            </div>
+</div>
+</div>
+<!-- File Card 2 (Completed) -->
+<div class="bg-surface-container-lowest rounded-xl p-md shadow-[0px_4px_12px_rgba(0,0,0,0.05)] border border-outline-variant/20 flex flex-col hover:shadow-[0px_8px_24px_rgba(0,0,0,0.08)] transition-shadow">
+<div class="flex items-start justify-between mb-md">
+<div class="flex items-center gap-sm">
+<div class="w-10 h-10 rounded bg-surface-container-high flex items-center justify-center text-on-surface-variant">
+<span class="material-symbols-outlined">video_file</span>
+</div>
+<div>
+<p class="font-headline-sm text-headline-sm text-on-background truncate w-32 md:w-40" title="CEO_Townhall_Jan.mp4">CEO_Townhall_Ja...</p>
+<p class="font-body-md text-body-md text-on-surface-variant text-sm">Oct 24, 2:30 PM</p>
+</div>
+</div>
+<span class="bg-primary-container/10 text-primary px-xs py-xs rounded text-[10px] font-bold uppercase tracking-wide flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px]">check_circle</span> ГОТОВО
+                            </span>
+</div>
+<div class="mt-auto pt-sm border-t border-outline-variant/20 flex items-center justify-between text-on-surface-variant">
+<button class="font-body-md text-body-md text-sm text-primary hover:underline flex items-center gap-xs">
+<span class="material-symbols-outlined text-sm">open_in_new</span> Открыть текст
+                            </button>
+<span class="font-body-md text-body-md text-sm">45m 12s</span>
+</div>
+</div>
+</div>
+</section>
+</div>
+</main>
+</body></html>

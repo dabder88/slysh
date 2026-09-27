@@ -1,0 +1,65 @@
+[project]
+name = "slysh"
+version = "0.1.0"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn>=0.34",
+  "pywebview>=5",
+  "sounddevice>=0.5",
+  "soundfile>=0.13",
+  "numpy>=2.0,<2.3",
+]
+
+[project.optional-dependencies]
+engine = [
+  "torch==2.8.0",
+  "torchaudio==2.8.0",
+  "faster-whisper>=1.1",
+  "openai-whisper>=20240930",
+  "gigaam @ git+https://github.com/salute-developers/GigaAM.git",
+]
+diarization = [
+  "nemo-toolkit-asr[asr]==2.8.0rc2",
+  "omegaconf>=2.3",
+]
+youtube = [
+  "yt-dlp>=2024",
+  "browser-cookie3>=0.19",
+  "youtube-transcript-api>=1.0",
+  "requests>=2.31",
+]
+
+[project.scripts]
+slysh = "slysh.app:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/slysh"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.uv]
+package = true
+index-strategy = "unsafe-best-match"
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cu129" }]
+torchaudio = [{ index = "pytorch-cu129" }]
+
+[[tool.uv.index]]
+name = "pytorch-cu129"
+url = "https://download.pytorch.org/whl/cu129"
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.1.1",
+]

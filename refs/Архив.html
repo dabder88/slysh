@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="ru"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Архив - Sonic Intelligence</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-background": "#121c2c",
+                        "on-secondary-container": "#11278e",
+                        "inverse-on-surface": "#ebf1ff",
+                        "surface-tint": "#4c56af",
+                        "error-container": "#ffdad6",
+                        "surface-container-high": "#dee8ff",
+                        "surface-dim": "#d0daf0",
+                        "tertiary-fixed": "#e0e2ee",
+                        "on-primary-container": "#8690ee",
+                        "surface-container-low": "#f0f3ff",
+                        "on-primary-fixed": "#000767",
+                        "outline-variant": "#c6c5d4",
+                        "secondary-fixed-dim": "#bac3ff",
+                        "surface-container-lowest": "#ffffff",
+                        "tertiary-container": "#2c3039",
+                        "on-primary-fixed-variant": "#343d96",
+                        "on-secondary-fixed-variant": "#293ca0",
+                        "error": "#ba1a1a",
+                        "tertiary": "#181b23",
+                        "inverse-primary": "#bdc2ff",
+                        "on-error": "#ffffff",
+                        "background": "#f9f9ff",
+                        "secondary-fixed": "#dee0ff",
+                        "primary-container": "#1a237e",
+                        "primary": "#000666",
+                        "primary-fixed-dim": "#bdc2ff",
+                        "on-surface": "#121c2c",
+                        "outline": "#767683",
+                        "surface-bright": "#f9f9ff",
+                        "inverse-surface": "#273141",
+                        "on-tertiary": "#ffffff",
+                        "on-secondary-fixed": "#00105c",
+                        "secondary-container": "#8596ff",
+                        "surface-variant": "#d9e3f9",
+                        "on-secondary": "#ffffff",
+                        "on-primary": "#ffffff",
+                        "tertiary-fixed-dim": "#c4c6d2",
+                        "secondary": "#4355b9",
+                        "on-surface-variant": "#454652",
+                        "on-error-container": "#93000a",
+                        "on-tertiary-fixed-variant": "#434750",
+                        "on-tertiary-container": "#9597a2",
+                        "surface-container-highest": "#d9e3f9",
+                        "on-tertiary-fixed": "#181b24",
+                        "surface": "#f9f9ff",
+                        "primary-fixed": "#e0e0ff",
+                        "surface-container": "#e7eeff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "xs": "4px",
+                        "2xl": "48px",
+                        "sm": "8px",
+                        "base": "4px",
+                        "gutter": "24px",
+                        "xl": "32px",
+                        "margin": "32px",
+                        "grid_columns": "12",
+                        "lg": "24px",
+                        "md": "16px"
+                    },
+                    "fontFamily": {
+                        "headline-md": ["Inter"],
+                        "headline-sm": ["Inter"],
+                        "display-lg": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "headline-md-mobile": ["Inter"],
+                        "label-md": ["Inter"],
+                        "body-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-md": ["24px", { "lineHeight": "1.3", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "headline-sm": ["18px", { "lineHeight": "1.4", "fontWeight": "600" }],
+                        "display-lg": ["32px", { "lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-lg": ["16px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                        "headline-md-mobile": ["20px", { "lineHeight": "1.3", "fontWeight": "600" }],
+                        "label-md": ["12px", { "lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "body-md": ["14px", { "lineHeight": "1.5", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background min-h-screen flex font-body-md">
+<!-- SideNavBar (Shared Component) -->
+<nav class="w-64 h-screen fixed left-0 top-0 shadow-sm dark:shadow-none shadow-[0px_4px_12px_rgba(0,0,0,0.05)] bg-surface-container-lowest dark:bg-tertiary-container flex flex-col py-xl px-md z-40">
+<div class="mb-xl flex items-center gap-sm px-sm">
+<div class="w-10 h-10 rounded-full bg-primary-container flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-on-primary-container" data-weight="fill" style="font-variation-settings: 'FILL' 1;">graphic_eq</span>
+</div>
+<div>
+<h1 class="font-headline-sm text-headline-sm font-bold text-primary dark:text-primary-fixed-dim tracking-tight">Sonic Intelligence</h1>
+<p class="font-label-md text-label-md text-on-surface-variant dark:text-on-tertiary-container mt-1">ИИ Транскрибатор</p>
+</div>
+</div>
+<button class="w-full bg-primary text-on-primary rounded-lg py-md px-md font-label-md text-label-md flex items-center justify-center gap-sm mb-xl hover:opacity-90 active:scale-95 transition-transform duration-150 shadow-[0px_4px_12px_rgba(0,0,0,0.05)]">
+<span class="material-symbols-outlined text-[18px]">upload_file</span>
+            Загрузить аудио
+        </button>
+<ul class="flex flex-col gap-sm flex-1">
+<li>
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant dark:text-on-tertiary-container hover:bg-surface-container dark:hover:bg-tertiary-fixed-dim/10 transition-colors duration-200" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="dashboard">dashboard</span>
+<span class="font-body-md text-body-md">Панель управления</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant dark:text-on-tertiary-container hover:bg-surface-container dark:hover:bg-tertiary-fixed-dim/10 transition-colors duration-200" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="pending_actions">pending_actions</span>
+<span class="font-body-md text-body-md">Очередь</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant dark:text-on-tertiary-container hover:bg-surface-container dark:hover:bg-tertiary-fixed-dim/10 transition-colors duration-200" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="description">description</span>
+<span class="font-body-md text-body-md">Расшифровки</span>
+</a>
+</li>
+<li>
+<!-- ACTIVE TAB -->
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-primary dark:text-inverse-primary font-bold border-r-4 border-primary dark:border-inverse-primary bg-surface-container-low dark:bg-tertiary active:scale-95 transition-transform duration-150" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="folder_shared" data-weight="fill" style="font-variation-settings: 'FILL' 1;">folder_shared</span>
+<span class="font-body-md text-body-md">Архив</span>
+</a>
+</li>
+</ul>
+<div class="mt-auto border-t border-outline-variant/30 pt-md">
+<ul class="flex flex-col gap-sm">
+<li>
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant dark:text-on-tertiary-container hover:bg-surface-container dark:hover:bg-tertiary-fixed-dim/10 transition-colors duration-200" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="settings">settings</span>
+<span class="font-body-md text-body-md">Настройки</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant dark:text-on-tertiary-container hover:bg-surface-container dark:hover:bg-tertiary-fixed-dim/10 transition-colors duration-200" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="help">help</span>
+<span class="font-body-md text-body-md">Поддержка</span>
+</a>
+</li>
+</ul>
+<div class="mt-md flex items-center gap-sm px-md py-sm">
+<img alt="User profile" class="w-8 h-8 rounded-full object-cover" data-alt="A small, circular avatar portrait of a professional individual against a clean, light-mode minimalist background. High-key lighting, soft shadows, conveying a sense of reliable intelligence." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDsk6MF0vLZVXg-WcgxJZ1LddE5Xhswwk12XoV0d4H43mBQVGdrTWjEc9bXm886yp9Htj67ZBpmoLhOthE7BcW3i0scCoS-irbZU9BUp5n4qAUaCP4B7_1eJlLELRYB0LmyDC1uaH2s2z0x0Gn6RuHc-iVqdBCXrIDKs2PZMAtfX6VgvjTbfslM43_yf3uNVjwN6eJrGE0WOl6Foco6WPj746F6Fitsntt-Kze7l3JqPK32nSE21HLoFQ"/>
+<span class="font-label-md text-label-md text-on-surface-variant">Профиль</span>
+</div>
+</div>
+</nav>
+<!-- Main Content Area -->
+<main class="ml-64 flex-1 flex flex-col min-h-screen">
+<!-- TopAppBar (Shared Component) -->
+<header class="h-16 w-full sticky top-0 z-50 bg-surface dark:bg-background flex items-center justify-between px-lg max-w-full">
+<div class="flex items-center gap-xl">
+<h2 class="font-display-lg text-display-lg text-primary dark:text-primary-fixed-dim hidden">Sonic Intelligence</h2>
+<!-- Search Bar as requested -->
+<div class="relative w-64 lg:w-96">
+<span class="material-symbols-outlined absolute left-sm top-1/2 -translate-y-1/2 text-outline text-[20px]">search</span>
+<input class="w-full pl-xl pr-md py-sm bg-surface-container-lowest border border-outline-variant rounded-lg font-body-md text-body-md text-on-surface focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all" placeholder="Поиск по архиву..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-xl">
+<nav class="hidden lg:flex items-center gap-lg">
+<a class="font-headline-sm text-headline-sm text-on-surface-variant dark:text-on-tertiary-container hover:text-primary dark:hover:text-inverse-primary transition-colors cursor-pointer" href="#">Прямая загрузка</a>
+<a class="font-headline-sm text-headline-sm text-on-surface-variant dark:text-on-tertiary-container hover:text-primary dark:hover:text-inverse-primary transition-colors cursor-pointer" href="#">Пакетная обработка</a>
+</nav>
+<div class="flex items-center gap-md border-l border-outline-variant/30 pl-lg">
+<button class="bg-surface-container-lowest border border-primary text-primary rounded-lg py-sm px-md font-label-md text-label-md hover:bg-primary/5 transition-colors cursor-pointer">
+                          Экспорт
+                      </button>
+<button class="bg-primary text-on-primary rounded-lg py-sm px-md font-label-md text-label-md shadow-sm hover:opacity-90 transition-opacity cursor-pointer">
+                          Новый проект
+                      </button>
+</div>
+<div class="flex items-center gap-sm">
+<button class="p-sm rounded-full text-on-surface-variant hover:bg-surface-container transition-colors cursor-pointer">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="p-sm rounded-full text-on-surface-variant hover:bg-surface-container transition-colors cursor-pointer">
+<span class="material-symbols-outlined" data-icon="account_circle">account_circle</span>
+</button>
+</div>
+</div>
+</header>
+<!-- Page Canvas -->
+<div class="flex-1 p-xl lg:p-2xl max-w-[1200px] w-full mx-auto">
+<div class="mb-xl flex items-end justify-between">
+<div>
+<h2 class="font-display-lg text-display-lg text-on-background mb-xs">Архив</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant">Управляйте завершенными расшифровками и пакетами файлов.</p>
+</div>
+</div>
+<!-- Custom Tabs Setup -->
+<div class="mb-xl border-b border-outline-variant/30">
+<div class="flex gap-lg" id="archive-tabs" role="tablist">
+<button aria-controls="panel-single" aria-selected="false" class="tab-btn font-headline-sm text-headline-sm py-md text-on-surface-variant hover:text-primary transition-colors relative" id="tab-single" role="tab">
+                        Одиночные файлы
+                        <div class="absolute bottom-0 left-0 w-full h-[2px] bg-primary hidden indicator"></div>
+</button>
+<button aria-controls="panel-packages" aria-selected="true" class="tab-btn font-headline-sm text-headline-sm py-md text-primary font-semibold relative" id="tab-packages" role="tab">
+                        Пакеты
+                        <div class="absolute bottom-0 left-0 w-full h-[2px] bg-primary indicator"></div>
+</button>
+</div>
+</div>
+<!-- Tab Panels -->
+<div class="relative w-full">
+<!-- Packages Panel (Active initially based on request highlighting 'Packages' design) -->
+<div aria-labelledby="tab-packages" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-lg" id="panel-packages" role="tabpanel">
+<!-- Package Card 1 -->
+<div class="bg-surface-container-lowest rounded-xl p-md shadow-[0px_4px_12px_rgba(0,0,0,0.05)] hover:shadow-[0px_8px_24px_rgba(0,0,0,0.08)] transition-shadow duration-300 border border-transparent hover:border-outline-variant/20 flex flex-col group cursor-pointer">
+<div class="flex justify-between items-start mb-md">
+<div class="w-12 h-12 rounded-lg bg-surface-container flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[24px]">folder_open</span>
+</div>
+<button class="text-on-surface-variant opacity-0 group-hover:opacity-100 transition-opacity p-sm hover:bg-surface-container rounded-full">
+<span class="material-symbols-outlined text-[20px]">more_vert</span>
+</button>
+</div>
+<h3 class="font-headline-sm text-headline-sm text-on-background mb-xs">Project Alpha</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mb-xl line-clamp-2">Quarterly earnings calls and stakeholder interviews.</p>
+<div class="mt-auto border-t border-outline-variant/20 pt-md flex items-center justify-between">
+<div class="flex items-center gap-xs text-outline">
+<span class="material-symbols-outlined text-[16px]">audio_file</span>
+<span class="font-label-md text-label-md">12 Файлов</span>
+</div>
+<div class="flex items-center gap-xs text-outline">
+<span class="material-symbols-outlined text-[16px]">schedule</span>
+<span class="font-label-md text-label-md">14h 30m</span>
+</div>
+</div>
+</div>
+<!-- Package Card 2 -->
+<div class="bg-surface-container-lowest rounded-xl p-md shadow-[0px_4px_12px_rgba(0,0,0,0.05)] hover:shadow-[0px_8px_24px_rgba(0,0,0,0.08)] transition-shadow duration-300 border border-transparent hover:border-outline-variant/20 flex flex-col group cursor-pointer">
+<div class="flex justify-between items-start mb-md">
+<div class="w-12 h-12 rounded-lg bg-surface-container flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[24px]">folder_open</span>
+</div>
+<button class="text-on-surface-variant opacity-0 group-hover:opacity-100 transition-opacity p-sm hover:bg-surface-container rounded-full">
+<span class="material-symbols-outlined text-[20px]">more_vert</span>
+</button>
+</div>
+<h3 class="font-headline-sm text-headline-sm text-on-background mb-xs">Conference Day 1</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mb-xl line-clamp-2">Keynotes and main stage presentations from TechSummit 2024.</p>
+<div class="mt-auto border-t border-outline-variant/20 pt-md flex items-center justify-between">
+<div class="flex items-center gap-xs text-outline">
+<span class="material-symbols-outlined text-[16px]">audio_file</span>
+<span class="font-label-md text-label-md">8 Файлов</span>
+</div>
+<div class="flex items-center gap-xs text-outline">
+<span class="material-symbols-outlined text-[16px]">schedule</span>
+<span class="font-label-md text-label-md">6h 15m</span>
+</div>
+</div>
+</div>
+<!-- Package Card 3 -->
+<div class="bg-surface-container-lowest rounded-xl p-md shadow-[0px_4px_12px_rgba(0,0,0,0.05)] hover:shadow-[0px_8px_24px_rgba(0,0,0,0.08)] transition-shadow duration-300 border border-transparent hover:border-outline-variant/20 flex flex-col group cursor-pointer">
+<div class="flex justify-between items-start mb-md">
+<div class="w-12 h-12 rounded-lg bg-surface-container flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[24px]">folder_open</span>
+</div>
+<button class="text-on-surface-variant opacity-0 group-hover:opacity-100 transition-opacity p-sm hover:bg-surface-container rounded-full">
+<span class="material-symbols-outlined text-[20px]">more_vert</span>
+</button>
+</div>
+<h3 class="font-headline-sm text-headline-sm text-on-background mb-xs">Legal Depositions</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mb-xl line-clamp-2">Smith v. State confidential recordings. Redacted versions.</p>
+<div class="mt-auto border-t border-outline-variant/20 pt-md flex items-center justify-between">
+<div class="flex items-center gap-xs text-outline">
+<span class="material-symbols-outlined text-[16px]">audio_file</span>
+<span class="font-label-md text-label-md">24 Файлов</span>
+</div>
+<div class="flex items-center gap-xs text-outline">
+<span class="material-symbols-outlined text-[16px]">schedule</span>
+<span class="font-label-md text-label-md">32h 00m</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Single Files Panel -->
+<div aria-labelledby="tab-single" class="hidden flex-col gap-sm" id="panel-single" role="tabpanel">
+<!-- Table Header -->
+<div class="grid grid-cols-12 gap-sm px-md py-sm font-label-md text-label-md text-on-surface-variant uppercase tracking-wider border-b border-outline-variant/30 mb-sm">
+<div class="col-span-5">Имя</div>
+<div class="col-span-2">Дата</div>
+<div class="col-span-2">Длительность</div>
+<div class="col-span-2">Статус</div>
+<div class="col-span-1 text-right">Действия</div>
+</div>
+<!-- List Item 1 -->
+<div class="bg-surface-container-lowest rounded-xl p-md flex items-center grid grid-cols-12 gap-sm shadow-[0px_4px_12px_rgba(0,0,0,0.05)] hover:shadow-[0px_8px_24px_rgba(0,0,0,0.08)] transition-shadow duration-300">
+<div class="col-span-5 flex items-center gap-md">
+<div class="w-10 h-10 rounded-lg bg-surface-container flex items-center justify-center shrink-0 text-primary">
+<span class="material-symbols-outlined text-[20px]">description</span>
+</div>
+<div>
+<h4 class="font-headline-sm text-headline-sm text-on-background truncate">Interview_John_Doe_Final.wav</h4>
+<div class="w-48 h-[4px] bg-surface-variant rounded-full mt-2 hidden">
+<div class="h-full bg-primary rounded-full w-full"></div>
+</div>
+</div>
+</div>
+<div class="col-span-2 font-body-md text-body-md text-outline">Oct 24, 2023</div>
+<div class="col-span-2 font-body-md text-body-md text-outline">01:45:22</div>
+<div class="col-span-2">
+<span class="inline-flex items-center px-2 py-1 rounded text-label-md font-label-md uppercase bg-primary/10 text-primary">Готов</span>
+</div>
+<div class="col-span-1 flex items-center justify-end gap-xs text-on-surface-variant">
+<button class="p-xs hover:bg-surface-container rounded transition-colors" title="Download">
+<span class="material-symbols-outlined text-[18px]">download</span>
+</button>
+<button class="p-xs hover:bg-error-container hover:text-error rounded transition-colors" title="Delete">
+<span class="material-symbols-outlined text-[18px]">delete</span>
+</button>
+</div>
+</div>
+<!-- List Item 2 -->
+<div class="bg-surface-container-lowest rounded-xl p-md flex items-center grid grid-cols-12 gap-sm shadow-[0px_4px_12px_rgba(0,0,0,0.05)] hover:shadow-[0px_8px_24px_rgba(0,0,0,0.08)] transition-shadow duration-300">
+<div class="col-span-5 flex items-center gap-md">
+<div class="w-10 h-10 rounded-lg bg-surface-container flex items-center justify-center shrink-0 text-primary">
+<span class="material-symbols-outlined text-[20px]">mic</span>
+</div>
+<div class="w-full">
+<h4 class="font-headline-sm text-headline-sm text-on-background truncate">Weekly_Sync_Marketing.mp3</h4>
+<div class="w-full max-w-[200px] h-[4px] bg-surface-variant rounded-full mt-2">
+<div class="h-full bg-primary rounded-full w-[65%]"></div>
+</div>
+</div>
+</div>
+<div class="col-span-2 font-body-md text-body-md text-outline">Oct 26, 2023</div>
+<div class="col-span-2 font-body-md text-body-md text-outline">00:55:10</div>
+<div class="col-span-2">
+<span class="inline-flex items-center px-2 py-1 rounded text-label-md font-label-md uppercase bg-secondary-container/30 text-on-secondary-container">В обработке</span>
+</div>
+<div class="col-span-1 flex items-center justify-end gap-xs text-on-surface-variant">
+<button class="p-xs hover:bg-surface-container rounded transition-colors opacity-50 cursor-not-allowed" disabled="" title="Download">
+<span class="material-symbols-outlined text-[18px]">download</span>
+</button>
+<button class="p-xs hover:bg-error-container hover:text-error rounded transition-colors" title="Delete">
+<span class="material-symbols-outlined text-[18px]">delete</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<script>
+        // Simple vanilla JS for tab switching
+        document.addEventListener('DOMContentLoaded', () => {
+            const tabs = document.querySelectorAll('.tab-btn');
+            const panels = document.querySelectorAll('[role="tabpanel"]');
+
+            tabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    // Reset all tabs
+                    tabs.forEach(t => {
+                        t.setAttribute('aria-selected', 'false');
+                        t.classList.remove('text-primary', 'font-semibold');
+                        t.classList.add('text-on-surface-variant');
+                        t.querySelector('.indicator').classList.add('hidden');
+                    });
+
+                    // Set active tab
+                    tab.setAttribute('aria-selected', 'true');
+                    tab.classList.remove('text-on-surface-variant');
+                    tab.classList.add('text-primary', 'font-semibold');
+                    tab.querySelector('.indicator').classList.remove('hidden');
+
+                    // Show corresponding panel
+                    const controls = tab.getAttribute('aria-controls');
+                    panels.forEach(panel => {
+                        if(panel.id === controls) {
+                            panel.classList.remove('hidden');
+                            if(controls === 'panel-packages') {
+                                panel.classList.add('grid');
+                            } else {
+                                panel.classList.add('flex');
+                            }
+                        } else {
+                            panel.classList.add('hidden');
+                            panel.classList.remove('grid', 'flex');
+                        }
+                    });
+                });
+            });
+        });
+    </script>
+</body></html>

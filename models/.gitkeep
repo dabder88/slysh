@@ -1,0 +1,2 @@
+# Keep this folder for local/copied ASR weights (GigaAM ckpt, faster-whisper snapshots).
+# Do not commit large model files.

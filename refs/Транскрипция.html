@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+
+<html class="h-full" lang="ru"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Sonic Intelligence - Редактор транскрипций</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-background": "#121c2c",
+                        "on-secondary-container": "#11278e",
+                        "inverse-on-surface": "#ebf1ff",
+                        "surface-tint": "#4c56af",
+                        "error-container": "#ffdad6",
+                        "surface-container-high": "#dee8ff",
+                        "surface-dim": "#d0daf0",
+                        "tertiary-fixed": "#e0e2ee",
+                        "on-primary-container": "#8690ee",
+                        "surface-container-low": "#f0f3ff",
+                        "on-primary-fixed": "#000767",
+                        "outline-variant": "#c6c5d4",
+                        "secondary-fixed-dim": "#bac3ff",
+                        "surface-container-lowest": "#ffffff",
+                        "tertiary-container": "#2c3039",
+                        "on-primary-fixed-variant": "#343d96",
+                        "on-secondary-fixed-variant": "#293ca0",
+                        "error": "#ba1a1a",
+                        "tertiary": "#181b23",
+                        "inverse-primary": "#bdc2ff",
+                        "on-error": "#ffffff",
+                        "background": "#f9f9ff",
+                        "secondary-fixed": "#dee0ff",
+                        "primary-container": "#1a237e",
+                        "primary": "#000666",
+                        "primary-fixed-dim": "#bdc2ff",
+                        "on-surface": "#121c2c",
+                        "outline": "#767683",
+                        "surface-bright": "#f9f9ff",
+                        "inverse-surface": "#273141",
+                        "on-tertiary": "#ffffff",
+                        "on-secondary-fixed": "#00105c",
+                        "secondary-container": "#8596ff",
+                        "surface-variant": "#d9e3f9",
+                        "on-secondary": "#ffffff",
+                        "on-primary": "#ffffff",
+                        "tertiary-fixed-dim": "#c4c6d2",
+                        "secondary": "#4355b9",
+                        "on-surface-variant": "#454652",
+                        "on-error-container": "#93000a",
+                        "on-tertiary-fixed-variant": "#434750",
+                        "on-tertiary-container": "#9597a2",
+                        "surface-container-highest": "#d9e3f9",
+                        "on-tertiary-fixed": "#181b24",
+                        "surface": "#f9f9ff",
+                        "primary-fixed": "#e0e0ff",
+                        "surface-container": "#e7eeff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "xs": "4px",
+                        "2xl": "48px",
+                        "sm": "8px",
+                        "base": "4px",
+                        "gutter": "24px",
+                        "xl": "32px",
+                        "margin": "32px",
+                        "grid_columns": "12",
+                        "lg": "24px",
+                        "md": "16px"
+                    },
+                    "fontFamily": {
+                        "headline-md": ["Inter"],
+                        "headline-sm": ["Inter"],
+                        "display-lg": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "headline-md-mobile": ["Inter"],
+                        "label-md": ["Inter"],
+                        "body-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-md": ["24px", { "lineHeight": "1.3", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "headline-sm": ["18px", { "lineHeight": "1.4", "fontWeight": "600" }],
+                        "display-lg": ["32px", { "lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-lg": ["16px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                        "headline-md-mobile": ["20px", { "lineHeight": "1.3", "fontWeight": "600" }],
+                        "label-md": ["12px", { "lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "body-md": ["14px", { "lineHeight": "1.5", "fontWeight": "400" }]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-family: 'Material Symbols Outlined';
+            font-weight: normal;
+            font-style: normal;
+            font-size: 24px;
+            line-height: 1;
+            letter-spacing: normal;
+            text-transform: none;
+            display: inline-block;
+            white-space: nowrap;
+            word-wrap: normal;
+            direction: ltr;
+            font-feature-settings: 'liga';
+            -webkit-font-feature-settings: 'liga';
+            -webkit-font-smoothing: antialiased;
+        }
+        
+        /* Custom scrollbar for transcripts */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background-color: #d9e3f9;
+            border-radius: 9999px;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md h-full flex overflow-hidden">
+<!-- SideNavBar (Shared Component) -->
+<nav class="w-64 h-screen fixed left-0 top-0 bg-surface-container-lowest shadow-sm flex flex-col py-xl px-md z-50">
+<div class="mb-xl flex items-center gap-sm">
+<span class="font-display-lg text-display-lg text-primary truncate">Sonic Intelligence</span>
+</div>
+<div class="mb-lg">
+<button class="w-full bg-primary-container text-on-primary-container font-label-md text-label-md py-sm px-md rounded-lg flex items-center justify-center gap-sm hover:opacity-90 transition-opacity">
+<span class="material-symbols-outlined" data-icon="upload" data-weight="fill" style="font-variation-settings: 'FILL' 1;">upload</span>
+                Загрузить аудио
+            </button>
+</div>
+<ul class="flex flex-col gap-xs flex-1">
+<!-- Active state logic: Not on Dashboard, Queue, or Archive. Closest match is Transcripts for an editor -->
+<li>
+<a class="flex items-center gap-md py-sm px-md rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-label-md text-label-md">Панель управления</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-md py-sm px-md rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="pending_actions">pending_actions</span>
+<span class="font-label-md text-label-md">Очередь</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-md py-sm px-md rounded-lg text-primary font-bold border-r-4 border-primary bg-surface-container-low active:scale-95 transition-transform duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="description" data-weight="fill" style="font-variation-settings: 'FILL' 1;">description</span>
+<span class="font-label-md text-label-md">Транскрипции</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-md py-sm px-md rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="folder_shared">folder_shared</span>
+<span class="font-label-md text-label-md">Архив</span>
+</a>
+</li>
+</ul>
+<div class="mt-auto flex flex-col gap-xs border-t border-surface-variant pt-md">
+<a class="flex items-center gap-md py-sm px-md rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-label-md text-label-md">Настройки</span>
+</a>
+<a class="flex items-center gap-md py-sm px-md rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="help">help</span>
+<span class="font-label-md text-label-md">Поддержка</span>
+</a>
+<div class="flex items-center gap-md py-sm px-md mt-sm">
+<img class="w-8 h-8 rounded-full object-cover" data-alt="A small, circular avatar image of a professional woman in a bright, modern office setting, representing a user profile. Soft lighting, minimalist aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDSCaEkscNtBn417jyKrvNtK0RK_J90G-T6Su6fDEV0V4Qb18ATNyGw5vE675qeSnqAoiMbH37rxETymAfccqub9yg8WyS2rG-fNOpwlLCYGlSo9mVizUjD_UKAF_ET74hy3Xr6BuYk-d3XEND-1T7cLnCYTMak1u_Rj0JMGd0yjS1l0SRjzFtarezuNSDLBG_Sem-yyNhcLXj4MRkksAT1yWWK6w3Kre6j9uNLEfsKvBiz4p2sE7uvbA"/>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface">Jane Doe</span>
+<span class="font-body-md text-[10px] text-on-surface-variant">Про-план</span>
+</div>
+</div>
+</div>
+</nav>
+<!-- Main Content Area -->
+<div class="flex-1 flex flex-col ml-64 h-full relative">
+<!-- TopAppBar (Shared Component) -->
+<header class="h-16 w-full sticky top-0 z-40 bg-surface flex items-center justify-between px-lg max-w-full border-b border-surface-variant">
+<div class="flex items-center gap-lg">
+<h1 class="font-headline-sm text-headline-sm text-on-surface">Проект: Q3 Earnings Call</h1>
+<span class="bg-surface-container-low text-primary px-sm py-[2px] rounded font-label-md text-[10px] uppercase tracking-wider">РЕДАКТИРОВАНИЕ</span>
+</div>
+<div class="flex items-center gap-md">
+<button class="bg-surface-container-lowest border border-primary text-primary font-label-md text-label-md py-sm px-md rounded-lg hover:bg-surface-container-low transition-colors">
+                    Поделиться
+                </button>
+<button class="bg-primary text-on-primary font-label-md text-label-md py-sm px-md rounded-lg flex items-center gap-xs hover:bg-primary-fixed-variant transition-colors">
+<span class="material-symbols-outlined text-[18px]" data-icon="download">download</span>
+                    Экспорт
+                </button>
+</div>
+</header>
+<!-- Editor Layout -->
+<main class="flex-1 flex overflow-hidden">
+<!-- Left Column: Audio Player (Fixed) -->
+<section class="w-1/3 min-w-[320px] max-w-[400px] border-r border-surface-variant bg-surface-container-lowest p-lg flex flex-col h-full z-10 shadow-[4px_0_12px_rgba(0,0,0,0.02)]">
+<div class="flex flex-col gap-md mb-xl">
+<h2 class="font-headline-sm text-headline-sm text-on-surface">Источник аудио</h2>
+<div class="text-on-surface-variant font-body-md text-body-md text-sm">
+                        Q3_Earnings_Call_Raw.mp3
+                    </div>
+</div>
+<!-- Waveform Placeholder -->
+<div class="w-full h-32 bg-surface-container-low rounded-xl border border-surface-variant flex items-center justify-center mb-lg relative overflow-hidden group">
+<!-- Conceptual Waveform rendering via background -->
+<div class="bg-cover bg-center w-full h-full opacity-60" data-alt="A high-contrast, minimalist digital audio waveform visualization against a clean, light surface background. The waveform lines are precise, alternating between deep indigo and soft gray to indicate played and unplayed segments. Premium, utilitarian aesthetic." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCOLTjVXSmQmHJ6_QxJkwQkp16T5PIeYkLkksc7Dxh5w-llBS61Suk5alKQfX_fjUokYkj7M5HBcL6MvOFN1G2IFXUn4MyVrorAFoskiZ3JUEhIGeipO6LugAFRB6f3azzaORqhblCsbZpZneExa2fUa5pLHgnl2fdasEDcOJWAyvd-yp271JTJrBAJUFc0nZnXgMyvuioLZ-tl0Z2NkkL-GhzdL7-8V7sIY-5wkEnRshLPy7v6CVVn1g')"></div>
+<!-- Playhead -->
+<div class="absolute left-1/3 top-0 bottom-0 w-[2px] bg-primary"></div>
+<div class="absolute left-1/3 top-2 w-2 h-2 -ml-[3px] rounded-full bg-primary shadow-sm"></div>
+</div>
+<!-- Controls -->
+<div class="flex flex-col gap-lg mt-auto pb-xl">
+<!-- Progress / Time -->
+<div class="flex justify-between font-label-md text-label-md text-on-surface-variant">
+<span>12:45</span>
+<span>45:30</span>
+</div>
+<!-- Main Buttons -->
+<div class="flex items-center justify-center gap-md">
+<button class="text-on-surface-variant hover:text-primary transition-colors p-sm rounded-full hover:bg-surface-container">
+<span class="material-symbols-outlined text-[28px]" data-icon="replay_10">replay_10</span>
+</button>
+<button class="bg-primary text-on-primary w-14 h-14 rounded-full flex items-center justify-center shadow-[0px_4px_12px_rgba(0,0,0,0.1)] hover:scale-105 transition-transform">
+<span class="material-symbols-outlined text-[32px]" data-icon="play_arrow" data-weight="fill" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+<button class="text-on-surface-variant hover:text-primary transition-colors p-sm rounded-full hover:bg-surface-container">
+<span class="material-symbols-outlined text-[28px]" data-icon="forward_10">forward_10</span>
+</button>
+</div>
+<!-- Speed & Settings -->
+<div class="flex items-center justify-between border-t border-surface-variant pt-md mt-sm">
+<button class="flex items-center gap-xs text-on-surface-variant font-label-md text-label-md hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined text-[18px]" data-icon="speed">speed</span>
+                            1.0x
+                        </button>
+<button class="flex items-center gap-xs text-on-surface-variant font-label-md text-label-md hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined text-[18px]" data-icon="tune">tune</span>
+                            Улучшить
+                        </button>
+</div>
+</div>
+</section>
+<!-- Center Column: Transcript -->
+<section class="flex-1 flex flex-col bg-background h-full relative">
+<div class="p-md border-b border-surface-variant flex justify-between items-center bg-surface-container-lowest/80 backdrop-blur-sm sticky top-0 z-20">
+<div class="flex gap-sm">
+<button class="px-md py-sm rounded-lg bg-surface-container text-on-surface font-label-md text-label-md">Просмотр</button>
+<button class="px-md py-sm rounded-lg bg-surface-container-lowest border border-outline-variant text-on-surface-variant font-label-md text-label-md hover:bg-surface-container transition-colors">Правка</button>
+</div>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-sm top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px]" data-icon="search">search</span>
+<input class="pl-xl pr-sm py-[6px] rounded-lg border border-outline-variant bg-surface-container-lowest text-body-md font-body-md w-64 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-outline" placeholder="Поиск по тексту..." type="text"/>
+</div>
+</div>
+<!-- Transcript Content -->
+<div class="flex-1 overflow-y-auto p-xl custom-scrollbar flex flex-col gap-xl">
+<!-- Block 1 -->
+<div class="flex gap-md group">
+<div class="w-24 shrink-0 flex flex-col items-end text-right gap-xs pt-1">
+<span class="font-label-md text-label-md text-primary font-bold">Спикер 1</span>
+<span class="font-body-md text-[12px] text-outline">12:45</span>
+</div>
+<div class="flex-1 p-md rounded-xl bg-surface-container-lowest border border-transparent group-hover:border-outline-variant transition-colors shadow-[0px_4px_12px_rgba(0,0,0,0.02)]">
+<p class="font-body-lg text-body-lg text-on-background leading-relaxed">
+                                 Welcome everyone to the Q3 earnings call. I'll hand it over to Sarah to discuss the primary revenue drivers for this quarter, particularly highlighting the growth in our enterprise segment.
+                             </p>
+</div>
+</div>
+<!-- Block 2 (Active/Highlight) -->
+<div class="flex gap-md group relative">
+<div class="absolute -left-lg top-4 w-1 h-8 bg-primary rounded-r-md"></div>
+<div class="w-24 shrink-0 flex flex-col items-end text-right gap-xs pt-1">
+<span class="font-label-md text-label-md text-secondary font-bold">Спикер 2</span>
+<span class="font-body-md text-[12px] text-outline">12:52</span>
+</div>
+<div class="flex-1 p-md rounded-xl bg-surface-container-low border border-primary-fixed-dim transition-colors shadow-[0px_4px_12px_rgba(0,0,0,0.05)]">
+<p class="font-body-lg text-body-lg text-on-background leading-relaxed">
+<span class="bg-secondary-fixed/50 rounded px-1">Thank you. As you can see from the preliminary reports,</span> our enterprise adoption has increased by roughly 24% year-over-year. This was largely driven by the new features rolled out in August.
+                             </p>
+<!-- Edit Tools overlay (appears on active/hover) -->
+<div class="mt-sm flex gap-sm justify-end">
+<button class="p-xs text-on-surface-variant hover:text-primary transition-colors"><span class="material-symbols-outlined text-[16px]" data-icon="edit">edit</span></button>
+<button class="p-xs text-on-surface-variant hover:text-primary transition-colors"><span class="material-symbols-outlined text-[16px]" data-icon="content_copy">content_copy</span></button>
+</div>
+</div>
+</div>
+<!-- Block 3 -->
+<div class="flex gap-md group">
+<div class="w-24 shrink-0 flex flex-col items-end text-right gap-xs pt-1">
+<span class="font-label-md text-label-md text-primary font-bold">Спикер 1</span>
+<span class="font-body-md text-[12px] text-outline">13:10</span>
+</div>
+<div class="flex-1 p-md rounded-xl bg-surface-container-lowest border border-transparent group-hover:border-outline-variant transition-colors shadow-[0px_4px_12px_rgba(0,0,0,0.02)]">
+<p class="font-body-lg text-body-lg text-on-background leading-relaxed">
+                                 That's excellent. Are we expecting similar momentum going into Q4, considering the typical seasonal dip we see in December?
+                             </p>
+</div>
+</div>
+<div class="h-32"></div> <!-- Scroll padding -->
+</div>
+</section>
+<!-- Right Column: Package Context (Sidebar) -->
+<aside class="w-72 border-l border-surface-variant bg-surface-container-lowest p-md flex flex-col h-full shadow-[-4px_0_12px_rgba(0,0,0,0.02)] z-10">
+<div class="flex items-center gap-sm mb-lg px-xs">
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="inventory_2">inventory_2</span>
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Контекст пакета</h3>
+</div>
+<div class="flex flex-col gap-sm overflow-y-auto custom-scrollbar pr-xs">
+<!-- Active File -->
+<div class="p-sm rounded-lg bg-surface-container border border-surface-variant flex flex-col gap-xs cursor-pointer">
+<div class="flex items-center justify-between">
+<span class="font-label-md text-label-md text-on-surface truncate">Q3_Earnings_Call_Raw.mp3</span>
+<span class="material-symbols-outlined text-[16px] text-primary" data-icon="mic" data-weight="fill" style="font-variation-settings: 'FILL' 1;">mic</span>
+</div>
+<div class="flex items-center justify-between text-on-surface-variant font-body-md text-[11px]">
+<span>45:30</span>
+<span class="text-primary">РЕДАКТИРОВАНИЕ</span>
+</div>
+</div>
+<!-- Other Files -->
+<div class="p-sm rounded-lg bg-surface-container-lowest border border-transparent hover:border-surface-variant hover:bg-surface-container/50 flex flex-col gap-xs cursor-pointer transition-colors">
+<div class="flex items-center justify-between">
+<span class="font-label-md text-label-md text-on-surface-variant truncate">Pre_Call_Notes.docx</span>
+<span class="material-symbols-outlined text-[16px] text-on-surface-variant" data-icon="description">description</span>
+</div>
+<div class="flex items-center justify-between text-outline font-body-md text-[11px]">
+<span>2 pages</span>
+<span>Ссылка</span>
+</div>
+</div>
+<div class="p-sm rounded-lg bg-surface-container-lowest border border-transparent hover:border-surface-variant hover:bg-surface-container/50 flex flex-col gap-xs cursor-pointer transition-colors">
+<div class="flex items-center justify-between">
+<span class="font-label-md text-label-md text-on-surface-variant truncate">Q&amp;A_Session_Backup.mp3</span>
+<span class="material-symbols-outlined text-[16px] text-on-surface-variant" data-icon="mic">mic</span>
+</div>
+<div class="flex items-center justify-between text-outline font-body-md text-[11px]">
+<span>15:20</span>
+<span>В ожидании</span>
+</div>
+</div>
+</div>
+<div class="mt-auto pt-md border-t border-surface-variant">
+<button class="w-full text-on-surface-variant font-label-md text-label-md py-sm px-md rounded-lg flex items-center justify-center gap-xs hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined text-[18px]" data-icon="add">add</span>
+                        Добавить в пакет
+                    </button>
+</div>
+</aside>
+</main>
+</div>
+</body></html>

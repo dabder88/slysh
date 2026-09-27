@@ -1,0 +1,1673 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>Slysh</title>
+  <link rel="icon" href="/branding/favicon-32.png" type="image/png" sizes="32x32">
+  <link rel="stylesheet" href="/app.css?v=114">
+  <style>
+    .boot-error {
+      position: fixed;
+      inset: 0 auto auto 0;
+      right: 0;
+      z-index: 10000;
+      padding: 12px 16px;
+      background: #991b1b;
+      color: #fff;
+      font-size: 14px;
+      line-height: 1.4;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
+  </style>
+</head>
+<body class="is-booting">
+  <div id="boot-splash" class="boot-splash" role="status" aria-live="polite">
+    <div class="boot-splash-card">
+      <div class="boot-splash-row">
+        <div class="boot-splash-mark" aria-hidden="true">
+          <img class="boot-splash-logo" src="/branding/slysh-mark-48.png" alt="" width="36" height="36" decoding="async">
+        </div>
+        <div class="boot-splash-copy">
+          <div class="boot-splash-heading">
+            <p class="boot-splash-title">Slysh</p>
+            <span class="boot-splash-badge" data-i18n="firstRun.bootBadge">Десктоп</span>
+            <div class="boot-splash-wave" aria-hidden="true">
+              <span></span><span></span><span></span><span></span><span></span><span></span>
+            </div>
+          </div>
+          <p class="boot-splash-text" data-i18n="firstRun.bootLoading">Запуск Slysh…</p>
+        </div>
+      </div>
+      <div class="boot-splash-progress" aria-hidden="true"><span></span></div>
+    </div>
+  </div>
+  <div id="app-shell" class="app-shell">
+    <nav id="sidebar" class="sidebar" aria-label="Главная навигация">
+      <div class="sidebar-brand">
+        <div class="sidebar-logo" aria-hidden="true">
+          <img class="sidebar-logo-img" src="/branding/slysh-mark-48.png" alt="" width="40" height="40" decoding="async">
+        </div>
+        <div class="sidebar-brand-text">
+          <h1 class="sidebar-title">Slysh</h1>
+          <p class="sidebar-subtitle" data-i18n="page.a7253df3bd26">Транскрибатор</p>
+        </div>
+        <button type="button" id="btn-sidebar-toggle" class="sidebar-toggle icon-btn" title="Свернуть меню" aria-expanded="true" aria-controls="sidebar">
+          <span class="material-symbols-outlined" id="sidebar-toggle-icon">chevron_left</span>
+        </button>
+      </div>
+
+      <button type="button" id="btn-upload-cta" class="sidebar-cta">
+        <span class="material-symbols-outlined" aria-hidden="true">upload</span>
+        <span class="sidebar-cta-text" data-i18n="page.5d614e78c09c">Загрузить аудио</span>
+      </button>
+
+      <ul class="nav-list">
+        <li>
+          <button type="button" class="nav-link is-active" data-nav="nav-dashboard">
+            <span class="material-symbols-outlined" aria-hidden="true">dashboard</span>
+            <span class="nav-label" data-i18n="topbar.dashboard">Панель управления</span>
+          </button>
+        </li>
+        <li>
+          <button type="button" class="nav-link" data-nav="nav-queue">
+            <span class="material-symbols-outlined" aria-hidden="true">pending_actions</span>
+            <span class="nav-label" data-i18n="topbar.queue">Очередь</span>
+          </button>
+        </li>
+        <li>
+          <button type="button" class="nav-link" data-nav="nav-editor">
+            <span class="material-symbols-outlined" aria-hidden="true">description</span>
+            <span class="nav-label" data-i18n="topbar.transcripts">Расшифровки</span>
+          </button>
+        </li>
+        <li>
+          <button type="button" class="nav-link" data-nav="nav-archive">
+            <span class="material-symbols-outlined" aria-hidden="true">folder_shared</span>
+            <span class="nav-label" data-i18n="topbar.archive">Архив</span>
+          </button>
+        </li>
+        <li>
+          <button type="button" class="nav-link" data-nav="nav-legacy">
+            <span class="material-symbols-outlined" aria-hidden="true">inventory_2</span>
+            <span class="nav-label" data-i18n="topbar.legacy">Файлы и пакеты</span>
+          </button>
+        </li>
+        <li>
+          <button type="button" class="nav-link" data-nav="nav-live">
+            <span class="material-symbols-outlined" aria-hidden="true">mic</span>
+            <span class="nav-label" data-i18n="topbar.live">Диктофон</span>
+          </button>
+        </li>
+        <li>
+          <button type="button" class="nav-link" data-nav="nav-meeting">
+            <span class="material-symbols-outlined" aria-hidden="true">headset_mic</span>
+            <span class="nav-label" data-i18n="topbar.meeting">Запись встречи</span>
+          </button>
+        </li>
+        <li>
+          <button type="button" class="nav-link" data-nav="nav-youtube">
+            <span class="material-symbols-outlined" aria-hidden="true">video_library</span>
+            <span class="nav-label">YouTube</span>
+          </button>
+        </li>
+      </ul>
+
+      <div class="sidebar-footer">
+        <ul class="nav-list">
+          <li id="nav-check-updates-wrap" hidden>
+            <button type="button" id="btn-check-updates" class="nav-link">
+              <span class="material-symbols-outlined" aria-hidden="true">system_update</span>
+              <span class="nav-label" data-i18n="updates.checkMenu">Проверить обновления</span>
+            </button>
+          </li>
+          <li>
+            <button type="button" class="nav-link" data-nav="nav-settings">
+              <span class="material-symbols-outlined" aria-hidden="true">settings</span>
+              <span class="nav-label" data-i18n="settings.title">Настройки</span>
+            </button>
+          </li>
+        </ul>
+      </div>
+    </nav>
+
+    <div class="main-area">
+      <header id="topbar" class="topbar">
+        <div class="topbar-inner">
+          <button type="button" id="btn-topbar-back" class="icon-btn topbar-back" title="Назад" hidden>
+            <span class="material-symbols-outlined" aria-hidden="true">arrow_back</span>
+          </button>
+          <h2 id="topbar-title" class="section-title" hidden></h2>
+          <nav id="topbar-tabs" class="topbar-tabs">
+            <button type="button" id="topbar-tab-single" class="topbar-tab is-active" data-i18n="page.ad41559a4ca7">Прямая загрузка</button>
+            <button type="button" id="topbar-tab-batch" class="topbar-tab" data-i18n="page.c3c5cb4ce7f5">Пакетная обработка</button>
+          </nav>
+        </div>
+        <div id="topbar-actions" class="topbar-actions" hidden>
+          <button type="button" id="btn-queue-pause-all" class="btn-outline btn-compact" hidden>
+            <span class="material-symbols-outlined" aria-hidden="true">pause_circle</span>
+            <span data-i18n="page.2bdcc8f6264f">Пауза всех</span>
+          </button>
+          <button type="button" id="btn-topbar-transcribe" class="btn-primary btn-compact" hidden>
+            <span class="material-symbols-outlined" aria-hidden="true">graphic_eq</span>
+            <span data-i18n="page.b4327dd21040">Расшифровать</span>
+          </button>
+          <button type="button" id="btn-topbar-stop" class="btn-outline btn-compact" hidden>
+            <span class="material-symbols-outlined" aria-hidden="true">stop</span>
+            <span data-i18n="page.d4f447c13032">Остановить</span>
+          </button>
+          <button type="button" id="btn-topbar-export" class="btn-primary btn-compact" hidden>
+            <span class="material-symbols-outlined" aria-hidden="true">download</span>
+            <span data-i18n="page.dd5016c82982">Экспорт</span>
+          </button>
+        </div>
+      </header>
+
+      <div id="view-port" class="view-port">
+        <!-- Dashboard -->
+        <section id="view-dashboard" class="view is-active">
+          <div class="bento-grid">
+            <div id="dashboard-single-card" class="card card-accent">
+              <div class="card-header">
+                <h2 class="card-title" data-i18n="page.e46b2ed83a92">Загрузка файлов</h2>
+                <span class="badge" data-i18n="page.7f71b1618ec2">Аудио / Видео</span>
+              </div>
+              <div id="dashboard-drop-zone" class="drop-zone" data-drop-target="single">
+                <div class="drop-zone-body">
+                  <div class="drop-icon" aria-hidden="true">
+                    <span class="material-symbols-outlined ms-lg">cloud_upload</span>
+                  </div>
+                  <p class="drop-zone-title" data-i18n="page.42f3e3c420e8">Перетащите файлы сюда</p>
+                  <p class="hint drop-zone-hint" data-i18n="page.29ccaa3cbd1d">Поддерживаются .mp3, .wav, .mp4 и другие форматы</p>
+                </div>
+                <div class="drop-zone-actions">
+                  <button type="button" id="btn-dashboard-pick-files" class="btn-outline" data-i18n="page.8ff8f4203a10">Выбрать файлы</button>
+                </div>
+              </div>
+              <div class="compute-bar">
+                <span class="hint" data-i18n="page.f023c8d6d7c4">Движок обработки:</span>
+                <div class="compute-toggle" id="dashboard-compute-toggle">
+                  <button type="button" data-compute="auto" class="is-active" data-i18n="page.5695330ffb54">Авто</button>
+                  <button type="button" data-compute="gpu">GPU</button>
+                  <button type="button" data-compute="cpu">CPU</button>
+                </div>
+              </div>
+              <p id="dashboard-compute-hint" class="hint compute-hint-spaced"></p>
+            </div>
+
+            <div id="dashboard-batch-card" class="card">
+              <div class="card-header">
+                <h2 class="card-title" data-i18n="page.c3c5cb4ce7f5">Пакетная обработка</h2>
+                <span class="badge badge-secondary" data-i18n="page.002f58b9b230">Несколько файлов</span>
+              </div>
+              <p class="hint card-desc" data-i18n="page.d7828e302314">Обработка папок и нескольких файлов с правилами экспорта.</p>
+              <div id="dashboard-batch-drop" class="batch-stack" data-drop-target="batch">
+                <button type="button" id="btn-dashboard-batch-folder" class="batch-action">
+                  <div class="batch-action-icon">
+                    <span class="material-symbols-outlined ms-md">folder_open</span>
+                  </div>
+                  <div class="batch-action-body">
+                    <div class="batch-action-title" data-i18n="dashboard.batchPickFolderTitle">Выбрать папку</div>
+                    <div class="hint" data-i18n="dashboard.batchPickFolderHint">Сканировать медиафайлы в папке</div>
+                  </div>
+                  <span class="material-symbols-outlined" aria-hidden="true">chevron_right</span>
+                </button>
+                <button type="button" id="btn-dashboard-batch-files" class="batch-action">
+                  <div class="batch-action-icon">
+                    <span class="material-symbols-outlined ms-md">library_music</span>
+                  </div>
+                  <div class="batch-action-body">
+                    <div class="batch-action-title" data-i18n="dashboard.batchAddFilesTitle">Добавить файлы</div>
+                    <div class="hint" data-i18n="dashboard.batchAddFilesHint">Выбор нескольких файлов</div>
+                  </div>
+                  <span class="material-symbols-outlined" aria-hidden="true">chevron_right</span>
+                </button>
+                <button type="button" id="btn-dashboard-new-batch" class="btn-outline batch-new-btn" data-i18n="page.29f41a1bc81c">Новый пакет</button>
+              </div>
+            </div>
+          </div>
+
+          <section class="dashboard-recent">
+            <div class="section-header">
+              <h3 class="section-title" data-i18n="page.03784b87b6d9">Быстрый доступ</h3>
+              <a href="#" id="btn-view-all" class="hint section-link" data-i18n="page.75ee9d959ca4">Открыть файлы</a>
+            </div>
+            <div id="recent-grid" class="recent-grid"></div>
+          </section>
+        </section>
+
+        <!-- Queue -->
+        <section id="view-queue" class="view">
+          <div id="queue-metrics" class="queue-metrics"></div>
+
+          <h3 class="queue-section-title queue-section-title--live">
+            <span class="queue-live-dot" aria-hidden="true"></span>
+            <span data-i18n="queue.activeTranscriptions">Активные расшифровки</span>
+          </h3>
+          <div id="queue-active-list" class="queue-active-list"></div>
+        </section>
+
+        <!-- Transcripts -->
+        <section id="view-transcripts" class="view transcripts-view">
+          <div class="transcripts-page archive-page">
+            <div class="legacy-tabs">
+              <button type="button" class="legacy-tab is-active" data-tab="files" data-i18n="legacy.tabFiles">Файлы</button>
+              <button type="button" class="legacy-tab" data-tab="batches" data-i18n="legacy.tabBatches">Пакеты</button>
+            </div>
+            <p class="hint archive-lead" data-i18n="transcripts.lead">Готовые расшифровки: одиночные файлы и пакеты с хотя бы одной готовой записью.</p>
+            <div id="transcripts-files-wrap" class="archive-singles-wrap"></div>
+            <div id="transcripts-batches-wrap" class="archive-singles-wrap" hidden></div>
+          </div>
+        </section>
+
+        <!-- Editor -->
+        <section id="view-editor" class="view editor-view">
+          <div id="job-banner" class="job-banner editor-banner" hidden></div>
+          <div class="editor-layout" id="editor-layout">
+            <aside class="editor-panel editor-panel--player" id="editor-player-panel">
+              <div class="editor-panel-head editor-panel-head--toggle">
+                <div class="editor-panel-head-text">
+                  <h3 class="editor-panel-title" data-i18n="page.8290a3dbc0c8">Источник</h3>
+                  <p id="editor-source-name" class="hint editor-source-name"></p>
+                </div>
+                <button type="button" id="editor-toggle-player" class="icon-btn" title="Свернуть плеер" aria-expanded="true">
+                  <span class="material-symbols-outlined" id="editor-toggle-player-icon">expand_less</span>
+                </button>
+              </div>
+              <div id="editor-player-compact" class="editor-player-compact" hidden>
+                <button type="button" id="editor-play-compact" class="icon-btn" title="Воспроизведение">
+                  <span class="material-symbols-outlined is-filled">play_arrow</span>
+                </button>
+                <span id="editor-time-compact" class="hint editor-time-compact">0:00 / 0:00</span>
+              </div>
+              <div id="editor-player-body" class="editor-player-body">
+                <div id="editor-youtube-source" class="editor-youtube-source" hidden>
+                  <div class="editor-youtube-card">
+                    <div class="editor-youtube-hero">
+                      <a
+                        id="editor-youtube-thumb-link"
+                        class="editor-youtube-thumb-link"
+                        href="#"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        hidden
+                      >
+                        <img id="editor-youtube-thumb" class="editor-youtube-thumb" alt="" loading="lazy">
+                      </a>
+                      <div class="editor-youtube-hero-body">
+                        <p class="editor-youtube-kicker" data-i18n="page.553c45f1b84a">Тема</p>
+                        <h4 id="editor-youtube-title" class="editor-youtube-title"></h4>
+                        <a
+                          id="editor-youtube-open"
+                          class="btn-outline btn-compact editor-youtube-open"
+                          href="#"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <span class="material-symbols-outlined" aria-hidden="true">open_in_new</span>
+                          Открыть на YouTube
+                        </a>
+                      </div>
+                    </div>
+                    <dl class="editor-youtube-meta">
+                      <div class="editor-youtube-meta-row">
+                        <dt>Канал</dt>
+                        <dd id="editor-youtube-channel">—</dd>
+                      </div>
+                      <div class="editor-youtube-meta-row">
+                        <dt>Длительность</dt>
+                        <dd id="editor-youtube-duration">—</dd>
+                      </div>
+                      <div class="editor-youtube-meta-row">
+                        <dt>Опубликовано</dt>
+                        <dd id="editor-youtube-uploaded">—</dd>
+                      </div>
+                    </dl>
+                    <details id="editor-youtube-chapters" class="editor-youtube-chapters" open>
+                      <summary data-i18n="editor.chaptersSummary">Таймкоды</summary>
+                      <ol id="editor-youtube-chapters-list" class="editor-youtube-chapters-list"></ol>
+                      <p id="editor-youtube-chapters-empty" class="hint editor-youtube-chapters-empty" hidden data-i18n="page.ec817d262e28">
+                        Таймкоды не указаны автором
+                      </p>
+                    </details>
+                  </div>
+                </div>
+                <canvas id="editor-waveform" class="editor-waveform" width="320" height="56" aria-hidden="true"></canvas>
+                <audio id="player" class="editor-audio"></audio>
+                <div class="editor-time-row">
+                  <span id="editor-time-current" class="hint">0:00</span>
+                  <span id="editor-time-total" class="hint">0:00</span>
+                </div>
+                <div class="editor-transport">
+                  <button type="button" id="editor-skip-back" class="icon-btn" title="−10 с">
+                    <span class="material-symbols-outlined">replay_10</span>
+                  </button>
+                  <button type="button" id="editor-play-toggle" class="editor-play-btn" title="Воспроизведение">
+                    <span class="material-symbols-outlined is-filled" id="editor-play-icon">play_arrow</span>
+                  </button>
+                  <button type="button" id="editor-skip-forward" class="icon-btn" title="+10 с">
+                    <span class="material-symbols-outlined">forward_10</span>
+                  </button>
+                </div>
+                <div class="editor-range">
+                  <div class="editor-range-row">
+                    <label class="editor-range-field">
+                      <span data-i18n="editor.rangeFrom">С</span>
+                      <input type="text" id="editor-range-start" inputmode="numeric" data-i18n-placeholder="editor.rangeStartPh" placeholder="начало" autocomplete="off">
+                    </label>
+                    <button type="button" id="editor-range-from-cursor" class="btn-outline btn-compact" data-i18n="page.4471d4d12b46">с курсора</button>
+                  </div>
+                  <div class="editor-range-row">
+                    <label class="editor-range-field">
+                      <span data-i18n="editor.rangeTo">До</span>
+                      <input type="text" id="editor-range-end" inputmode="numeric" data-i18n-placeholder="editor.rangeEndPh" placeholder="конец" autocomplete="off">
+                    </label>
+                    <button type="button" id="editor-range-to-cursor" class="btn-outline btn-compact" data-i18n="page.9e45af5d8f8c">до курсора</button>
+                  </div>
+                  <p class="hint editor-range-hint" data-i18n="page.5d48b34c249a">Пусто — весь файл. Клик по волне — перемотка, протянуть — интервал.</p>
+                </div>
+                <div class="editor-player-toolbar">
+                  <button type="button" id="btn-transcribe" class="btn-transcribe" disabled data-i18n="page.b4327dd21040">Расшифровать</button>
+                  <button type="button" id="btn-cancel" class="btn-stop" hidden data-i18n="page.d4f447c13032">Остановить</button>
+                  <button type="button" id="btn-retranscribe" hidden data-i18n="page.c0f8316f2739">Заново</button>
+                  <button type="button" id="btn-speakers" hidden data-i18n="page.9e8dc1ce7821">Распознать спикеров</button>
+                </div>
+              </div>
+              <details id="editor-speakers-details" class="editor-speakers-details">
+                <summary data-i18n="editor.speakerNames">Имена спикеров</summary>
+                <div id="speaker-rename" class="speaker-rename editor-speakers"></div>
+              </details>
+              <div id="editor-batch-in-source" class="editor-batch-in-source" hidden>
+                <div class="editor-batch-in-source-head">
+                  <h3 class="editor-panel-title" data-i18n="page.56c808257984">Пакет</h3>
+                  <button type="button" id="btn-editor-batch-export" class="btn-outline btn-compact editor-batch-export" hidden title="Экспортировать все готовые расшифровки пакета" data-i18n="page.7ce0a01efb55">
+                    Экспорт всех
+                  </button>
+                </div>
+                <div id="editor-batch-list" class="editor-batch-list"></div>
+              </div>
+            </aside>
+
+            <div id="editor-resizer-player" class="editor-resizer" role="separator" aria-orientation="vertical" aria-label="Ширина панели источника" tabindex="0"></div>
+
+            <main class="editor-panel editor-panel--main is-mode-view" id="editor-transcript-panel">
+              <div class="editor-panel-head editor-panel-head--toggle">
+                <div class="editor-panel-head-text">
+                  <h3 class="editor-panel-title" data-i18n="page.e617cd3f9e07">Расшифровка</h3>
+                </div>
+                <button type="button" id="editor-toggle-transcript" class="icon-btn" title="Скрыть расшифровку" aria-expanded="true">
+                  <span class="material-symbols-outlined" id="editor-toggle-transcript-icon">expand_less</span>
+                </button>
+              </div>
+              <div id="editor-transcript-compact" class="editor-transcript-compact" hidden>
+                <button type="button" id="editor-transcript-expand" class="icon-btn" title="Показать расшифровку">
+                  <span class="material-symbols-outlined">notes</span>
+                </button>
+                <span class="hint" data-i18n="page.e617cd3f9e07">Расшифровка</span>
+              </div>
+              <div id="editor-transcript-body" class="editor-transcript-body">
+              <div class="editor-toolbar">
+                <div class="editor-mode-tabs">
+                  <button type="button" id="editor-mode-view" class="editor-mode-tab is-active" data-i18n="page.ef4567f9236a">Просмотр</button>
+                  <button type="button" id="editor-mode-edit" class="editor-mode-tab" data-i18n="page.1f62f0ab48eb">Правка</button>
+                </div>
+                <label class="editor-search">
+                  <span class="material-symbols-outlined" aria-hidden="true">search</span>
+                  <input type="search" id="editor-search" data-i18n-placeholder="editor.searchPlaceholder" placeholder="Поиск по тексту…">
+                </label>
+              </div>
+              <div id="editor-segments" class="editor-segments"></div>
+              <p id="transcript-hint" class="hint editor-edit-hint" hidden data-i18n="page.5c838d5bdbac">
+                Строки с таймкодом [ЧЧ:ММ:СС]. Клик по строке перематывает запись.
+              </p>
+              <textarea id="transcript-edit" class="transcript-edit editor-textarea" hidden spellcheck="true"></textarea>
+              <div class="editor-main-footer">
+                <button type="button" id="btn-save" class="btn-primary btn-compact" hidden data-i18n="page.5f384074724e">Сохранить правки</button>
+                <div id="export-actions" class="export-actions" hidden>
+                  <span id="export-actions-path" class="hint"></span>
+                  <div class="export-actions-row">
+                    <button type="button" id="btn-open-export" class="btn-primary btn-compact">
+                      <span class="material-symbols-outlined" aria-hidden="true">draft</span>
+                      <span data-i18n="editor.openExportFile">Открыть файл</span>
+                    </button>
+                    <button type="button" id="btn-open-export-folder" class="btn-outline btn-compact">
+                      <span class="material-symbols-outlined" aria-hidden="true">folder_open</span>
+                      <span data-i18n="editor.openExportFolder">Открыть в папке</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+              </div>
+            </main>
+          </div>
+          <button type="button" id="btn-export" hidden aria-hidden="true"></button>
+        </section>
+
+        <!-- Archive -->
+        <section id="view-archive" class="view archive-view">
+          <div class="archive-page">
+            <div class="legacy-tabs">
+              <button type="button" class="legacy-tab is-active" data-tab="files" data-i18n="legacy.tabFiles">Файлы</button>
+              <button type="button" class="legacy-tab" data-tab="batches" data-i18n="legacy.tabBatches">Пакеты</button>
+            </div>
+            <p class="hint archive-lead" data-i18n="archive.lead">Архивные расшифровки: одиночные файлы и пакеты, перенесённые сюда из раздела «Расшифровки».</p>
+            <div id="archive-files-wrap" class="archive-singles-wrap"></div>
+            <div id="archive-batches-wrap" class="archive-singles-wrap" hidden></div>
+          </div>
+        </section>
+
+        <!-- Live -->
+        <section id="view-live" class="view live-panel">
+          <div class="toolbar">
+            <label class="mic-picker">
+              Микрофон
+              <select id="mic-select"></select>
+            </label>
+            <button type="button" id="btn-refresh-mics" class="btn-outline btn-compact" title="Обновить список микрофонов" data-i18n="page.c2f668e54fb6">Обновить</button>
+            <button type="button" id="btn-rec" data-i18n="page.fbcda4694fbf">Запись</button>
+            <button type="button" id="btn-live-pause" class="btn-outline btn-compact" disabled data-i18n="live.pause">Пауза</button>
+            <button type="button" id="btn-stop" disabled data-i18n="page.6d714e833d40">Стоп</button>
+          </div>
+          <p id="live-hint" class="hint"></p>
+          <p id="live-countdown" class="hint"></p>
+          <div class="meter" aria-hidden="true"><div id="live-meter" class="meter-bar"></div></div>
+          <div id="live-results-bar" class="meeting-results-bar" hidden>
+            <button type="button" id="btn-live-clear" class="btn-outline btn-compact" data-i18n="page.4db06830676a">Очистить экран</button>
+          </div>
+          <div id="live-transcript-wait" class="meeting-transcript-wait" hidden>
+            <span class="meeting-transcript-wait-icon material-symbols-outlined" aria-hidden="true">progress_activity</span>
+            <span data-i18n="page.2ff84cb662e9">Распознаём речь…</span>
+          </div>
+          <textarea id="live-transcript" class="live-transcript" rows="12" spellcheck="true"></textarea>
+          <div id="live-post-actions" class="meeting-post-actions" hidden>
+            <button type="button" id="btn-live-copy" class="btn-outline btn-compact" data-i18n="page.4a05d8619ded">Копировать</button>
+            <button type="button" id="btn-live-export" class="btn-outline btn-compact" data-i18n="page.dd5016c82982">Экспорт</button>
+          </div>
+        </section>
+
+        <!-- Meeting capture -->
+        <section id="view-meeting" class="view live-panel meeting-panel">
+          <p class="hint meeting-lead" data-i18n="page.670ce135fd6e">
+            Запись системного звука Windows и вашего микрофона без бота в Zoom, Meet или Teams.
+            Предупредите участников. Наушники дают меньше эха, чем колонки. Одна моно-дорожка:
+            отдельных каналов «я / они» нет, спикеров можно разметить после записи.
+            Если Bluetooth подключили уже после запуска Slysh — нажмите «Обновить».
+          </p>
+          <div class="toolbar meeting-toolbar">
+            <label class="mic-picker">
+              <span data-i18n="meeting.outputDevice">Выход</span>
+              <select id="meeting-output-select"></select>
+            </label>
+            <label class="mic-picker">
+              <span data-i18n="meeting.microphoneDevice">Микрофон</span>
+              <select id="meeting-mic-select"></select>
+            </label>
+            <label class="meeting-include-mic">
+              <input type="checkbox" id="meeting-include-mic" checked>
+              <span data-i18n="meeting.myMicrophone">Мой микрофон</span>
+            </label>
+            <button type="button" id="btn-meeting-refresh" class="btn-outline btn-compact" title="Пересканировать наушники и микрофоны, в том числе Bluetooth, подключённые после запуска" data-i18n="page.c2f668e54fb6">Обновить</button>
+            <button type="button" id="btn-meeting-rec" data-i18n="page.fbcda4694fbf">Запись</button>
+            <button type="button" id="btn-meeting-pause" disabled data-i18n="page.03498e395a43">Пауза</button>
+            <button type="button" id="btn-meeting-stop" disabled data-i18n="page.6d714e833d40">Стоп</button>
+          </div>
+          <div id="meeting-rec-banner" class="meeting-rec-banner" hidden>
+            <span class="meeting-rec-dot" aria-hidden="true"></span>
+            <span id="meeting-rec-banner-label" data-i18n="page.69087bd911f0">Идёт запись</span>
+            <span id="meeting-rec-timer">00:00</span>
+          </div>
+          <p id="meeting-hint" class="hint"></p>
+          <p id="meeting-countdown" class="hint"></p>
+          <div class="meeting-meters">
+            <div class="meeting-meter-row">
+              <span class="hint" data-i18n="page.3ac98f278c8c">Система</span>
+              <div class="meter" aria-hidden="true"><div id="meeting-meter-system" class="meter-bar"></div></div>
+            </div>
+            <div class="meeting-meter-row">
+              <span class="hint" data-i18n="page.9c46a3fc49ae">Микрофон</span>
+              <div class="meter" aria-hidden="true"><div id="meeting-meter-mic" class="meter-bar"></div></div>
+            </div>
+          </div>
+          <div class="meeting-view-options">
+            <label class="meeting-timestamps-toggle">
+              <input type="checkbox" id="meeting-show-timestamps">
+              <span data-i18n="meeting.showTimestamps">Таймкоды</span>
+            </label>
+            <label id="meeting-auto-speakers-wrap" class="meeting-auto-speakers-toggle meeting-timestamps-toggle">
+              <input type="checkbox" id="meeting-auto-speakers">
+              <span data-i18n="meeting.autoSpeakersAfterRec">Определять спикеров после записи</span>
+            </label>
+          </div>
+          <div id="meeting-results-bar" class="meeting-results-bar" hidden>
+            <button type="button" id="btn-meeting-clear" class="btn-outline btn-compact" data-i18n="page.4db06830676a">Очистить экран</button>
+          </div>
+          <div id="meeting-transcript-wait" class="meeting-transcript-wait" hidden>
+            <span class="meeting-transcript-wait-icon material-symbols-outlined" aria-hidden="true">progress_activity</span>
+            <span data-i18n="page.2ff84cb662e9">Распознаём речь…</span>
+          </div>
+          <div id="meeting-transcript" class="live-transcript"></div>
+          <div id="meeting-post-actions" class="meeting-post-actions" hidden>
+            <button type="button" id="btn-meeting-copy" class="btn-outline btn-compact" data-i18n="page.4a05d8619ded">Копировать</button>
+            <button type="button" id="btn-meeting-export" class="btn-outline btn-compact" data-i18n="page.dd5016c82982">Экспорт</button>
+          </div>
+          <details id="meeting-speakers-details" class="meeting-speakers-details" hidden>
+            <summary data-i18n="meeting.speakersSection">Распознавание спикеров</summary>
+            <div class="meeting-speakers-details-body">
+              <div id="meeting-speakers-wait" class="meeting-speakers-wait" hidden>
+                <span class="meeting-transcript-wait-icon material-symbols-outlined" aria-hidden="true">progress_activity</span>
+                <span data-i18n="page.b40df6c1040c">Определяем спикеров…</span>
+              </div>
+              <button type="button" id="btn-meeting-speakers" class="btn-outline btn-compact meeting-speakers-btn" hidden data-i18n="page.9e8dc1ce7821">
+                Распознать спикеров
+              </button>
+              <div id="meeting-speaker-rename" class="speaker-rename meeting-speaker-rename" hidden></div>
+            </div>
+          </details>
+          <div id="meeting-export-actions" class="meeting-export-actions export-actions" hidden>
+            <span id="meeting-export-path" class="hint"></span>
+            <div class="export-actions-row">
+              <button type="button" id="btn-meeting-open-export" class="btn-primary btn-compact">
+                <span class="material-symbols-outlined" aria-hidden="true">draft</span>
+                <span data-i18n="editor.openExportFile">Открыть файл</span>
+              </button>
+              <button type="button" id="btn-meeting-open-export-folder" class="btn-outline btn-compact">
+                <span class="material-symbols-outlined" aria-hidden="true">folder_open</span>
+                <span data-i18n="editor.openExportFolder">Открыть в папке</span>
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- YouTube -->
+        <section id="view-youtube" class="view youtube-panel">
+          <p class="hint youtube-lead" data-i18n="page.7adfc9947822">
+            Вставьте ссылку на видео YouTube и получите готовый транскрипт из субтитров.
+          </p>
+          <div class="card youtube-card">
+            <div class="youtube-mode-tabs" role="tablist">
+              <button type="button" id="youtube-mode-single" class="youtube-mode-tab is-active" data-youtube-mode="single" data-i18n="page.8c25fdeb8efb">Одно видео</button>
+              <button type="button" id="youtube-mode-batch" class="youtube-mode-tab" data-youtube-mode="batch" data-i18n="page.56c808257984">Пакет</button>
+            </div>
+            <div id="youtube-single-panel">
+            <label class="youtube-url-field" for="youtube-url">
+              <span class="youtube-url-label" data-i18n="page.54fbfaf96a2d">Ссылка на видео</span>
+              <div class="youtube-url-wrap">
+                <span class="material-symbols-outlined youtube-url-icon" aria-hidden="true">link</span>
+                <input
+                  type="url"
+                  id="youtube-url"
+                  class="youtube-url-input"
+                  placeholder="https://www.youtube.com/watch?v=…"
+                  spellcheck="false"
+                  autocomplete="off"
+                >
+              </div>
+            </label>
+            </div>
+            <fieldset class="youtube-methods">
+              <legend data-i18n="page.13c04f33d515">Способ получения</legend>
+              <div class="youtube-method-card" data-youtube-method="apify">
+                <label class="youtube-method-head" for="youtube-method-apify">
+                  <input type="radio" name="youtube-method" id="youtube-method-apify" value="apify" checked>
+                  <span class="youtube-method-title" data-i18n="page.30ec6b7515f1">Облачный сервис</span>
+                </label>
+                <details class="youtube-method-details">
+                  <summary data-i18n="youtube.methodSetup">Настройка способа</summary>
+                  <div class="youtube-method-panel">
+                    <p class="hint" data-i18n="page.ce894836fbe0">Транскрипт получается через облако Apify. Браузер и cookies на вашем ПК не нужны.</p>
+                    <ol class="youtube-steps">
+                      <li data-i18n-html="youtube.apifyStep1">Зарегистрируйтесь на <a href="https://apify.com/" target="_blank" rel="noopener noreferrer">apify.com</a>.</li>
+                      <li data-i18n-html="youtube.apifyStep2">Откройте <a href="https://console.apify.com/account/integrations" target="_blank" rel="noopener noreferrer">API tokens</a> в личном кабинете.</li>
+                      <li data-i18n="youtube.apifyStep3">Создайте токен и скопируйте его.</li>
+                      <li data-i18n="youtube.apifyStep4">Вставьте ключ ниже и нажмите «Сохранить».</li>
+                    </ol>
+                    <div class="youtube-panel-row">
+                      <input
+                        id="youtube-apify-key"
+                        type="password"
+                        autocomplete="off"
+                        spellcheck="false"
+                        placeholder="Apify API token"
+                      >
+                      <button type="button" id="btn-youtube-apify-save" class="btn-outline btn-compact" data-i18n="page.4864057d626a">Сохранить</button>
+                    </div>
+                    <p id="youtube-apify-key-hint" class="hint"></p>
+                  </div>
+                </details>
+              </div>
+              <div class="youtube-method-card" data-youtube-method="firefox">
+                <label class="youtube-method-head" for="youtube-method-firefox">
+                  <input type="radio" name="youtube-method" id="youtube-method-firefox" value="firefox">
+                  <span class="youtube-method-title" data-i18n="page.4d1c2deba446">Через ваш Firefox</span>
+                </label>
+                <details class="youtube-method-details">
+                  <summary data-i18n="youtube.methodSetup">Настройка способа</summary>
+                  <div class="youtube-method-panel">
+                    <p class="hint" data-i18n-html="youtube.firefoxHint">
+                      Бесплатно и локально. Войдите в YouTube в Firefox — приложение возьмёт cookies оттуда.
+                      Извлечение доступно <strong>только из Mozilla Firefox</strong>.
+                    </p>
+                    <p id="youtube-firefox-meta" class="hint"></p>
+                    <div class="youtube-panel-actions">
+                      <button type="button" id="btn-youtube-extract-cookies-quick" class="btn-outline btn-compact" data-i18n="page.79d4c67eaa00">
+                        Быстро из Firefox
+                      </button>
+                      <label class="mic-picker">
+                        <span data-i18n="youtube.firefoxProfile">Профиль Firefox</span>
+                        <select id="youtube-browser-profile"></select>
+                      </label>
+                      <button type="button" id="btn-youtube-extract-cookies" class="btn-outline btn-compact" data-i18n="page.6a1b5fc6fa5b">Извлечь</button>
+                    </div>
+                  </div>
+                </details>
+              </div>
+              <div class="youtube-method-card" data-youtube-method="cookies">
+                <label class="youtube-method-head" for="youtube-method-cookies">
+                  <input type="radio" name="youtube-method" id="youtube-method-cookies" value="cookies">
+                  <span class="youtube-method-title" data-i18n="page.302efca28f87">Через другой браузер</span>
+                </label>
+                <details class="youtube-method-details">
+                  <summary data-i18n="youtube.methodSetup">Настройка способа</summary>
+                  <div class="youtube-method-panel">
+                    <p class="hint" data-i18n="page.b5c6227b8085">
+                      Если вы пользуетесь Chrome, Edge или другим браузером — экспортируйте cookies вручную
+                      и загрузите файл сюда.
+                    </p>
+                    <ol class="youtube-steps">
+                      <li data-i18n-html="youtube.cookiesStep1">Установите расширение <a href="https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc" target="_blank" rel="noopener noreferrer">Get cookies.txt LOCALLY</a> (Chrome/Edge).</li>
+                      <li data-i18n-html="youtube.cookiesStep2">Откройте <a href="https://www.youtube.com/" target="_blank" rel="noopener noreferrer">youtube.com</a> и войдите в аккаунт.</li>
+                      <li data-i18n-html="youtube.cookiesStep3">Через расширение экспортируйте cookies для youtube.com в файл <code>cookies.txt</code>.</li>
+                      <li data-i18n="youtube.cookiesStep4">Нажмите «Загрузить cookies.txt» ниже.</li>
+                    </ol>
+                    <p id="youtube-import-meta" class="hint"></p>
+                    <div class="youtube-panel-actions">
+                      <button type="button" id="btn-youtube-import-cookies" class="btn-outline btn-compact" data-i18n="page.8b6e8552f157">Загрузить cookies.txt</button>
+                    </div>
+                  </div>
+                </details>
+              </div>
+            </fieldset>
+            <div class="youtube-status-row">
+              <span id="youtube-status-apify" class="youtube-status-chip" data-i18n="page.7651ef63e832">Облако</span>
+              <span id="youtube-status-firefox" class="youtube-status-chip">Firefox</span>
+              <span id="youtube-status-cookies-file" class="youtube-status-chip" data-i18n="page.582ddc72086b">Файл cookies</span>
+              <span id="youtube-status-ytdlp" class="youtube-status-chip" hidden>yt-dlp</span>
+              <span id="youtube-status-browser-cookie3" class="youtube-status-chip" hidden>browser-cookie3</span>
+            </div>
+            <div class="youtube-actions" id="youtube-single-actions">
+              <button type="button" id="btn-youtube-ingest" class="btn-primary" data-i18n="page.35e044345972">Получить транскрипт</button>
+            </div>
+            <p id="youtube-ingest-status" class="hint youtube-ingest-status"></p>
+            <div id="youtube-batch-panel" class="youtube-batch-panel" hidden>
+              <fieldset class="youtube-batch-source">
+                <legend data-i18n="page.8290a3dbc0c8">Источник</legend>
+                <label class="youtube-batch-source-option" for="youtube-batch-mode-lines">
+                  <input type="radio" name="youtube-batch-mode" id="youtube-batch-mode-lines" value="lines" checked>
+                  <span data-i18n="page.e6f294420d21">Список ссылок (по одной на строку)</span>
+                </label>
+                <label class="youtube-batch-source-option" for="youtube-batch-mode-feed">
+                  <input type="radio" name="youtube-batch-mode" id="youtube-batch-mode-feed" value="feed">
+                  <span data-i18n="page.9d2ed01e54fb">Канал или плейлист (одна ссылка)</span>
+                </label>
+              </fieldset>
+              <label class="field" id="youtube-batch-lines-wrap">
+                <span class="field-label" data-i18n="page.488356b435d9">Ссылки на видео</span>
+                <textarea id="youtube-batch-lines" class="youtube-batch-textarea" rows="6" spellcheck="false" placeholder="https://www.youtube.com/watch?v=…"></textarea>
+              </label>
+              <label class="field" id="youtube-batch-feed-wrap" hidden>
+                <span class="field-label" data-i18n="page.c55f5be758a9">URL канала или плейлиста</span>
+                <input type="url" id="youtube-batch-feed-url" class="youtube-url-input" placeholder="https://www.youtube.com/@…/videos">
+              </label>
+              <details class="youtube-batch-filters">
+                <summary data-i18n="youtube.batchFiltersSummary">Фильтры (канал / плейлист)</summary>
+                <div class="youtube-batch-filters-grid">
+                  <label class="field">
+                    <span class="field-label" data-i18n="page.b3136b0109e3">Лимит видео</span>
+                    <input type="number" id="youtube-batch-limit" min="1" placeholder="5">
+                  </label>
+                  <label class="field">
+                    <span class="field-label" data-i18n="page.a29f6fdb5502">Не раньше</span>
+                    <input type="date" id="youtube-batch-dateafter">
+                  </label>
+                  <label class="field">
+                    <span class="field-label" data-i18n="page.e37eb0da4f9b">Не позже</span>
+                    <input type="date" id="youtube-batch-datebefore">
+                  </label>
+                  <div class="youtube-batch-filters-row">
+                    <label class="field youtube-batch-start-video-field">
+                      <span class="field-label" data-i18n="page.1eb9aa7cfb7f">Ссылка на видео для старта</span>
+                      <input type="url" id="youtube-batch-start-video" class="youtube-url-input" placeholder="https://www.youtube.com/watch?v=…" spellcheck="false" autocomplete="off">
+                    </label>
+                    <label class="field youtube-batch-direction-field">
+                      <span class="field-label" data-i18n="page.ea8f530a954c">Направление от стартового</span>
+                      <select id="youtube-batch-direction">
+                        <option value="older" data-i18n="page.45b470a5e262">Старее (к концу ленты)</option>
+                        <option value="newer" data-i18n="page.1b95f58ff583">Новее (к началу ленты)</option>
+                      </select>
+                    </label>
+                  </div>
+                </div>
+              </details>
+              <div class="youtube-batch-rules">
+                <label class="youtube-batch-option">
+                  <input type="checkbox" id="youtube-batch-skip-completed" checked>
+                  <span data-i18n="page.4e9bd75441b6">Пропускать уже готовые в пакете</span>
+                </label>
+                <label class="youtube-batch-option">
+                  <input type="checkbox" id="youtube-batch-export">
+                  <span data-i18n="page.b9ae7bf1d7f1">Автоэкспорт после каждого видео</span>
+                </label>
+                <div id="youtube-batch-export-options" class="youtube-batch-export-options" hidden>
+                  <label class="field">
+                    <span class="field-label" data-i18n="page.04e42537897f">Формат экспорта</span>
+                    <select id="youtube-batch-export-fmt">
+                      <option value="md">Markdown (Obsidian)</option>
+                      <option value="srt">SRT</option>
+                      <option value="vtt">VTT</option>
+                      <option value="txt">TXT</option>
+                    </select>
+                  </label>
+                  <div class="field">
+                    <span class="field-label" data-i18n="page.a63e955bbb32">Папки экспорта</span>
+                    <div id="youtube-batch-export-dirs" class="export-dirs-list"></div>
+                    <button type="button" id="youtube-batch-export-dir-add" class="btn-outline btn-compact export-dir-add" data-i18n="page.585b38ac2082">
+                      Добавить папку
+                    </button>
+                    <p class="hint" data-i18n="page.8ca10256cc62">Пустой список — файлы в каталог данных приложения (youtube/exports).</p>
+                  </div>
+                </div>
+              </div>
+              <div class="youtube-actions">
+                <button type="button" id="btn-youtube-batch-resolve" class="btn-outline" data-i18n="page.a55edbb7c1eb">Проверить список</button>
+                <button type="button" id="btn-youtube-batch-start" class="btn-primary" data-i18n="page.050583a41244">Запустить пакет</button>
+              </div>
+              <p id="youtube-batch-api-hint" class="hint" hidden data-i18n="page.b51ce168a12d">
+                Пакетный API недоступен. Закройте Slysh и запустите Slysh.bat заново (сброс кэша интерфейса не перезагружает Python).
+              </p>
+              <p id="youtube-batch-preview" class="hint"></p>
+              <p id="youtube-batch-status" class="hint youtube-ingest-status"></p>
+            </div>
+          </div>
+        </section>
+
+        <!-- Legacy workspace -->
+        <section id="view-legacy" class="view legacy-workspace">
+          <div class="legacy-tabs">
+            <button type="button" class="legacy-tab is-active" data-tab="files" data-i18n="legacy.tabFiles">Файлы</button>
+            <button type="button" class="legacy-tab" data-tab="batches" data-i18n="legacy.tabBatches">Пакеты</button>
+          </div>
+
+          <div id="legacy-workspace">
+            <div id="files-chrome">
+              <div class="toolbar toolbar-add">
+                <button type="button" id="btn-add-files" class="primary" data-i18n="legacy.addFiles">+ Файлы</button>
+              </div>
+              <p class="hint" data-i18n="legacy.orphansHint">Все одиночные записи, кроме архива. Сортировка по столбцам, ПКМ — меню.</p>
+            </div>
+
+            <div id="batches-chrome" hidden>
+              <div class="toolbar toolbar-add">
+                <button type="button" id="btn-batch-new" class="primary" data-i18n="legacy.addBatch">+ Пакет</button>
+                <button type="button" id="btn-batch-add-files" data-i18n="legacy.addFiles">+ Файлы</button>
+                <button type="button" id="btn-batch-add-folder" data-i18n="legacy.addFolder">+ Папка</button>
+                <div class="add-target">
+                  <label for="batch-target-select" data-i18n="legacy.activeBatch">Активный пакет</label>
+                  <select id="batch-target-select" aria-label="Пакет для добавления файлов"></select>
+                </div>
+              </div>
+              <p class="hint" data-i18n="legacy.allBatchesHint">Все пакеты, кроме архива. Правила и запуск — через ПКМ или панель массовых действий.</p>
+            </div>
+
+            <div id="legacy-files-wrap"></div>
+            <div id="legacy-batches-wrap" hidden></div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modals -->
+  <div id="update-modal" class="modal" hidden>
+    <div class="modal-card update-modal-card" role="dialog" aria-labelledby="update-modal-title">
+      <h2 id="update-modal-title" data-i18n="updates.title">Обновление Slysh</h2>
+      <p id="update-modal-status" class="hint" aria-live="polite"></p>
+      <p id="update-modal-version-line" class="hint" hidden></p>
+      <div id="update-modal-notes" class="update-modal-notes hint" hidden></div>
+      <progress id="update-modal-progress" class="engine-setup-progress" max="100" hidden></progress>
+      <p id="update-modal-progress-label" class="hint" hidden></p>
+      <div class="modal-actions modal-actions--stack">
+        <button type="button" id="update-modal-download" class="btn-primary" hidden data-i18n="updates.download">Скачать</button>
+        <button type="button" id="update-modal-apply" class="btn-primary" hidden data-i18n="updates.install">Установить</button>
+        <button type="button" id="update-modal-github" class="btn-outline" hidden data-i18n="updates.openRelease">Открыть на GitHub</button>
+        <button type="button" id="update-modal-close" class="ghost" data-i18n="page.0ec753be8df9">Отмена</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="engine-setup-modal" class="modal engine-setup-modal" hidden>
+    <div class="modal-card" role="dialog" aria-labelledby="engine-setup-title" aria-describedby="engine-setup-copy">
+      <div id="engine-setup-step-choose">
+        <h2 id="engine-setup-title" data-i18n="firstRun.engineTitle">Как расшифровывать</h2>
+        <p id="engine-setup-copy" class="hint" data-i18n="firstRun.engineCopy">
+          Выберите, как расшифровывать. Позже это можно сменить в «Настройках».
+        </p>
+        <div class="engine-setup-choices modal-actions modal-actions--stack">
+          <button type="button" id="engine-setup-install" class="engine-setup-choice btn-primary">
+            <span class="engine-setup-choice-title" data-i18n="firstRun.engineLocalTitle">Локально на этом компьютере</span>
+            <span class="engine-setup-choice-hint" data-i18n="firstRun.engineLocalHint">Сразу начнётся загрузка около 3 ГБ — программы распознавания. Лучше видеокарта NVIDIA, на процессоре будет медленнее. Затем можно скачать модель для распознавания.</span>
+          </button>
+          <button type="button" id="engine-setup-cloud" class="engine-setup-choice btn-outline">
+            <span class="engine-setup-choice-title" data-i18n="firstRun.engineCloudTitle">Через облако (без нейросетей на ПК)</span>
+            <span class="engine-setup-choice-hint" data-i18n="firstRun.engineCloudHint">Нужен ваш ключ Groq, OpenAI, Gladia или другого сервиса. Аудио уходит на сервер провайдера, на компьютер пакеты не качаются.</span>
+          </button>
+          <button type="button" id="engine-setup-later" class="ghost" data-i18n="firstRun.engineLater">Напомнить позже</button>
+        </div>
+      </div>
+      <div id="engine-setup-step-install" hidden>
+        <h2 id="engine-setup-install-title" data-i18n="firstRun.engineInstallTitle">Загрузка программ для локальной расшифровки</h2>
+        <ul class="engine-confirm-list engine-setup-body">
+          <li data-i18n="firstRun.engineInstallWhat">Скачиваются библиотеки (PyTorch и др.) — не веса модели речи.</li>
+          <li data-i18n="firstRun.engineInstallTime">Обычно 10–30 минут; окно можно не закрывать.</li>
+          <li data-i18n="firstRun.engineInstallVpn">При включённом VPN загрузка часто «замирает» — на время установки лучше отключить VPN.</li>
+        </ul>
+      </div>
+      <div id="engine-setup-progress-wrap" class="engine-setup-progress-wrap" hidden>
+        <progress id="engine-setup-progress" class="engine-setup-progress" max="100"></progress>
+        <p id="engine-setup-progress-summary" class="hint engine-setup-progress-summary" hidden></p>
+        <p id="engine-setup-progress-label" class="hint engine-setup-progress-label"></p>
+        <p id="engine-setup-progress-hint" class="hint engine-setup-progress-hint" hidden></p>
+        <p id="engine-setup-progress-stalled" class="hint engine-setup-progress-stalled" hidden></p>
+        <button type="button" id="engine-setup-log-toggle" class="ghost" data-i18n="firstRun.engineShowLog">Показать лог</button>
+      </div>
+      <pre id="engine-setup-log" class="engine-setup-log" hidden></pre>
+      <p id="engine-setup-status" class="hint" hidden></p>
+    </div>
+  </div>
+
+  <div id="engine-packages-confirm-modal" class="modal engine-setup-modal" hidden>
+    <div
+      class="modal-card"
+      role="dialog"
+      aria-labelledby="engine-packages-confirm-title"
+      aria-describedby="engine-packages-confirm-copy"
+    >
+      <h2 id="engine-packages-confirm-title" data-i18n="firstRun.engineConfirmTitle">
+        Установить программы для локальной расшифровки?
+      </h2>
+      <p id="engine-packages-confirm-copy" class="hint engine-setup-body" data-i18n="firstRun.engineConfirmIntro">
+        Скачаются библиотеки для локальной расшифровки на компьютере (PyTorch и связанные пакеты, NeMo, yt-dlp). Веса модели GigaAM или Whisper — отдельно, на следующем шаге.
+      </p>
+      <ul class="engine-confirm-list engine-setup-body">
+        <li data-i18n="firstRun.engineConfirmSize">Ориентир по объёму: около 3–5 ГБ.</li>
+        <li data-i18n="firstRun.engineConfirmLater">Можно отложить и установить позже в «Настройках» → «Скачать пакеты расшифровки».</li>
+        <li data-i18n="firstRun.engineConfirmVpn">Если включён VPN, на время установки лучше отключить — иначе загрузка может идти очень медленно или «зависнуть».</li>
+      </ul>
+      <div class="modal-actions modal-actions--stack">
+        <button type="button" id="engine-packages-confirm-start" class="btn-primary" data-i18n="firstRun.engineConfirmStart">
+          Начать загрузку
+        </button>
+        <button type="button" id="engine-packages-confirm-back" class="btn-outline" data-i18n="firstRun.engineConfirmBack">
+          Назад
+        </button>
+        <button type="button" id="engine-packages-confirm-later" class="ghost" data-i18n="firstRun.engineLater">
+          Напомнить позже
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="model-setup-modal" class="modal model-setup-modal" hidden>
+    <div class="modal-card" role="dialog" aria-labelledby="model-setup-title">
+      <h2 id="model-setup-title" data-i18n="modelSetup.title">Модель для распознавания</h2>
+      <p class="hint" data-i18n="modelSetup.copy">Пакеты установлены. Выберите модель и нажмите «Скачать», или сделайте это позже в «Настройках».</p>
+      <label class="model-setup-field">
+        <span data-i18n="modelSetup.modelLabel">Модель</span>
+        <select id="model-setup-select"></select>
+      </label>
+      <p
+        id="model-setup-gigaam-vpn-hint"
+        class="hint model-setup-vpn-hint"
+        hidden
+        data-i18n="modelSetup.gigaamVpn"
+      >
+        При скачивании GigaAM на время загрузки лучше отключить VPN — иначе файл может повредиться или загрузка «зависнет».
+      </p>
+      <progress id="model-setup-progress" class="model-setup-progress" max="100" hidden></progress>
+      <p id="model-setup-progress-summary" class="hint model-setup-progress-summary" hidden></p>
+      <p id="model-setup-status" class="hint" hidden></p>
+      <p id="model-setup-progress-stalled" class="hint model-setup-progress-stalled" hidden></p>
+      <p
+        id="model-setup-download-wait-hint"
+        class="hint model-setup-download-wait-hint"
+        hidden
+        data-i18n="modelSetup.downloadWaitHint"
+      ></p>
+      <div class="modal-actions">
+        <button type="button" id="model-setup-download" class="btn-primary" data-i18n="modelSetup.download">Скачать</button>
+        <button type="button" id="model-setup-later" class="ghost" data-i18n="modelSetup.later">Позже</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="settings-modal" class="modal" hidden>
+    <div class="modal-card settings-modal-card settings-bento" role="dialog" aria-labelledby="settings-title">
+      <header class="settings-bento-header">
+        <div class="settings-bento-header-brand">
+          <span class="settings-bento-header-icon material-symbols-outlined" aria-hidden="true">tune</span>
+          <div>
+            <h2 id="settings-title" data-i18n="settings.title">Настройки</h2>
+            <p class="settings-bento-header-sub" data-i18n="settings.modalSubtitle">Параметры нейросетей, железа и провайдеров</p>
+          </div>
+        </div>
+        <button type="button" id="settings-close" class="settings-bento-close" data-i18n-title="page.4ae50d30739d" title="Закрыть" aria-label="Закрыть">
+          <span class="material-symbols-outlined" aria-hidden="true">close</span>
+        </button>
+      </header>
+      <div class="settings-bento-tabs-shell">
+      <nav class="settings-bento-tabs" role="tablist" aria-label="Разделы настроек">
+        <button type="button" class="settings-bento-tab is-active" role="tab" data-settings-tab="asr" aria-selected="true" aria-controls="settings-pane-asr" id="settings-tab-asr">
+          <span class="material-symbols-outlined" aria-hidden="true">mic</span>
+          <span data-i18n="settings.tabAsr">ASR</span>
+        </button>
+        <button type="button" class="settings-bento-tab" role="tab" data-settings-tab="proxy" aria-selected="false" aria-controls="settings-pane-proxy" id="settings-tab-proxy">
+          <span class="material-symbols-outlined" aria-hidden="true">vpn_lock</span>
+          <span data-i18n="settings.tabProxy">Прокси</span>
+        </button>
+        <button type="button" class="settings-bento-tab" role="tab" data-settings-tab="cloud" aria-selected="false" aria-controls="settings-pane-cloud" id="settings-tab-cloud">
+          <span class="material-symbols-outlined" aria-hidden="true">cloud</span>
+          <span class="settings-bento-tab-label" data-i18n="settings.tabCloud">Облако</span>
+          <span class="settings-bento-tab-meta" id="settings-tab-cloud-meta" aria-hidden="true"></span>
+        </button>
+        <button type="button" class="settings-bento-tab" role="tab" data-settings-tab="youtube" aria-selected="false" aria-controls="settings-pane-youtube" id="settings-tab-youtube">
+          <span class="material-symbols-outlined" aria-hidden="true">smart_display</span>
+          <span data-i18n="settings.tabYoutube">YouTube</span>
+        </button>
+        <button type="button" class="settings-bento-tab" role="tab" data-settings-tab="system" aria-selected="false" aria-controls="settings-pane-system" id="settings-tab-system">
+          <span class="material-symbols-outlined" aria-hidden="true">build</span>
+          <span data-i18n="settings.tabSystem">Система</span>
+        </button>
+      </nav>
+      </div>
+      <div class="settings-bento-panes">
+      <div id="settings-pane-asr" class="settings-bento-pane" role="tabpanel" aria-labelledby="settings-tab-asr">
+      <p id="cloud-only-banner" class="hint settings-cloud-only-banner" hidden data-i18n="page.1bd3922244d2">
+        Режим «только облако»: локальный torch не используется. Спикеры (NeMo) и скачивание GigaAM недоступны, пока не включите локальную расшифровку.
+      </p>
+      <button type="button" id="btn-enable-local-asr" class="btn-outline btn-compact" hidden data-i18n="page.7a2293eb3dfa">
+        Включить локальную расшифровку
+      </button>
+      <div class="settings-bento-asr-top">
+        <div id="ui-locale-settings-mount" class="settings-bento-tile settings-bento-tile-locale">
+          <span class="settings-bento-tile-label" data-i18n="settings.languageTitle">Язык интерфейса</span>
+        </div>
+        <div id="compute-settings-wrap" class="settings-bento-tile settings-bento-tile-compute">
+          <div class="settings-bento-tile-head-row">
+            <span class="settings-bento-tile-label" data-i18n="settings.computeTile">Вычислитель</span>
+            <span id="settings-bento-compute-live" class="settings-bento-compute-live" hidden></span>
+          </div>
+          <div class="compute-toggle">
+            <label class="compute-opt"><input type="radio" name="compute" value="auto"> <span data-i18n="settings.computeAuto">Авто</span></label>
+            <label class="compute-opt"><input type="radio" name="compute" value="gpu"> GPU</label>
+            <label class="compute-opt"><input type="radio" name="compute" value="cpu"> CPU</label>
+          </div>
+          <p id="compute-hint-settings" class="hint settings-bento-compute-detail"></p>
+        </div>
+      </div>
+      <div class="settings-bento-tile settings-bento-tile-model">
+        <div class="settings-bento-tile-head-row settings-bento-tile-head-row--model">
+          <div>
+            <h3 class="settings-bento-tile-title" data-i18n="settings.localAsrTitle">Локальная модель ASR</h3>
+            <p class="settings-bento-tile-desc" data-i18n="settings.localAsrDesc">Быстрая расшифровка прямо на вашем ПК</p>
+          </div>
+          <span id="settings-asr-mode-chip" class="settings-bento-chip settings-bento-chip-active" hidden data-i18n="settings.chipActive">Активно</span>
+        </div>
+      <fieldset class="asr-source settings-bento-asr-field" id="asr-source-field">
+        <legend class="settings-bento-sr-only" data-i18n="page.c072066abef1">Что использовать для расшифровки</legend>
+        <div class="settings-bento-asr-source-row">
+        <label class="asr-source-opt asr-source-opt-segment">
+          <input type="radio" name="asr-source" value="local">
+          <span data-i18n="page.be9a356f6a04">Локальная модель</span>
+        </label>
+        <label class="asr-source-opt asr-source-opt-segment asr-source-opt-provider">
+          <input type="radio" name="asr-source" value="provider">
+          <span data-i18n="page.2d385af6d69b">Провайдер</span>
+        </label>
+        </div>
+        <div class="asr-local-block">
+          <div class="asr-local-model-row settings-bento-model-actions">
+            <div class="local-model-picker" id="local-model-picker">
+              <button
+                type="button"
+                id="local-model-picker-btn"
+                class="local-model-picker-btn"
+                aria-haspopup="listbox"
+                aria-expanded="false"
+              >
+                <span id="local-model-picker-icon" class="local-model-picker-icon" aria-hidden="true"></span>
+                <span id="local-model-picker-label" class="local-model-picker-label"></span>
+                <span id="local-model-picker-sublabel" class="local-model-picker-sublabel" hidden></span>
+                <span class="local-model-picker-change" data-i18n="settings.changeModel">Сменить</span>
+                <span class="material-symbols-outlined local-model-picker-chevron" aria-hidden="true">expand_more</span>
+              </button>
+              <div id="local-model-picker-dropdown" class="local-model-picker-dropdown" hidden>
+                <div class="local-model-picker-catalog-head">
+                  <span class="local-model-picker-catalog-title" data-i18n="settings.catalogTitle">Каталог моделей ASR</span>
+                </div>
+                <ul id="local-model-picker-list" class="local-model-picker-list" role="listbox"></ul>
+              </div>
+              <select id="asr-model-select-local" class="local-model-select-native" aria-label="Локальная модель" tabindex="-1"></select>
+            </div>
+            <button
+              type="button"
+              id="btn-download-model"
+              class="btn-outline btn-compact asr-model-download-btn"
+              hidden
+            >
+              <span class="material-symbols-outlined" aria-hidden="true">download</span>
+              <span data-i18n="settings.downloadModel">Скачать</span>
+            </button>
+            <span id="asr-model-ready-badge" class="asr-model-ready-badge" hidden>
+              <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>
+              <span data-i18n="settings.modelReady">Готово</span>
+            </span>
+            <p
+              id="asr-model-gigaam-vpn-hint"
+              class="hint asr-model-gigaam-vpn-hint"
+              hidden
+              data-i18n="modelSetup.gigaamVpn"
+            >
+              При скачивании GigaAM на время загрузки лучше отключить VPN — иначе файл может повредиться или загрузка «зависнет».
+            </p>
+          </div>
+          <div id="settings-model-download-progress-wrap" class="settings-model-download-progress-wrap" hidden>
+            <div class="settings-bento-progress-head">
+              <span id="settings-model-download-progress-label" class="settings-bento-progress-label"></span>
+              <span id="settings-model-download-progress-pct" class="settings-bento-progress-pct"></span>
+            </div>
+            <div class="settings-bento-progress-track" aria-hidden="true">
+              <div id="settings-model-download-progress-fill" class="settings-bento-progress-fill"></div>
+            </div>
+            <progress
+              id="settings-model-download-progress"
+              class="settings-model-download-progress settings-bento-progress-native"
+              max="100"
+            ></progress>
+            <p id="settings-model-download-summary" class="hint settings-model-download-summary" hidden></p>
+            <p
+              id="settings-model-download-stalled"
+              class="hint settings-model-download-stalled"
+              hidden
+              data-i18n="settings.modelDownloadStalled"
+            ></p>
+            <p
+              id="settings-model-download-wait-hint"
+              class="hint settings-model-download-wait-hint"
+              hidden
+              data-i18n="modelSetup.downloadWaitHint"
+            ></p>
+            <p
+              id="model-download-status"
+              class="hint asr-model-download-status"
+              hidden
+              aria-live="polite"
+            ></p>
+          </div>
+          <p id="asr-engine-packages-hint" class="hint asr-engine-packages-hint" hidden data-i18n="settings.enginePackagesHint">
+            Сначала установите пакеты расшифровки (кнопка ниже).
+          </p>
+          <p id="asr-local-folder-hint" class="hint asr-local-folder-hint" hidden></p>
+        </div>
+        <div class="asr-provider-block settings-bento-provider-pick">
+          <p
+            id="asr-provider-select-hint"
+            class="hint asr-provider-select-hint"
+            data-i18n="settings.providerSelectBelow"
+          >
+            Выберите облачный сервис на вкладке «Облако», укажите ключ и нажмите «Сохранить».
+          </p>
+          <div id="asr-provider-field" class="asr-provider-field asr-provider-active-chip" hidden>
+            <span class="material-symbols-outlined asr-provider-active-icon" aria-hidden="true">cloud</span>
+            <span id="asr-provider-label" class="asr-provider-field-value">—</span>
+          </div>
+        </div>
+      </fieldset>
+      </div>
+
+      <div class="settings-bento-asr-shortcuts">
+        <button type="button" class="settings-bento-shortcut" data-settings-tab-jump="cloud">
+          <span class="settings-bento-shortcut-icon material-symbols-outlined" aria-hidden="true">cloud</span>
+          <span class="settings-bento-shortcut-text">
+            <span class="settings-bento-shortcut-title" data-i18n="settings.shortcutCloudTitle">Облако</span>
+            <span class="settings-bento-shortcut-desc" data-i18n="settings.shortcutCloudDesc">Gladia, Groq…</span>
+          </span>
+        </button>
+        <button type="button" class="settings-bento-shortcut" data-settings-tab-jump="proxy">
+          <span class="settings-bento-shortcut-icon material-symbols-outlined" aria-hidden="true">vpn_lock</span>
+          <span class="settings-bento-shortcut-text">
+            <span class="settings-bento-shortcut-title" data-i18n="settings.shortcutProxyTitle">Прокси</span>
+            <span class="settings-bento-shortcut-desc" id="settings-asr-shortcut-proxy-desc" data-i18n="settings.shortcutProxyDesc">8 сервисов</span>
+          </span>
+        </button>
+      </div>
+
+      <div id="engine-setup-settings" class="settings-engine-block settings-bento-tile" hidden>
+        <p class="hint" data-i18n="page.45f3f70c1225">Пакеты расшифровки (torch, GigaAM) ещё не установлены.</p>
+        <p id="engine-setup-settings-error" class="hint settings-engine-error" hidden aria-live="polite"></p>
+        <button type="button" id="btn-install-engine" class="btn-outline settings-reload-btn" title="Скачать пакеты расшифровки">
+          <span class="material-symbols-outlined" aria-hidden="true">download</span>
+          Скачать пакеты расшифровки
+        </button>
+        <pre id="engine-setup-settings-log" class="engine-setup-log" hidden></pre>
+      </div>
+      </div>
+
+      <div id="settings-pane-proxy" class="settings-bento-pane" role="tabpanel" aria-labelledby="settings-tab-proxy" hidden>
+      <div class="settings-bento-pane-head">
+        <div>
+          <h3 class="settings-bento-pane-title" data-i18n="settings.proxyPaneTitle">Настройки сети и прокси</h3>
+          <p class="settings-bento-pane-desc" data-i18n="page.0cd49d022c5d">HTTP/HTTPS-прокси для выбранных внешних сервисов. Локальный engine не использует прокси.</p>
+        </div>
+        <span id="proxy-status-chip" class="settings-bento-status-chip" data-i18n="page.147380b0b939">выкл.</span>
+      </div>
+      <section id="spoiler-proxy" class="proxy-settings settings-bento-tile settings-bento-tile-proxy" aria-label="Прокси">
+        <div class="settings-bento-proxy-toggle">
+          <div>
+            <span class="settings-bento-proxy-toggle-title" data-i18n="page.9b903c3bb16b">Включить прокси</span>
+            <p class="settings-bento-proxy-toggle-desc" data-i18n="settings.proxyToggleDesc">Перенаправлять исходящие запросы</p>
+          </div>
+          <label class="settings-bento-switch">
+            <input type="checkbox" id="proxy-enabled" />
+            <span class="settings-bento-switch-track" aria-hidden="true"></span>
+          </label>
+        </div>
+        <div class="settings-bento-proxy-fields">
+          <span class="settings-bento-field-label" data-i18n="settings.proxyConnectionLabel">Параметры подключения</span>
+          <div class="settings-compact-row proxy-connection-row settings-bento-proxy-host-row">
+            <input id="proxy-host" type="text" autocomplete="off" spellcheck="false" placeholder="хост" aria-label="Хост прокси">
+            <input id="proxy-port" type="number" min="1" max="65535" placeholder="порт" aria-label="Порт прокси" class="proxy-port-input">
+          </div>
+          <div class="settings-compact-row proxy-connection-row settings-bento-proxy-auth-row">
+            <input id="proxy-username" type="text" autocomplete="off" spellcheck="false" placeholder="логин (необязательно)" aria-label="Логин прокси">
+            <input id="proxy-password" type="password" autocomplete="off" spellcheck="false" placeholder="пароль (необязательно)" aria-label="Пароль прокси">
+          </div>
+          <p id="proxy-password-hint" class="hint"></p>
+          <fieldset class="proxy-targets-fieldset">
+            <legend class="settings-bento-field-label" data-i18n="page.80093b1acab0">Проксировать запросы к</legend>
+            <div class="proxy-targets-grid">
+              <label><input type="checkbox" data-proxy-target="openrouter" /> OpenRouter</label>
+              <label><input type="checkbox" data-proxy-target="groq" /> Groq</label>
+              <label><input type="checkbox" data-proxy-target="openai" /> OpenAI</label>
+              <label><input type="checkbox" data-proxy-target="gladia" /> Gladia</label>
+              <label><input type="checkbox" data-proxy-target="deepgram" /> Deepgram</label>
+              <label><input type="checkbox" data-proxy-target="custom" /> Кастомные HTTP</label>
+              <label><input type="checkbox" data-proxy-target="gemini" /> Gemini CLI</label>
+              <label><input type="checkbox" data-proxy-target="youtube" /> YouTube</label>
+            </div>
+          </fieldset>
+          <button type="button" id="btn-proxy-save" class="btn-primary settings-bento-save-btn" data-i18n="page.4864057d626a">Сохранить</button>
+          <p id="proxy-status" class="hint"></p>
+          <span id="proxy-summary" class="settings-bento-sr-only" aria-hidden="true"></span>
+        </div>
+      </section>
+      </div>
+
+      <div id="settings-pane-cloud" class="settings-bento-pane" role="tabpanel" aria-labelledby="settings-tab-cloud" hidden>
+      <div class="settings-bento-pane-head">
+        <div>
+          <h3 class="settings-bento-pane-title" data-i18n="settings.cloudPaneTitle">Облачные провайдеры (API ключи)</h3>
+          <p class="settings-bento-pane-desc" data-i18n="settings.cloudPaneDesc">Нажмите на карточку для настроек</p>
+        </div>
+        <span class="settings-bento-chip settings-bento-chip-free" data-i18n="settings.cloudFreeBadge">3 FREE</span>
+      </div>
+      <section id="providers-settings" class="providers-settings settings-bento-cloud-list" aria-label="Сервисы и ключи">
+        <p class="settings-subtitle settings-bento-sr-only" data-i18n="page.09678dfe4386">Сервисы и ключи</p>
+
+        <div class="provider-category settings-bento-provider-group">
+          <h3 class="provider-category-title settings-bento-sr-only" data-i18n="page.1e5f2802db6e">Облачная расшифровка</h3>
+          <p class="hint provider-category-hint settings-bento-sr-only" data-i18n="page.ebef1da8883e">Файлы, диктофон и запись встречи. Активный сервис — в блоке «Провайдер» выше.</p>
+        <details class="settings-spoiler settings-bento-provider-spoiler" data-http-preset="gladia">
+          <summary><span class="spoiler-summary-label">Gladia<span class="provider-free-badge" title="Бесплатные кредиты при регистрации">FREE</span></span><span class="spoiler-meta-wrap"><span class="provider-ready-check material-symbols-outlined" aria-hidden="true" hidden>check_circle</span><span class="spoiler-meta" data-http-summary data-i18n="page.edc637eb52e9">нет ключа</span></span></summary>
+          <div class="spoiler-body">
+            <p class="provider-free-tier-hint" data-i18n-html="providerHints.gladiaFreeTier">Разовые €50 кредитов при регистрации (ориентир: ~80+ ч файлов или ~60+ ч live по ставкам Starter). Ежемесячно не пополняется — дальше top-up. Лимиты могут меняться: <a href="https://www.gladia.io/pricing" target="_blank" rel="noopener noreferrer" class="provider-key-link" data-i18n="page.c75aae437899">тарифы Gladia</a>.</p>
+            <p class="hint">
+              <a href="https://app.gladia.io/account" target="_blank" rel="noopener noreferrer" class="provider-key-link" data-i18n="page.4772d4ad1d0d">Получить API-ключ</a>
+              <span data-i18n="providerHints.gladiaKeyHint">— в аккаунте Gladia → API keys. Для русского и автоязыка — solaria-1.</span>
+            </p>
+            <div class="settings-compact-row">
+              <input data-http-key type="password" autocomplete="off" spellcheck="false" placeholder="ключ Gladia">
+              <select data-http-model aria-label="Модель Gladia">
+                <option value="solaria-1" data-i18n="page.b26abe953038">solaria-1 (все языки)</option>
+                <option value="solaria-3">solaria-3 (en/fr/de/es/it)</option>
+              </select>
+              <button type="button" data-http-save class="btn-outline" data-i18n="page.4864057d626a">Сохранить</button>
+            </div>
+            <p class="hint" data-http-key-hint></p>
+          </div>
+        </details>
+        <details class="settings-spoiler settings-bento-provider-spoiler" data-http-preset="groq">
+          <summary><span class="spoiler-summary-label">Groq<span class="provider-free-badge" title="Постоянный бесплатный тариф с лимитами">FREE</span></span><span class="spoiler-meta-wrap"><span class="provider-ready-check material-symbols-outlined" aria-hidden="true" hidden>check_circle</span><span class="spoiler-meta" data-http-summary data-i18n="page.edc637eb52e9">нет ключа</span></span></summary>
+          <div class="spoiler-body">
+            <p class="provider-free-tier-hint" data-i18n-html="providerHints.groqFreeTier">Постоянный $0-тариф без карты: Whisper в квотах (ориентир: ~8 ч аудио в сутки, до 25 MB на файл). Точные RPM/RPD — в <a href="https://console.groq.com/docs/rate-limits" target="_blank" rel="noopener noreferrer" class="provider-key-link" data-i18n="page.befb927fa7e4">лимитах Groq</a>.</p>
+            <p class="hint">
+              <a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer" class="provider-key-link" data-i18n="page.4772d4ad1d0d">Получить API-ключ</a>
+              <span data-i18n="providerHints.pasteKeyAndSave">— вставьте ниже и нажмите «Сохранить».</span>
+            </p>
+            <div class="settings-compact-row">
+              <input data-http-key type="password" autocomplete="off" spellcheck="false" placeholder="gsk_…">
+              <select data-http-model aria-label="Модель Groq">
+                <option value="whisper-large-v3-turbo">whisper-large-v3-turbo</option>
+                <option value="whisper-large-v3">whisper-large-v3</option>
+                <option value="distil-whisper-large-v3-en">distil-whisper-large-v3-en</option>
+              </select>
+              <button type="button" data-http-save class="btn-outline" data-i18n="page.4864057d626a">Сохранить</button>
+            </div>
+            <p class="hint" data-http-key-hint></p>
+          </div>
+        </details>
+        <details class="settings-spoiler settings-bento-provider-spoiler" data-http-preset="deepgram">
+          <summary><span class="spoiler-summary-label">Deepgram<span class="provider-free-badge" title="Стартовые кредиты при регистрации">FREE</span></span><span class="spoiler-meta-wrap"><span class="provider-ready-check material-symbols-outlined" aria-hidden="true" hidden>check_circle</span><span class="spoiler-meta" data-http-summary data-i18n="page.edc637eb52e9">нет ключа</span></span></summary>
+          <div class="spoiler-body">
+            <p class="provider-free-tier-hint" data-i18n-html="providerHints.deepgramFreeTier">Новым аккаунтам — $200 кредитов без карты (промо обычно сгорает через 12 месяцев). Постоянного бесплатного STT нет — далее оплата по минутам. <a href="https://deepgram.com/pricing" target="_blank" rel="noopener noreferrer" class="provider-key-link" data-i18n="page.d95f56d35391">Тарифы Deepgram</a>.</p>
+            <p class="hint">
+              <a href="https://console.deepgram.com/signup" target="_blank" rel="noopener noreferrer" class="provider-key-link" data-i18n="page.4772d4ad1d0d">Получить API-ключ</a>
+              <span data-i18n="providerHints.deepgramKeyHint">— в консоли Deepgram → API Keys, затем вставьте ниже.</span>
+            </p>
+            <div class="settings-compact-row">
+              <input data-http-key type="password" autocomplete="off" spellcheck="false" placeholder="ключ Deepgram">
+              <select data-http-model aria-label="Модель Deepgram">
+                <option value="nova-3">nova-3</option>
+                <option value="nova-2">nova-2</option>
+                <option value="enhanced">enhanced</option>
+                <option value="base">base</option>
+              </select>
+              <button type="button" data-http-save class="btn-outline" data-i18n="page.4864057d626a">Сохранить</button>
+            </div>
+            <p class="hint" data-http-key-hint></p>
+          </div>
+        </details>
+        <details class="settings-spoiler settings-bento-provider-spoiler" data-http-preset="openai">
+          <summary><span class="spoiler-summary-label">OpenAI</span><span class="spoiler-meta-wrap"><span class="provider-ready-check material-symbols-outlined" aria-hidden="true" hidden>check_circle</span><span class="spoiler-meta" data-http-summary data-i18n="page.edc637eb52e9">нет ключа</span></span></summary>
+          <div class="spoiler-body">
+            <p class="hint">
+              <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" class="provider-key-link" data-i18n="page.4772d4ad1d0d">Получить API-ключ</a>
+              <span data-i18n="providerHints.pasteKeyAndSave">— вставьте ниже и нажмите «Сохранить».</span>
+            </p>
+            <div class="settings-compact-row">
+              <input data-http-key type="password" autocomplete="off" spellcheck="false" placeholder="sk-…">
+              <select data-http-model aria-label="Модель OpenAI">
+                <option value="whisper-1">whisper-1</option>
+                <option value="gpt-4o-transcribe">gpt-4o-transcribe</option>
+                <option value="gpt-4o-mini-transcribe">gpt-4o-mini-transcribe</option>
+              </select>
+              <button type="button" data-http-save class="btn-outline" data-i18n="page.4864057d626a">Сохранить</button>
+            </div>
+            <p class="hint" data-http-key-hint></p>
+          </div>
+        </details>
+        <details class="settings-spoiler settings-bento-provider-spoiler" id="spoiler-openrouter">
+          <summary><span class="spoiler-summary-label">OpenRouter</span><span class="spoiler-meta-wrap"><span class="provider-ready-check material-symbols-outlined" aria-hidden="true" hidden>check_circle</span><span class="spoiler-meta" id="openrouter-summary"></span></span></summary>
+          <div class="spoiler-body">
+            <p class="hint">
+              <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer" class="provider-key-link" data-i18n="page.4772d4ad1d0d">Получить API-ключ</a>
+              <span data-i18n="providerHints.pasteKeyAndSave">— вставьте ниже и нажмите «Сохранить».</span>
+            </p>
+            <div class="settings-compact-row settings-compact-row-wrap">
+              <input id="openrouter-key" type="password" autocomplete="off" spellcheck="false" placeholder="API-ключ sk-or-…">
+              <select id="openrouter-model" aria-label="Модель OpenRouter" disabled>
+                <option value="" data-i18n="page.4ff58b5d73fd">Сначала обновите список</option>
+              </select>
+              <button type="button" id="btn-openrouter-save" class="btn-outline" data-i18n="page.4864057d626a">Сохранить</button>
+            </div>
+            <div class="settings-compact-row settings-compact-row-wrap">
+              <p id="openrouter-key-hint" class="hint settings-compact-grow"></p>
+              <button type="button" id="btn-openrouter-refresh" class="ghost settings-link-btn" data-i18n="page.ead8f5ad130f">Обновить модели</button>
+            </div>
+            <p id="openrouter-status" class="hint"></p>
+          </div>
+        </details>
+        <details class="settings-spoiler settings-bento-provider-spoiler" id="spoiler-gemini">
+          <summary><span class="spoiler-summary-label">Gemini CLI</span><span class="spoiler-meta-wrap"><span class="provider-ready-check material-symbols-outlined" aria-hidden="true" hidden>check_circle</span><span class="spoiler-meta" id="gemini-summary"></span></span></summary>
+          <div class="spoiler-body">
+            <p class="hint">
+              <a href="https://github.com/google-gemini/gemini-cli" target="_blank" rel="noopener noreferrer" class="provider-key-link" data-i18n="page.3f68e831ca98">Установка Gemini CLI</a>
+              — нужен `gemini` в PATH и вход в Google-аккаунт.
+            </p>
+            <p id="gemini-cli-status" class="hint"></p>
+          </div>
+        </details>
+        <details class="settings-spoiler settings-bento-provider-spoiler" id="spoiler-custom">
+          <summary><span class="spoiler-summary-label" data-i18n="page.b1367e82ca7f">Кастомный HTTP</span><span class="spoiler-meta-wrap"><span class="provider-ready-check material-symbols-outlined" aria-hidden="true" hidden>check_circle</span><span class="spoiler-meta" id="custom-summary"></span></span></summary>
+          <div class="spoiler-body">
+            <p class="hint" id="custom-protocol-hint" data-i18n="page.87d601d73035">Свой endpoint. Ключ выдаёт ваш сервис — см. документацию API (OpenAI Whisper, Gladia или Deepgram).</p>
+            <div id="custom-providers-list" class="custom-providers-list"></div>
+            <details class="settings-spoiler settings-spoiler-nested">
+              <summary>Добавить</summary>
+              <div class="spoiler-body settings-compact-grid">
+                <input id="custom-name" type="text" spellcheck="false" placeholder="Имя">
+                <select id="custom-protocol" aria-label="Тип API">
+                  <option value="openai">OpenAI Whisper API</option>
+                  <option value="gladia">Gladia</option>
+                  <option value="deepgram">Deepgram</option>
+                </select>
+                <input id="custom-model" type="text" spellcheck="false" placeholder="Модель">
+                <input id="custom-key" type="password" autocomplete="off" spellcheck="false" placeholder="API-ключ">
+                <input id="custom-endpoint" type="text" spellcheck="false" placeholder="https://api.example.com/v1" class="settings-span-2">
+                <button type="button" id="btn-custom-add" class="btn-outline" data-i18n="page.559a87f7cc13">Добавить</button>
+              </div>
+            </details>
+            <p id="custom-status" class="hint"></p>
+          </div>
+        </details>
+        </div>
+      </section>
+      </div>
+
+      <div id="settings-pane-youtube" class="settings-bento-pane" role="tabpanel" aria-labelledby="settings-tab-youtube" hidden>
+      <section class="providers-settings providers-settings-youtube" aria-label="YouTube">
+        <div class="provider-category">
+          <h3 class="provider-category-title">YouTube</h3>
+          <p class="hint provider-category-hint" data-i18n="page.5679458fe74e">Готовые субтитры через Apify (без скачивания видео для Whisper).</p>
+        <details class="settings-spoiler" id="spoiler-apify">
+          <summary><span class="spoiler-summary-label">Apify</span><span class="spoiler-meta-wrap"><span class="provider-ready-check material-symbols-outlined" aria-hidden="true" hidden>check_circle</span><span class="spoiler-meta" id="apify-summary"></span></span></summary>
+          <div class="spoiler-body">
+            <p class="hint">
+              <a href="https://console.apify.com/account#/integrations" target="_blank" rel="noopener noreferrer" class="provider-key-link" data-i18n="page.4772d4ad1d0d">Получить API-ключ</a>
+              — для актора scrapesage/youtube-transcript-scraper. Можно также задать APIFY_API_TOKEN.
+            </p>
+            <div class="settings-compact-row">
+              <input id="apify-key" type="password" autocomplete="off" spellcheck="false" placeholder="Apify API token">
+              <button type="button" id="btn-apify-save" class="btn-outline" data-i18n="page.4864057d626a">Сохранить</button>
+            </div>
+            <p id="apify-key-hint" class="hint"></p>
+          </div>
+        </details>
+        </div>
+      </section>
+      </div>
+
+      <div id="settings-pane-system" class="settings-bento-pane" role="tabpanel" aria-labelledby="settings-tab-system" hidden>
+      <p id="settings-app-version" class="hint settings-app-version" hidden></p>
+      <div class="settings-reload-block settings-bento-tile">
+        <p class="hint settings-reload-hint" data-i18n="page.62ec01817f96">После правок в файлах интерфейса перезагрузите окно, чтобы подтянуть изменения.</p>
+        <button type="button" id="btn-reload-ui" class="btn-outline settings-reload-btn" data-i18n-title="settings.reloadUiTitle" title="Перезагрузить окно приложения">
+          <span class="material-symbols-outlined" aria-hidden="true">refresh</span>
+          <span data-i18n="settings.reloadUi">Обновить интерфейс</span>
+        </button>
+        <button type="button" id="btn-reset-ui-cache" class="btn-outline settings-reload-btn" data-i18n-title="settings.resetUiCacheTitle" title="Очистить сохранённое состояние интерфейса">
+          <span class="material-symbols-outlined" aria-hidden="true">delete_sweep</span>
+          <span data-i18n="settings.resetUiCache">Сбросить кэш интерфейса</span>
+        </button>
+      </div>
+      <div class="settings-logs-block">
+        <p class="hint settings-logs-hint"><span data-i18n="settings.appLogLabel">Лог приложения:</span> <code id="settings-logs-path">%LOCALAPPDATA%\Slysh\logs\app.log</code></p>
+        <button type="button" id="btn-open-logs" class="btn-outline settings-reload-btn" data-i18n-title="settings.openLogsFolderTitle" title="Открыть папку с логами">
+          <span class="material-symbols-outlined" aria-hidden="true">folder_open</span>
+          <span data-i18n="settings.openLogsFolder">Открыть папку логов</span>
+        </button>
+      </div>
+      </div>
+      </div>
+      </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="folder-add-modal" class="modal" hidden>
+    <div class="modal-card" role="dialog" aria-labelledby="folder-add-title">
+      <h2 id="folder-add-title" data-i18n="page.585b38ac2082">Добавить папку</h2>
+      <p id="folder-add-count" class="hint"></p>
+      <label class="field" id="folder-add-name-wrap">
+        Имя пакета
+        <input id="folder-add-name" type="text" spellcheck="false">
+      </label>
+      <label class="modal-check">
+        <input type="checkbox" id="folder-add-recursive">
+        Включая подпапки
+      </label>
+      <div class="modal-actions">
+        <button type="button" id="folder-add-confirm" class="btn-primary" data-i18n="page.559a87f7cc13">Добавить</button>
+        <button type="button" id="folder-add-cancel" class="ghost" data-i18n="page.0ec753be8df9">Отмена</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="upload-target-modal" class="modal" hidden>
+    <div class="modal-card" role="dialog" aria-labelledby="upload-target-title">
+      <h2 id="upload-target-title" data-i18n="page.d172188dc6a7">Куда добавить файлы?</h2>
+      <p id="upload-target-count" class="hint"></p>
+      <div id="upload-target-choice" class="upload-target-choice">
+        <button type="button" id="upload-target-orphans" class="btn-outline upload-target-btn" data-i18n="page.48ef3e1b7da9">Отдельные файлы</button>
+        <button type="button" id="upload-target-batch" class="btn-primary upload-target-btn" data-i18n="page.455f7e22d9bf">Создать пакет</button>
+      </div>
+      <div id="upload-target-batch-form" class="upload-target-batch-form" hidden>
+        <label class="modal-field">
+          Название пакета
+          <input type="text" id="upload-target-batch-name" autocomplete="off">
+        </label>
+        <button type="button" id="upload-target-batch-rules" class="btn-outline" data-i18n="page.a259a976ae5f">Правила пакета…</button>
+        <div class="modal-actions">
+          <button type="button" id="upload-target-batch-confirm" class="btn-primary" data-i18n="page.455f7e22d9bf">Создать пакет</button>
+          <button type="button" id="upload-target-back" class="ghost" data-i18n="page.f6dab074d7bb">Назад</button>
+        </div>
+      </div>
+      <div class="modal-actions upload-target-cancel-row">
+        <button type="button" id="upload-target-cancel" class="ghost" data-i18n="page.0ec753be8df9">Отмена</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="new-batch-modal" class="modal" hidden>
+    <div class="modal-card" role="dialog" aria-labelledby="new-batch-title">
+      <h2 id="new-batch-title" data-i18n="page.29f41a1bc81c">Новый пакет</h2>
+      <label class="modal-field">
+        <span data-i18n="queue.batchNamePrompt">Название пакета</span>
+        <input type="text" id="new-batch-name" autocomplete="off">
+      </label>
+      <label class="modal-check">
+        <input type="checkbox" id="new-batch-add-files">
+        <span data-i18n="queue.newBatchAddFilesNow">Добавить файлы сейчас</span>
+      </label>
+      <div class="modal-actions">
+        <button type="button" id="new-batch-confirm" class="btn-primary" data-i18n="page.84370a209727">Создать</button>
+        <button type="button" id="new-batch-cancel" class="ghost" data-i18n="page.0ec753be8df9">Отмена</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="move-to-batch-modal" class="modal" hidden>
+    <div class="modal-card" role="dialog" aria-labelledby="move-to-batch-title">
+      <h2 id="move-to-batch-title" data-i18n="page.df823a36f1f5">Добавить в пакет</h2>
+      <p id="move-to-batch-count" class="hint"></p>
+      <label class="modal-field">
+        Пакет
+        <select id="move-to-batch-select" aria-label="Пакет"></select>
+      </label>
+      <label class="modal-field" id="move-to-batch-name-wrap">
+        Название нового пакета
+        <input type="text" id="move-to-batch-name" autocomplete="off">
+      </label>
+      <div class="modal-actions">
+        <button type="button" id="move-to-batch-confirm" class="btn-primary" data-i18n="page.559a87f7cc13">Добавить</button>
+        <button type="button" id="move-to-batch-cancel" class="ghost" data-i18n="page.0ec753be8df9">Отмена</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="batch-rules-modal" class="modal" hidden>
+    <div class="modal-card" role="dialog" aria-labelledby="batch-rules-title">
+      <h2 id="batch-rules-title" data-i18n="page.776bbc60a1be">Правила пакета</h2>
+      <div class="modal-form">
+        <label class="modal-check">
+          <input type="checkbox" id="rule-speakers">
+          Распознать спикеров после расшифровки
+        </label>
+        <label class="modal-check">
+          <input type="checkbox" id="rule-export">
+          Автоэкспорт после расшифровки
+        </label>
+        <div class="rules-export-block">
+          <label class="field">
+            <span class="field-label" data-i18n="page.04e42537897f">Формат экспорта</span>
+            <select id="rule-export-fmt">
+              <option value="srt">SRT</option>
+              <option value="vtt">VTT</option>
+              <option value="txt">TXT</option>
+              <option value="md">Markdown</option>
+            </select>
+          </label>
+          <label class="field">
+            <span class="field-label" data-i18n="page.5eb8427bd12f">Папка экспорта</span>
+            <select id="rule-export-dir-mode">
+              <option value="beside_source" data-i18n="page.07f8090d0088">Рядом с исходником</option>
+              <option value="fixed" data-i18n="page.da37567a334a">Одна папка для пакета</option>
+            </select>
+          </label>
+          <label class="field" id="rule-export-dir-wrap">
+            <span class="field-label" data-i18n="page.1b46c650da43">Путь</span>
+            <span class="field-row">
+              <input id="rule-export-dir" type="text" spellcheck="false">
+              <button type="button" id="rule-export-browse" class="btn-outline btn-compact">
+                <span class="material-symbols-outlined" aria-hidden="true">folder_open</span>
+                Обзор…
+              </button>
+            </span>
+          </label>
+        </div>
+        <label class="modal-check">
+          <input type="checkbox" id="rule-skip-completed" checked>
+          Пропускать уже готовые при повторном запуске
+        </label>
+      </div>
+      <div class="modal-actions">
+        <button type="button" id="batch-rules-save" class="btn-primary" data-i18n="page.4864057d626a">Сохранить</button>
+        <button type="button" id="batch-rules-cancel" class="ghost" data-i18n="page.0ec753be8df9">Отмена</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="export-modal" class="modal" hidden>
+    <div class="modal-card" role="dialog" aria-labelledby="export-title">
+      <h2 id="export-title" data-i18n="page.dd5016c82982">Экспорт</h2>
+      <p id="export-batch-hint" class="hint" hidden></p>
+      <label class="field">
+        <span data-i18n="exportUi.format">Формат</span>
+        <select id="export-fmt">
+          <option value="md">Markdown (Obsidian)</option>
+          <option value="srt">SRT</option>
+          <option value="vtt">VTT</option>
+          <option value="txt">TXT</option>
+        </select>
+      </label>
+      <label class="field" id="export-name-field">
+        <span data-i18n="exportUi.fileName">Имя файла</span>
+        <input id="export-name" type="text" spellcheck="false">
+      </label>
+      <div class="field" id="export-dirs-field">
+        <span class="field-label" data-i18n="page.38ee4ea3f9e8">Папки</span>
+        <div id="export-dirs-list" class="export-dirs-list"></div>
+        <button type="button" id="export-dir-add" class="btn-outline btn-compact export-dir-add">
+          <span class="material-symbols-outlined" aria-hidden="true">add</span>
+          <span data-i18n="exportUi.addFolder">Добавить папку</span>
+        </button>
+      </div>
+      <div class="modal-actions">
+        <button type="button" id="export-confirm" class="btn-primary" data-i18n="page.4864057d626a">Сохранить</button>
+        <button type="button" id="export-cancel" class="ghost" data-i18n="page.0ec753be8df9">Отмена</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="ctx-menu" class="ctx-menu" hidden>
+    <button type="button" data-act="batch-start" hidden data-i18n="page.050583a41244">Запустить пакет</button>
+    <button type="button" data-act="batch-pause" hidden data-i18n="page.03498e395a43">Пауза</button>
+    <button type="button" data-act="batch-cancel" hidden data-i18n="page.2fe9f48c950b">Остановить пакет</button>
+    <button type="button" data-act="batch-rules" hidden data-i18n="page.776bbc60a1be">Правила пакета</button>
+    <button type="button" data-act="batch-add" hidden data-i18n="page.14694797a417">Добавить файлы…</button>
+    <button type="button" data-act="batch-add-folder" hidden data-i18n="page.37087e875bbf">Добавить папку…</button>
+    <button type="button" data-act="batch-delete" class="danger" hidden data-i18n="page.b2c88c3e1db6">Удалить пакет</button>
+    <button type="button" data-act="batch-archive" hidden data-i18n="page.c7824aa0285a">В архив</button>
+    <button type="button" data-act="batch-unarchive" hidden data-i18n="page.a37228a4d30c">Вернуть из архива</button>
+    <button type="button" data-act="batch-export" hidden data-i18n="page.3164b99e2308">Экспортировать все…</button>
+    <button type="button" data-act="batch-open-export" hidden data-i18n="page.b13910dfa55a">Открыть файл расшифровки</button>
+    <button type="button" data-act="batch-open-export-folder" hidden data-i18n="page.a96de5ab2064">Открыть папку с расшифровкой</button>
+    <button type="button" data-act="remove-from-batch" hidden data-i18n="page.3c2ce0a9fe5f">Убрать из пакета</button>
+    <button type="button" data-act="transcribe" data-i18n="page.b4327dd21040">Расшифровать</button>
+    <button type="button" data-act="export" data-i18n="page.dd5016c82982">Экспорт</button>
+    <button type="button" data-act="open-export" hidden data-i18n="page.b13910dfa55a">Открыть файл расшифровки</button>
+    <button type="button" data-act="open-export-folder" hidden data-i18n="page.a96de5ab2064">Открыть папку с расшифровкой</button>
+    <button type="button" data-act="open-source-folder" hidden data-i18n="page.366366015cf5">Открыть папку с файлом</button>
+    <button type="button" data-act="archive" hidden data-i18n="page.c7824aa0285a">В архив</button>
+    <button type="button" data-act="unarchive" hidden data-i18n="page.a37228a4d30c">Вернуть из архива</button>
+    <button type="button" data-act="speakers" data-i18n="page.9e8dc1ce7821">Распознать спикеров</button>
+    <button type="button" data-act="retranscribe" data-i18n="page.c0f8316f2739">Заново</button>
+    <button type="button" data-act="cancel" data-i18n="page.0ec753be8df9">Отмена</button>
+    <button type="button" data-act="delete" class="danger" data-i18n="page.86ea33aef5e9">Удалить</button>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+  <div id="boot-error" class="boot-error" hidden role="alert"></div>
+  <script>
+    (function () {
+      function showBootError(msg, detail) {
+        var el = document.getElementById("boot-error");
+        if (!el) {
+          return;
+        }
+        el.hidden = false;
+        el.textContent =
+          "Ошибка интерфейса: " +
+          msg +
+          (detail ? " (" + detail + ")" : "") +
+          ". Попробуйте Настройки → Сбросить кэш интерфейса.";
+      }
+      window.addEventListener("error", function (event) {
+        if (event.message) {
+          var detail = event.filename ? event.filename.split("/").pop() + ":" + event.lineno : "";
+          showBootError(event.message, detail);
+        }
+      });
+      window.addEventListener("unhandledrejection", function (event) {
+        var reason = event.reason;
+        var msg =
+          (reason && reason.message) || String(reason || "неизвестная ошибка");
+        showBootError(msg);
+      });
+    })();
+  </script>
+  <script type="importmap">
+  {
+    "imports": {
+      "/js/api.js": "/js/api.js?v=45",
+      "/js/archive.js": "/js/archive.js?v=46",
+      "/js/batch-panel.js": "/js/batch-panel.js?v=45",
+      "/js/batch-kind.js": "/js/batch-kind.js?v=45",
+      "/js/dashboard.js": "/js/dashboard.js?v=44",
+      "/js/editor.js": "/js/editor.js?v=45",
+      "/js/errors.js": "/js/errors.js?v=45",
+      "/js/i18n.js": "/js/i18n.js?v=49",
+      "/js/icons.js": "/js/icons.js?v=45",
+      "/js/intake-duplicate.js": "/js/intake-duplicate.js?v=45",
+      "/js/legacy.js": "/js/legacy.js?v=46",
+      "/js/media-time.js": "/js/media-time.js?v=45",
+      "/js/library-store.js": "/js/library-store.js?v=45",
+      "/js/job-source.js": "/js/job-source.js?v=45",
+      "/js/library-table-filters.js": "/js/library-table-filters.js?v=45",
+      "/js/library-table.js": "/js/library-table.js?v=45",
+      "/js/library-utils.js": "/js/library-utils.js?v=45",
+      "/js/live.js": "/js/live.js?v=48",
+      "/js/meeting.js": "/js/meeting.js?v=45",
+      "/js/main.js": "/js/main.js?v=53",
+      "/js/secret-field.js": "/js/secret-field.js?v=45",
+      "/js/orphan-files-table.js": "/js/orphan-files-table.js?v=45",
+      "/js/queue.js": "/js/queue.js?v=44",
+      "/js/router.js": "/js/router.js?v=47",
+      "/js/shell.js": "/js/shell.js?v=73",
+      "/js/state.js": "/js/state.js?v=45",
+      "/js/transcripts.js": "/js/transcripts.js?v=45",
+      "/js/version.js": "/js/version.js?v=45",
+      "/js/youtube.js": "/js/youtube.js?v=45"
+    }
+  }
+  </script>
+  <script type="module" src="/js/main.js?v=53"></script>
+</body>
+</html>
