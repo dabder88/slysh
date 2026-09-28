@@ -33,3 +33,29 @@ models/*
 bin/ffmpeg.exe
 bin/ffprobe.exe
 
+# See docs/core/WORKFLOW.md — dist/, design/, local logs are not committed
+
+# Local dev / pytest home in repo root
+.test-home/
+
+# Runtime logs at repo root (install copy is outside git)
+launch-last-error.txt
+.install-ui-locale
+
+# UI mockups and design sources (shipped: web/branding/, slysh.ico)
+refs/
+design/
+
+# Frontend build artifacts and caches
+web/dist/
+web/locales/*.cache.json
+
+# Legacy monolith (superseded by web/js/* + web/app.css)
+web/app.js
+web/styles.css
+
+# OS / logs
+Thumbs.db
+Desktop.ini
+*.log
+

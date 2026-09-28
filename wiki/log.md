@@ -41,3 +41,8 @@
 - Ручная проверка обновлений: меню «Проверить обновления», GitHub Releases, API `/api/app/info`, `/api/updates/*`.
 - Сборка: `version.json` в payload, `AppVersion` в Inno из `pyproject.toml`.
 - Документация: [docs/features/APP-UPDATES.md](../docs/features/APP-UPDATES.md), [[installer]].
+
+## 2026-09-27 (gitignore)
+
+- Расширен `.gitignore`: `.test-home/`, `refs/`, `design/`, `web/dist/`, кэш локалей, legacy `web/app.js` / `web/styles.css`, логи лаунчера в корне.
+- Сняты с отслеживания макеты `refs/`, исходники `design/`, дубликат CSS и кэш; в git остаются `web/branding/` и `slysh.ico`.

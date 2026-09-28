@@ -55,7 +55,7 @@ if ($pyText -notmatch '(?m)^version\s*=\s*"([^"]+)"') {
 $AppVersion = $Matches[1]
 $githubRepo = $env:SLYSH_GITHUB_REPO
 if (-not $githubRepo) {
-    $githubRepo = "slysh-app/slysh"
+    $githubRepo = "dabder88/slysh"
 }
 $versionJson = @{
     version     = $AppVersion

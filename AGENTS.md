@@ -231,7 +231,7 @@ bat → python -m slysh.app
 | `web/js/shell.js` | Настройки, модаль пакетов |
 | `web/styles/input.css` | Исходник Tailwind |
 | `web/app.css` | Сборка |
-| `web/branding/` | Логотип и favicon для UI (из `design/logo/final`, `scripts/sync-branding.ps1`) |
+| `web/branding/` | Логотип и favicon для UI (в git; обновление из локального `design/logo/final` через `scripts/sync-branding.ps1`) |
 
 ### Прочее
 
@@ -239,7 +239,7 @@ bat → python -m slysh.app
 |------|------|
 | `Slysh.bat` | Лаунчер |
 | `slysh.ico` | Иконка окна (pywebview) и ярлыка Windows |
-| `design/logo/final/` | Исходники логотипа; после правок — `build_exact_assets.py` + `sync-branding.ps1` |
+| `design/` | Исходники логотипа локально, **не в git** (`.gitignore`); после правок — `build_exact_assets.py` + `sync-branding.ps1` → `web/branding/` |
 | `pyproject.toml` | Пакет, extras `engine` / `diarization` / `youtube` |
 | `models/` | Веса (в git только `.gitkeep`) |
 | `tests/` | pytest |

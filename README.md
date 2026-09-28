@@ -22,7 +22,7 @@ Python package and launch command are still `slysh` (`uv run slysh`). The visibl
 
 Иконка окна на панели задач берётся из `slysh.ico` в корне репозитория (при запуске через Python/pywebview). Чтобы ярлык на рабочем столе выглядел так же: создайте ярлык на `Slysh.bat` → «Изменить значок» → укажите `slysh.ico` в папке проекта. Прямой запуск bat из проводника может показывать значок Python, пока не открыто окно приложения.
 
-Логотип в интерфейсе: `web/branding/` (копия из `design/logo/final`). После смены макета: `powershell -File scripts\sync-branding.ps1`.
+Логотип в интерфейсе: `web/branding/` и `slysh.ico` (в git). Папка `design/` в репозиторий не входит; для смены макета держите локально `design/logo/final`, затем `powershell -File scripts\sync-branding.ps1`.
 
 Если `.venv` уже есть (повторный запуск на вашей машине) — bat сразу открывает окно, **без** `uv sync`.
 
