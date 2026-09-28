@@ -366,17 +366,12 @@ def engine_resync_recommended() -> bool:
     if not engine_packages_ok():
         consume_app_update_marker()
         return False
-    current = uv_lock_fingerprint()
-    if not current:
-        return False
-    stored = stored_lock_fingerprint()
     marker_path = app_dir() / POST_UPDATE_MARKER
     had_marker = marker_path.is_file()
     if had_marker:
         consume_app_update_marker()
         return True
-    if stored and current != stored:
-        return True
+    save_lock_fingerprint()
     return False
 
 

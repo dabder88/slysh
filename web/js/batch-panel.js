@@ -19,7 +19,9 @@ import {
   batchDoneCount,
   formatBatchCountsSummary,
   jobProgressPct,
+  jobProgressPctLabel,
   createProgressBar,
+  isProgressIndeterminate,
 } from "./library-utils.js";
 import { msIcon } from "./icons.js";
 import { isYoutubeBatch } from "./batch-kind.js";
@@ -127,12 +129,13 @@ function renderJobRow(job, batchId, index, total, batchRunning, onRefresh, onCon
 
   if (isJobActive(job) || job.status === "queued") {
     const pct = jobProgressPct(job);
+    const indeterminate = isProgressIndeterminate(job);
     const progressRow = document.createElement("div");
     progressRow.className = "package-job-progress";
-    progressRow.appendChild(createProgressBar(pct, "primary", "progress-inline"));
+    progressRow.appendChild(createProgressBar(pct, "primary", "progress-inline", indeterminate));
     const pctLabel = document.createElement("span");
     pctLabel.className = "hint";
-    pctLabel.textContent = `${pct}%`;
+    pctLabel.textContent = jobProgressPctLabel(job);
     progressRow.appendChild(pctLabel);
     statusWrap.appendChild(progressRow);
   }

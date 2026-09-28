@@ -13,11 +13,25 @@ class SpeakerCancelledError(Exception):
 
 
 class SpeakersBackend(Protocol):
-    def label(self, source_path: str, segments: list[Segment]) -> list[Segment]: ...
+    def label(
+        self,
+        source_path: str,
+        segments: list[Segment],
+        *,
+        cancelled: Callable[[], bool] | None = None,
+    ) -> list[Segment]: ...
 
 
 class FakeSpeakersBackend:
-    def label(self, source_path: str, segments: list[Segment]) -> list[Segment]:
+    def label(
+        self,
+        source_path: str,
+        segments: list[Segment],
+        *,
+        cancelled: Callable[[], bool] | None = None,
+    ) -> list[Segment]:
+        if cancelled and cancelled():
+            raise SpeakerCancelledError()
         return [
             Segment(s.start_ms, s.end_ms, s.text, speaker="SPEAKER_00")
             for s in segments
@@ -49,9 +63,18 @@ def assign_speakers(
         raise ValueError(f"job {job_id} has no media path for speaker diarization")
     snapshot = _copy_segments(db.list_segments(job_id))
     try:
-        labeled = backend.label(media_path, _copy_segments(snapshot))
+        labeled = backend.label(
+            media_path,
+            _copy_segments(snapshot),
+            cancelled=cancelled,
+        )
+        if cancelled and cancelled():
+            raise SpeakerCancelledError()
+        db.replace_segments(job_id, labeled)
+        return labeled
+    except SpeakerCancelledError:
+        db.replace_segments(job_id, snapshot)
+        raise
     except Exception:
         db.replace_segments(job_id, snapshot)
         raise
-    db.replace_segments(job_id, labeled)
-    return labeled

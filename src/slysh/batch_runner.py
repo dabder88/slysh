@@ -87,6 +87,7 @@ def _export_batch_job(
         targets.append(rules)
 
     last_path: Path | None = None
+    all_paths: list[str] = []
     for target_rules in targets:
         if is_youtube_batch_rules(target_rules) or str(job.get("kind") or "") == JobKind.YOUTUBE.value:
             out = youtube_job_export_path(job, fmt, target_rules)
@@ -102,8 +103,11 @@ def _export_batch_job(
                 out = suggested_export_path(job["source_path"], fmt)
             write_job_export(out, segments, fmt, job=job)
         last_path = out
+        all_paths.append(str(out))
 
-    if last_path is not None:
+    if all_paths:
+        db.set_last_export_paths(job_id, all_paths)
+    elif last_path is not None:
         db.set_last_export_path(job_id, str(last_path))
 
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+import json
 import logging
 import os
 import subprocess
@@ -109,6 +110,7 @@ from slysh.runtime_setup import (
     setup_status,
     start_engine_install,
 )
+from slysh.subprocess_win import subprocess_no_console_kwargs
 from slysh.updates import (
     app_info,
     apply_update,
@@ -219,6 +221,10 @@ class JobsExportBody(BaseModel):
 class OpenPathBody(BaseModel):
     path: str
     reveal: bool = False
+
+
+class ExportPathsBody(BaseModel):
+    paths: list[str]
 
 
 class LiveStartBody(BaseModel):
@@ -353,8 +359,27 @@ LIVE_NOT_PAUSED_HINT = "Диктофон не на паузе."
 LIVE_ALREADY_HINT = "Диктофон уже записывает."
 
 
+def _parse_last_export_paths(job: dict) -> list[str]:
+    raw = job.get("last_export_paths")
+    if isinstance(raw, str) and raw.strip():
+        try:
+            parsed = json.loads(raw)
+            if isinstance(parsed, list):
+                return [str(p).strip() for p in parsed if str(p).strip()]
+        except json.JSONDecodeError:
+            pass
+    single = job.get("last_export_path")
+    if single:
+        text = str(single).strip()
+        if text:
+            return [text]
+    return []
+
+
 def _job_payload(job: dict) -> dict:
-    return dict(job)
+    payload = dict(job)
+    payload["last_export_paths"] = _parse_last_export_paths(job)
+    return payload
 
 
 def _apply_transcribe_range(db: Database, job_id: int, body: JobTranscribeBody) -> None:
@@ -771,6 +796,7 @@ def _spawn_engine(app: FastAPI) -> dict[str, int]:
         text=True,
         env=env,
         bufsize=1,
+        **subprocess_no_console_kwargs(),
     )
     port: int | None = None
     stdout = proc.stdout
@@ -1682,6 +1708,15 @@ def create_ui_app(
             raise HTTPException(status_code=400, detail=f"Не удалось сохранить файл: {exc}") from exc
         return {"path": str(out)}
 
+    @app.put("/api/jobs/{job_id}/last-export-paths")
+    def put_last_export_paths(job_id: int, body: ExportPathsBody) -> dict:
+        _require_job(db, job_id)
+        paths = [str(p).strip() for p in body.paths if str(p).strip()]
+        if not paths:
+            raise HTTPException(status_code=400, detail="Укажите хотя бы один путь.")
+        db.set_last_export_paths(job_id, paths)
+        return _decorate_job(app, _job_payload(_require_job(db, job_id)))
+
     @app.get("/api/jobs/{job_id}/media")
     def job_media(job_id: int) -> FileResponse:
         job = _require_job(db, job_id)
@@ -1766,6 +1801,9 @@ def create_ui_app(
             speaker_cancel = app.state.speaker_cancels.get(job_id)
             if speaker_cancel is not None:
                 speaker_cancel.set()
+            app.state.speaker_jobs.pop(job_id, None)
+            app.state.speaker_started.pop(job_id, None)
+            app.state.speaker_errors[job_id] = SPEAKER_CANCELLED_MESSAGE
             proc = app.state.speaker_ytdlp_procs.get(job_id)
             if proc is not None:
                 try:

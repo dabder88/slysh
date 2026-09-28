@@ -1,11 +1,13 @@
-﻿import { navigate, getRoute } from "./router.js";
+﻿import { navigate, getRoute, getEditorJobId } from "./router.js";
 import { mountLibraryTable } from "./library-table.js";
 import {
   isLibraryOrphan,
   isArchiveBatch,
   createProgressBar,
+  updateProgressBarFill,
   isJobTranscribing,
   jobProgressPct,
+  jobProgressPctLabel,
   isProgressIndeterminate,
 } from "./library-utils.js";
 import { api, showToast, jobDisplayName, isYoutubeJob } from "./api.js";
@@ -23,6 +25,7 @@ import {
   setLibrarySelectionHook,
   getSelectedBatchId,
   jobById,
+  upsertJobInStore,
   batchById,
   jobStatusLabel,
   jobStatusTone,
@@ -61,6 +64,10 @@ const exportActionsEl = document.getElementById("export-actions");
 const exportActionsPathEl = document.getElementById("export-actions-path");
 const ctxMenu = document.getElementById("ctx-menu");
 const jobBannerEl = document.getElementById("job-banner");
+let jobBannerViewMode = null;
+let jobBannerProgressStage = null;
+/** @type {{ row: HTMLElement, stageText: Text, pctEl: HTMLElement, hint: HTMLElement, fill: HTMLElement, track: HTMLElement } | null} */
+let jobBannerProgressRefs = null;
 const batchTargetSelectEl = document.getElementById("batch-target-select");
 const folderAddModal = document.getElementById("folder-add-modal");
 const folderAddCountEl = document.getElementById("folder-add-count");
@@ -288,13 +295,78 @@ function progressStageLabel(job) {
   return t("legacy.stageTranscribe");
 }
 
-function syncJobBanner(job) {
+function jobBannerProgressStageKey(job) {
+  if (job.speakers_running) {
+    return "speakers";
+  }
+  if (job.engine_starting) {
+    return "engine";
+  }
+  if (job.status === "queued") {
+    return "queued";
+  }
+  return "transcribe";
+}
+
+function resetJobBannerDom() {
   if (!jobBannerEl) {
     return;
   }
   jobBannerEl.replaceChildren();
+  jobBannerViewMode = null;
+  jobBannerProgressStage = null;
+  jobBannerProgressRefs = null;
+}
+
+function buildJobBannerProgressDom(job) {
+  const row = document.createElement("div");
+  row.className = "job-progress";
+
+  const meta = document.createElement("div");
+  meta.className = "job-progress-meta";
+  const label = document.createElement("span");
+  label.className = "job-progress-label";
+  const icon = msIcon(job.speakers_running ? "record_voice_over" : "graphic_eq");
+  icon.classList.add("job-progress-icon");
+  label.appendChild(icon);
+  const stageText = document.createTextNode(progressStageLabel(job));
+  label.appendChild(stageText);
+  const pctEl = document.createElement("span");
+  pctEl.className = "job-progress-pct";
+  meta.appendChild(label);
+  meta.appendChild(pctEl);
+
+  const bar = createProgressBar(
+    jobProgressPct(job),
+    "primary",
+    "progress-bar--lg",
+    isProgressIndeterminate(job),
+  );
+  const fill = bar.querySelector(".queue-progress-fill");
+  const hint = document.createElement("p");
+  hint.className = "hint job-progress-hint";
+
+  row.appendChild(meta);
+  row.appendChild(bar);
+  row.appendChild(hint);
+
+  return {
+    row,
+    stageText,
+    pctEl,
+    hint,
+    fill,
+    track: bar,
+  };
+}
+
+function syncJobBanner(job) {
+  if (!jobBannerEl) {
+    return;
+  }
   if (!job) {
     jobBannerEl.hidden = true;
+    resetJobBannerDom();
     return;
   }
   const tone = jobStatusTone(job);
@@ -305,6 +377,10 @@ function syncJobBanner(job) {
   }`;
 
   if (!transcribing) {
+    if (jobBannerViewMode !== "text") {
+      resetJobBannerDom();
+      jobBannerViewMode = "text";
+    }
     let text = jobStatusLabel(job);
     if (job.status === "failed" && job.error_text) {
       text = `${text}: ${job.error_text}`;
@@ -315,34 +391,25 @@ function syncJobBanner(job) {
     return;
   }
 
+  const stage = jobBannerProgressStageKey(job);
+  if (jobBannerViewMode !== "progress" || jobBannerProgressStage !== stage) {
+    resetJobBannerDom();
+    jobBannerViewMode = "progress";
+    jobBannerProgressStage = stage;
+    jobBannerProgressRefs = buildJobBannerProgressDom(job);
+    jobBannerEl.appendChild(jobBannerProgressRefs.row);
+  }
+
+  const refs = jobBannerProgressRefs;
+  if (!refs) {
+    return;
+  }
   const pct = jobProgressPct(job);
   const indeterminate = isProgressIndeterminate(job);
-  const row = document.createElement("div");
-  row.className = "job-progress";
-
-  const meta = document.createElement("div");
-  meta.className = "job-progress-meta";
-  const label = document.createElement("span");
-  label.className = "job-progress-label";
-  const icon = msIcon("graphic_eq");
-  icon.classList.add("job-progress-icon");
-  label.appendChild(icon);
-  label.appendChild(document.createTextNode(progressStageLabel(job)));
-  const pctEl = document.createElement("span");
-  pctEl.className = "job-progress-pct";
-  pctEl.textContent = indeterminate && pct <= 0 ? "…" : `${pct}%`;
-  meta.appendChild(label);
-  meta.appendChild(pctEl);
-
-  const bar = createProgressBar(pct, "primary", "progress-bar--lg", indeterminate);
-  const hint = document.createElement("p");
-  hint.className = "hint job-progress-hint";
-  hint.textContent = jobStatusLabel(job);
-
-  row.appendChild(meta);
-  row.appendChild(bar);
-  row.appendChild(hint);
-  jobBannerEl.appendChild(row);
+  refs.stageText.textContent = progressStageLabel(job);
+  refs.pctEl.textContent = jobProgressPctLabel(job);
+  refs.hint.textContent = jobStatusLabel(job);
+  updateProgressBarFill(refs.fill, pct, indeterminate, "primary", refs.track);
 }
 
 function legacyNeedsPoll() {
@@ -818,6 +885,7 @@ async function selectJob(id) {
   selectedId = id;
   renderLibrary();
   const job = await api(`/api/jobs/${id}`);
+  upsertJobInStore(job);
   if (getRoute() !== "editor") {
     return job;
   }
@@ -860,7 +928,8 @@ async function pollJobs() {
       lastSpeakersError = job.speakers_error;
       showToast(job.speakers_error);
     }
-    jobs = jobs.map((j) => (j.id === job.id ? { ...j, ...job } : j));
+    upsertJobInStore(job);
+    syncLocalLibraryState();
     renderLibrary();
     if (editorRefreshHook) {
       editorRefreshHook(job);
@@ -946,21 +1015,103 @@ function syncTranscribeUi(job) {
   }
 }
 
-export function syncExportActions(job) {
+export function syncExportActions(job, exportPaths = null) {
   if (!exportActionsEl || !exportActionsPathEl) {
     return;
   }
   const editActive = document.getElementById("editor-mode-edit")?.classList.contains("is-active");
   const path = job && job.last_export_path;
-  if (editActive || !path) {
+  let paths =
+    Array.isArray(exportPaths) && exportPaths.length
+      ? exportPaths.filter(Boolean)
+      : Array.isArray(job?.last_export_paths) && job.last_export_paths.length
+        ? job.last_export_paths.filter(Boolean)
+        : path
+          ? [path]
+          : [];
+  const displayPath = paths.length ? paths[paths.length - 1] : path;
+  if (editActive || !displayPath) {
     exportActionsEl.hidden = true;
-    if (!path) {
+    if (!displayPath) {
       exportActionsPathEl.textContent = "";
+      delete exportActionsPathEl.dataset.exportPath;
+      delete exportActionsPathEl.dataset.exportPaths;
+      exportActionsPathEl.removeAttribute("title");
     }
     return;
   }
   exportActionsEl.hidden = false;
-  exportActionsPathEl.textContent = path;
+  exportActionsPathEl.textContent = displayPath;
+  exportActionsPathEl.dataset.exportPath = displayPath;
+  if (paths.length > 1) {
+    exportActionsPathEl.dataset.exportPaths = JSON.stringify(paths);
+    exportActionsPathEl.title = paths.join("\n");
+  } else {
+    delete exportActionsPathEl.dataset.exportPaths;
+    exportActionsPathEl.title = displayPath;
+  }
+}
+
+function activeJobIdForExport() {
+  if (selectedId != null) {
+    return selectedId;
+  }
+  if (getRoute() === "editor") {
+    return getEditorJobId();
+  }
+  return null;
+}
+
+function pathFromExportActionsDom() {
+  if (!exportActionsEl || exportActionsEl.hidden) {
+    return "";
+  }
+  const fromDataset = exportActionsPathEl?.dataset?.exportPath?.trim();
+  if (fromDataset) {
+    return fromDataset;
+  }
+  return (exportActionsPathEl?.textContent || "").trim();
+}
+
+async function resolveExportOpenPaths() {
+  if (exportActionsPathEl?.dataset?.exportPaths) {
+    try {
+      const parsed = JSON.parse(exportActionsPathEl.dataset.exportPaths);
+      if (Array.isArray(parsed) && parsed.length) {
+        return parsed.map((p) => String(p).trim()).filter(Boolean);
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  const domPath = pathFromExportActionsDom();
+  if (domPath) {
+    return [domPath];
+  }
+  const id = activeJobIdForExport();
+  if (id == null) {
+    return [];
+  }
+  const job = jobById(id);
+  if (Array.isArray(job?.last_export_paths) && job.last_export_paths.length) {
+    return job.last_export_paths.filter(Boolean);
+  }
+  if (job?.last_export_path) {
+    return [job.last_export_path];
+  }
+  if (getRoute() === "editor" && getEditorJobId() === id) {
+    try {
+      const fresh = await api(`/api/jobs/${id}`);
+      upsertJobInStore(fresh);
+      if (Array.isArray(fresh.last_export_paths) && fresh.last_export_paths.length) {
+        return fresh.last_export_paths;
+      }
+      return fresh.last_export_path ? [fresh.last_export_path] : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
 }
 
 function uniqueSpeakers(segments) {
@@ -1901,12 +2052,24 @@ function setExportModalMode(mode, count) {
   }
 }
 
-function openExportModal() {
-  if (selectedId == null) {
+async function openExportModal() {
+  let id = selectedId;
+  if (id == null && getRoute() === "editor") {
+    id = getEditorJobId();
+  }
+  if (id == null) {
     showToast("legacy.k9064548");
     return;
   }
-  const job = jobById(selectedId);
+  let job = jobById(id);
+  if (!job) {
+    try {
+      job = await api(`/api/jobs/${id}`);
+      upsertJobInStore(job);
+    } catch {
+      job = null;
+    }
+  }
   openJobExportModal(job);
 }
 
@@ -2044,32 +2207,67 @@ async function confirmExport() {
     showToast(t("legacy.savedToPath", { path: exportedPath }));
   }
   window.dispatchEvent(
-    new CustomEvent("gigaam:job-exported", { detail: { jobId, path: exportedPath } })
+    new CustomEvent("gigaam:job-exported", {
+      detail: { jobId, path: exportedPath, paths: exportedPaths },
+    })
   );
+  try {
+    await api(`/api/jobs/${jobId}/last-export-paths`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ paths: exportedPaths }),
+    });
+  } catch (err) {
+    showToast(err.message || String(err));
+  }
   await refreshJobs();
-  if (selectedId === jobId) {
-    await selectJob(jobId);
+  const editorJobId = getEditorJobId();
+  if ((getRoute() === "editor" && editorJobId === jobId) || selectedId === jobId) {
+    const job = await selectJob(jobId);
+    if (exportedPaths.length > 1) {
+      syncExportActions(job, exportedPaths);
+    }
   }
 }
 
 async function exportSelected() {
-  openExportModal();
+  await openExportModal();
 }
 
 async function openLocalPath(path, reveal) {
-  if (!path) {
+  const normalized = String(path || "").trim();
+  if (!normalized) {
     showToast("legacy.k3235582");
     return;
   }
-  if (window.pywebview && window.pywebview.api && window.pywebview.api.open_path) {
-    await window.pywebview.api.open_path(path, reveal);
-    return;
+  if (window.pywebview?.api?.open_path) {
+    try {
+      await window.pywebview.api.open_path(normalized, reveal);
+      return;
+    } catch (err) {
+      try {
+        await api("/api/open-path", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ path: normalized, reveal }),
+        });
+        return;
+      } catch (fallbackErr) {
+        showToast(fallbackErr.message || err.message || String(fallbackErr));
+        throw fallbackErr;
+      }
+    }
   }
-  await api("/api/open-path", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path, reveal }),
-  });
+  try {
+    await api("/api/open-path", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: normalized, reveal }),
+    });
+  } catch (err) {
+    showToast(err.message || String(err));
+    throw err;
+  }
 }
 
 function firstBatchExportPath(batch) {
@@ -2078,13 +2276,28 @@ function firstBatchExportPath(batch) {
 }
 
 async function openSavedExport(reveal) {
-  const job = selectedId == null ? null : jobById(selectedId);
-  const path = job && job.last_export_path;
-  if (!path) {
+  const paths = await resolveExportOpenPaths();
+  if (!paths.length) {
     showToast("legacy.k8610333");
     return;
   }
-  await openLocalPath(path, reveal);
+  let ok = 0;
+  const errors = [];
+  for (const path of paths) {
+    try {
+      await openLocalPath(path, reveal);
+      ok += 1;
+    } catch (err) {
+      errors.push(err.message || String(err));
+    }
+  }
+  if (ok === 0) {
+    showToast(errors[0] || t("legacy.k3235582"));
+    return;
+  }
+  if (errors.length) {
+    showToast(t("legacy.exportOpenPartial", { ok, total: paths.length }));
+  }
 }
 
 async function openSourceFolder(jobId) {
@@ -2376,12 +2589,7 @@ function bindLegacyEvents() {
   );
   transcriptEl?.addEventListener("click", () => seekFromTranscriptClick());
 
-  exportModal?.addEventListener("click", (event) => {
-    if (event.target !== exportModal || isModalBackdropSuppressed()) {
-      return;
-    }
-    closeExportModal();
-  });
+  document.getElementById("export-close")?.addEventListener("click", () => closeExportModal());
   document.getElementById("export-cancel")?.addEventListener("click", () => closeExportModal());
   document.getElementById("export-confirm")?.addEventListener("click", () =>
     confirmExport().catch((err) => showToast(err.message || String(err)))

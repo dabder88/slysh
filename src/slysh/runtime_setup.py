@@ -176,10 +176,12 @@ def should_show_engine_setup_modal(*, engine_packages: bool) -> bool:
     except Exception:
         logging.debug("cloud_only check skipped", exc_info=True)
         cloud_only = False
+    if engine_packages:
+        if is_prompt_engine_setup():
+            clear_prompt_engine_setup()
+        return False
     if is_prompt_engine_setup():
         return not cloud_only
-    if engine_packages:
-        return False
     if cloud_only:
         return False
     if is_later_dismissed():

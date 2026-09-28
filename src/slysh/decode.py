@@ -4,13 +4,13 @@ import os
 import re
 import shutil
 import subprocess
-import sys
 import tempfile
 from pathlib import Path
 
 import numpy as np
 
 from slysh.paths import install_root
+from slysh.subprocess_win import subprocess_no_console_kwargs
 
 FFMPEG_MISSING_MESSAGE = "Рядом с программой нет bin\\ffmpeg.exe."
 FILE_UNREADABLE_MESSAGE = "Не удалось прочитать файл."
@@ -44,13 +44,7 @@ def find_ffmpeg() -> str | None:
 
 
 def _ffmpeg_kwargs() -> dict:
-    kwargs: dict = {}
-    if sys.platform == "win32":
-        startupinfo = subprocess.STARTUPINFO()
-        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-        kwargs["startupinfo"] = startupinfo
-        kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
-    return kwargs
+    return subprocess_no_console_kwargs()
 
 
 def decode_pcm_16k_mono(path: str) -> tuple[np.ndarray, int]:
@@ -76,6 +70,7 @@ def decode_pcm_16k_mono(path: str) -> tuple[np.ndarray, int]:
             [
                 ffmpeg,
                 "-hide_banner",
+                "-nostdin",
                 "-loglevel",
                 "error",
                 "-i",
@@ -140,7 +135,7 @@ def media_duration_ms(path: str) -> int:
     if not ffmpeg:
         raise DecodeError(FFMPEG_MISSING_MESSAGE)
     result = subprocess.run(
-        [ffmpeg, "-hide_banner", "-i", path, "-f", "null", "-"],
+        [ffmpeg, "-hide_banner", "-nostdin", "-i", path, "-f", "null", "-"],
         capture_output=True,
         check=False,
         **_ffmpeg_kwargs(),
@@ -171,7 +166,7 @@ def extract_stt_mp3(
         fd, out = tempfile.mkstemp(prefix="gigaam_stt_", suffix=".mp3")
         os.close(fd)
     tmp = _copy_media_to_ascii_temp(source)
-    cmd = [ffmpeg, "-hide_banner", "-loglevel", "error", "-y"]
+    cmd = [ffmpeg, "-hide_banner", "-nostdin", "-loglevel", "error", "-y"]
     if start_ms is not None and start_ms > 0:
         cmd.extend(["-ss", f"{start_ms / 1000:.3f}"])
     cmd.extend(["-i", tmp])

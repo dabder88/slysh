@@ -347,6 +347,7 @@
     "restoredCount": "Restored: {count}",
     "savedToFolders": "Saved to {count} folder(s)",
     "savedToPath": "Saved: {path}",
+    "exportOpenPartial": "Opened {ok} of {total}. Other paths are unavailable.",
     "selectBatchesFirst": "Select batches first.",
     "selectFilesFirst": "Select files first.",
     "stageModelLoad": "Loading model",

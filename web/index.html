@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <title>Slysh</title>
   <link rel="icon" href="/branding/favicon-32.png" type="image/png" sizes="32x32">
-  <link rel="stylesheet" href="/app.css?v=114">
+  <link rel="stylesheet" href="/app.css?v=117">
   <style>
     .boot-error {
       position: fixed;
@@ -1546,7 +1546,12 @@
 
   <div id="export-modal" class="modal" hidden>
     <div class="modal-card" role="dialog" aria-labelledby="export-title">
-      <h2 id="export-title" data-i18n="page.dd5016c82982">Экспорт</h2>
+      <div class="modal-card-header">
+        <h2 id="export-title" data-i18n="page.dd5016c82982">Экспорт</h2>
+        <button type="button" id="export-close" class="modal-card-close icon-btn" data-i18n-title="page.4ae50d30739d" title="Закрыть" aria-label="Закрыть">
+          <span class="material-symbols-outlined" aria-hidden="true">close</span>
+        </button>
+      </div>
       <p id="export-batch-hint" class="hint" hidden></p>
       <label class="field">
         <span data-i18n="exportUi.format">Формат</span>
@@ -1636,31 +1641,31 @@
   <script type="importmap">
   {
     "imports": {
-      "/js/api.js": "/js/api.js?v=45",
+      "/js/api.js": "/js/api.js?v=47",
       "/js/archive.js": "/js/archive.js?v=46",
-      "/js/batch-panel.js": "/js/batch-panel.js?v=45",
+      "/js/batch-panel.js": "/js/batch-panel.js?v=46",
       "/js/batch-kind.js": "/js/batch-kind.js?v=45",
-      "/js/dashboard.js": "/js/dashboard.js?v=44",
-      "/js/editor.js": "/js/editor.js?v=45",
+      "/js/dashboard.js": "/js/dashboard.js?v=45",
+      "/js/editor.js": "/js/editor.js?v=49",
       "/js/errors.js": "/js/errors.js?v=45",
       "/js/i18n.js": "/js/i18n.js?v=49",
       "/js/icons.js": "/js/icons.js?v=45",
       "/js/intake-duplicate.js": "/js/intake-duplicate.js?v=45",
-      "/js/legacy.js": "/js/legacy.js?v=46",
+      "/js/legacy.js": "/js/legacy.js?v=51",
       "/js/media-time.js": "/js/media-time.js?v=45",
       "/js/library-store.js": "/js/library-store.js?v=45",
       "/js/job-source.js": "/js/job-source.js?v=45",
       "/js/library-table-filters.js": "/js/library-table-filters.js?v=45",
       "/js/library-table.js": "/js/library-table.js?v=45",
-      "/js/library-utils.js": "/js/library-utils.js?v=45",
+      "/js/library-utils.js": "/js/library-utils.js?v=48",
       "/js/live.js": "/js/live.js?v=48",
-      "/js/meeting.js": "/js/meeting.js?v=45",
+      "/js/meeting.js": "/js/meeting.js?v=47",
       "/js/main.js": "/js/main.js?v=53",
       "/js/secret-field.js": "/js/secret-field.js?v=45",
-      "/js/orphan-files-table.js": "/js/orphan-files-table.js?v=45",
-      "/js/queue.js": "/js/queue.js?v=44",
+      "/js/orphan-files-table.js": "/js/orphan-files-table.js?v=46",
+      "/js/queue.js": "/js/queue.js?v=46",
       "/js/router.js": "/js/router.js?v=47",
-      "/js/shell.js": "/js/shell.js?v=73",
+      "/js/shell.js": "/js/shell.js?v=74",
       "/js/state.js": "/js/state.js?v=45",
       "/js/transcripts.js": "/js/transcripts.js?v=45",
       "/js/version.js": "/js/version.js?v=45",

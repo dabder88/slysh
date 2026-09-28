@@ -96,6 +96,20 @@ export function jobById(id) {
   return jobs.find((j) => j.id === id);
 }
 
+/** Merge fresh GET /api/jobs fields into the in-memory library snapshot. */
+export function upsertJobInStore(patch) {
+  const id = patch?.id;
+  if (id == null) {
+    return;
+  }
+  orphans = orphans.map((j) => (j.id === id ? { ...j, ...patch } : j));
+  batches = batches.map((batch) => ({
+    ...batch,
+    jobs: (batch.jobs || []).map((j) => (j.id === id ? { ...j, ...patch } : j)),
+  }));
+  jobs = [...orphans, ...batches.flatMap((b) => b.jobs || [])];
+}
+
 export function batchById(id) {
   return batches.find((b) => b.id === id);
 }

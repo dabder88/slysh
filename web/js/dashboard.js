@@ -247,6 +247,9 @@ export function initDashboard() {
     document.body.classList.remove("is-drop");
     const paths = pathsFromDrop(event);
     if (!paths.length) {
+      if (window.pywebview) {
+        return;
+      }
       showToast("dashboard.dropNoPath");
       return;
     }

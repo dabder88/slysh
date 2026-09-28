@@ -86,10 +86,15 @@ class JsApi:
         from slysh.open_paths import open_file, reveal_in_folder
 
         flag = reveal is True or str(reveal).lower() in {"1", "true", "yes"}
-        if flag:
-            reveal_in_folder(path)
-        else:
-            open_file(path)
+        try:
+            if flag:
+                reveal_in_folder(path)
+            else:
+                open_file(path)
+        except FileNotFoundError as exc:
+            raise FileNotFoundError("Файл не найден.") from exc
+        except OSError as exc:
+            raise OSError(str(exc)) from exc
         return True
 
     def open_logs_folder(self):

@@ -45,13 +45,19 @@ function resolveToastMessage(message) {
   if (typeof message !== "string") {
     return String(message);
   }
-  if (/^[a-z][\w]*(?:\.[\w]+)+$/i.test(message)) {
-    const translated = t(message);
-    if (translated !== message) {
-      return translated;
+  const keyLike = /^[a-z][\w\u0400-\u04FF]*(?:\.[\w\u0400-\u04FF]+)+$/i;
+  let text = message;
+  for (let depth = 0; depth < 4; depth += 1) {
+    if (!keyLike.test(text)) {
+      break;
     }
+    const translated = t(text);
+    if (translated === text) {
+      break;
+    }
+    text = translated;
   }
-  return message;
+  return text;
 }
 
 export function showToast(message) {

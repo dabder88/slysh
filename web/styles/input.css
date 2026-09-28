@@ -944,6 +944,26 @@
     box-shadow: var(--shadow-md);
   }
 
+  .modal-card-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .modal-card-header h2 {
+    margin: 0;
+    flex: 1;
+    min-width: 0;
+    font-size: 20px;
+  }
+
+  .modal-card-close {
+    flex-shrink: 0;
+    margin: -4px -4px 0 0;
+  }
+
   .settings-modal-card {
     width: min(640px, 100%);
     max-height: min(88vh, 920px);
@@ -2778,7 +2798,7 @@
     pointer-events: none;
   }
 
-  .modal-card h2 {
+  .modal-card > h2 {
     margin: 0 0 16px;
     font-size: 20px;
   }
@@ -3686,6 +3706,26 @@
   .job-progress-hint {
     margin: 0;
     font-size: 12px;
+  }
+
+  .job-progress .queue-progress-track.progress-bar--lg {
+    height: 10px;
+    flex-shrink: 0;
+  }
+
+  .job-progress .queue-progress-fill.is-indeterminate {
+    width: 40% !important;
+    will-change: transform;
+    animation: progress-indet-job 1.05s ease-in-out infinite, progress-bar-stripes 0.85s linear infinite;
+  }
+
+  @keyframes progress-indet-job {
+    0% {
+      transform: translateX(-120%);
+    }
+    100% {
+      transform: translateX(320%);
+    }
   }
 
   @keyframes job-progress-pulse {
@@ -4701,6 +4741,11 @@
     animation: progress-indet 1.45s ease-in-out infinite, progress-bar-stripes 1s linear infinite;
   }
 
+  .queue-progress-fill:not(.is-indeterminate) {
+    transform: none;
+    animation: none;
+  }
+
   .progress-bar--lg {
     height: 10px;
     background: color-mix(in srgb, var(--primary) 12%, var(--surface-variant));
@@ -5066,7 +5111,7 @@
     flex: 1;
     min-height: 0;
     overflow: hidden;
-    --editor-player-width: 240px;
+    --editor-player-width: 400px;
   }
 
   .editor-panel--player {

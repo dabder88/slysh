@@ -2395,9 +2395,6 @@ function initEngineSetup() {
       ) {
         sessionStorage.setItem("slysh-engine-resync-hint", "1");
         showToast("updates.engineResync");
-        if (typeof window.openEnginePackagesConfirm === "function") {
-          window.openEnginePackagesConfirm(false);
-        }
       }
       openEngineSetupModalIfNeeded(status);
       if (status.installing) {

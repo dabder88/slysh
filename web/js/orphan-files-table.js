@@ -3,7 +3,9 @@ import { msIcon } from "./icons.js";
 import {
   isJobTranscribing,
   jobProgressPct,
+  jobProgressPctLabel,
   createProgressBar,
+  isProgressIndeterminate,
   speakersBadgeClass,
   speakersStatusLabel,
 } from "./library-utils.js";
@@ -63,12 +65,13 @@ function renderStatusCell(job, statusLabelFn) {
   wrap.appendChild(statusBadge);
   if (isJobTranscribing(job)) {
     const pct = jobProgressPct(job);
+    const indeterminate = isProgressIndeterminate(job);
     const progressRow = document.createElement("div");
     progressRow.className = "table-progress-row";
-    progressRow.appendChild(createProgressBar(pct, "primary", "progress-inline"));
+    progressRow.appendChild(createProgressBar(pct, "primary", "progress-inline", indeterminate));
     const pctLabel = document.createElement("span");
     pctLabel.className = "hint table-progress-pct";
-    pctLabel.textContent = `${pct}%`;
+    pctLabel.textContent = jobProgressPctLabel(job);
     progressRow.appendChild(pctLabel);
     wrap.appendChild(progressRow);
   }

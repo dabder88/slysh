@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Callable
 from contextlib import contextmanager
 
 from slysh.models import Segment
@@ -153,12 +154,29 @@ def _run_diarizer(torch_mod, msdd_cls, source_path: str, audio):
 
 
 class MsddSpeakersBackend:
-    def label(self, source_path: str, segments: list[Segment]) -> list[Segment]:
+    def label(
+        self,
+        source_path: str,
+        segments: list[Segment],
+        *,
+        cancelled: Callable[[], bool] | None = None,
+    ) -> list[Segment]:
+        from slysh.speakers import SpeakerCancelledError
+
+        def _check() -> None:
+            if cancelled and cancelled():
+                raise SpeakerCancelledError()
+
         torch_mod, msdd_cls = _import_msdd_deps()
         try:
+            _check()
             audio = _load_audio(source_path)
+            _check()
             result = _run_diarizer(torch_mod, msdd_cls, source_path, audio)
+            _check()
             return _map_by_overlap(segments, _turns_from_result(result))
+        except SpeakerCancelledError:
+            raise
         except RuntimeError:
             raise
         except Exception as exc:

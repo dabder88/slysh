@@ -25,9 +25,10 @@ let editorPollTimer = null;
 let transcriptFollowTail = true;
 const PLAYER_COLLAPSE_KEY = "editor-player-collapsed-v2";
 const TRANSCRIPT_COLLAPSE_KEY = "editor-transcript-collapsed";
-const PLAYER_WIDTH_KEY = "editor-player-width";
-const PLAYER_WIDTH_MIN = 180;
-const PLAYER_WIDTH_MAX = 480;
+const PLAYER_WIDTH_KEY = "editor-player-width-v2";
+const PLAYER_WIDTH_DEFAULT = 400;
+const PLAYER_WIDTH_MIN = 240;
+const PLAYER_WIDTH_MAX = 520;
 
 let rangeFilledForJob = null;
 const SPEAKER_TONES = ["primary", "secondary", "primary", "secondary"];
@@ -874,6 +875,7 @@ export async function onEditorShow(jobId) {
     stopEditorPoll();
   }
   currentJobId = jobId || null;
+  applyEditorPanelWidths();
   applyDefaultPlayerCollapse();
   setEditorMode("view");
   if (!jobId) {
@@ -1031,13 +1033,15 @@ function applyEditorPanelWidths() {
   if (!layout) {
     return;
   }
-  const playerWidth = Number(localStorage.getItem(PLAYER_WIDTH_KEY));
-  if (Number.isFinite(playerWidth)) {
-    layout.style.setProperty(
-      "--editor-player-width",
-      `${clamp(playerWidth, PLAYER_WIDTH_MIN, PLAYER_WIDTH_MAX)}px`
-    );
+  const stored = localStorage.getItem(PLAYER_WIDTH_KEY);
+  let width = PLAYER_WIDTH_DEFAULT;
+  if (stored != null) {
+    const parsed = Number(stored);
+    if (Number.isFinite(parsed)) {
+      width = clamp(parsed, PLAYER_WIDTH_MIN, PLAYER_WIDTH_MAX);
+    }
   }
+  layout.style.setProperty("--editor-player-width", `${width}px`);
 }
 
 function bindPanelResizer(handle, onDrag) {
@@ -1176,6 +1180,22 @@ export function initEditor() {
 
   document.getElementById("btn-topbar-export")?.addEventListener("click", () => {
     document.getElementById("btn-export")?.click();
+  });
+  window.addEventListener("gigaam:job-exported", (event) => {
+    const { jobId, path, paths } = event.detail || {};
+    if (jobId == null || jobId !== currentJobId) {
+      return;
+    }
+    const exportPaths = Array.isArray(paths) && paths.length ? paths : path ? [path] : null;
+    syncExportActions(
+      {
+        ...(currentJob || {}),
+        id: jobId,
+        last_export_path: path || currentJob?.last_export_path,
+        last_export_paths: exportPaths || currentJob?.last_export_paths,
+      },
+      exportPaths,
+    );
   });
   document.getElementById("btn-editor-batch-export")?.addEventListener("click", () => {
     const batch = currentJob?.batch_id != null ? batchById(currentJob.batch_id) : null;

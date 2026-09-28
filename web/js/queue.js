@@ -14,8 +14,10 @@ import {
   batchDoneCount,
   formatBatchCountsSummary,
   jobProgressPct,
+  jobProgressPctLabel,
   batchProgressPct,
   createProgressBar,
+  updateProgressBarFill,
   isProgressIndeterminate,
 } from "./library-utils.js";
 
@@ -95,6 +97,7 @@ async function promptRenameBatch(batch) {
 function renderActiveJobCard(job) {
   const card = document.createElement("article");
   card.className = "queue-active-card";
+  card.dataset.queueActiveJob = String(job.id);
   const pct = jobProgressPct(job);
   const topBar = document.createElement("div");
   topBar.className = "queue-active-card-bar";
@@ -133,7 +136,7 @@ function renderActiveJobCard(job) {
   trailing.className = "queue-active-trailing";
   const stats = document.createElement("div");
   stats.className = "queue-active-stats";
-  stats.innerHTML = `<div class="queue-active-pct">${pct}%</div><div class="hint">${jobStatusLabel(job)}</div>`;
+  stats.innerHTML = `<div class="queue-active-pct">${jobProgressPctLabel(job)}</div><div class="hint">${jobStatusLabel(job)}</div>`;
   const actions = document.createElement("div");
   actions.className = "queue-active-actions";
   const cancelBtn = iconButton("stop_circle", t("queue.abortTranscription"), "icon-btn--danger");
@@ -151,6 +154,22 @@ function renderActiveJobCard(job) {
   card.appendChild(body);
   card.addEventListener("click", () => navigate("editor", { jobId: job.id }));
   return card;
+}
+
+function updateActiveJobCardProgress(card, job) {
+  const pct = jobProgressPct(job);
+  const indeterminate = isProgressIndeterminate(job);
+  const track = card.querySelector(".queue-active-card-bar .queue-progress-track");
+  const fill = track?.querySelector(".queue-progress-fill");
+  updateProgressBarFill(fill, pct, indeterminate, "primary", track);
+  const pctEl = card.querySelector(".queue-active-pct");
+  if (pctEl) {
+    pctEl.textContent = jobProgressPctLabel(job);
+  }
+  const statHint = card.querySelector(".queue-active-stats .hint");
+  if (statHint) {
+    statHint.textContent = jobStatusLabel(job);
+  }
 }
 
 function renderBatchSubItem(job) {
@@ -184,10 +203,14 @@ function renderBatchSubItem(job) {
   trailing.className = "queue-batch-item-trailing";
   if (isJobActive(job)) {
     const pct = jobProgressPct(job);
-    trailing.appendChild(renderProgressBar(pct, "primary", "", isProgressIndeterminate(job)));
+    trailing.appendChild(renderProgressBar(pct, "primary", isProgressIndeterminate(job)));
     const pctLabel = document.createElement("span");
     pctLabel.className = "hint queue-batch-item-pct";
-    pctLabel.textContent = isProgressIndeterminate(job) ? jobStatusLabel(job) : `${pct}%`;
+    pctLabel.textContent = job.speakers_running
+      ? jobProgressPctLabel(job)
+      : isProgressIndeterminate(job)
+        ? jobStatusLabel(job)
+        : `${pct}%`;
     trailing.appendChild(pctLabel);
   } else if (job.status === "completed") {
     trailing.textContent = t("common.done");
@@ -348,20 +371,45 @@ export function renderQueue() {
     renderMetricCard(t("queue.avgTime"), metrics.avgDuration, "timer")
   );
 
-  activeEl.replaceChildren();
   const activeOrphans = orphans.filter(isJobActive);
   const activeBatches = batches.filter(isBatchActive);
+  const orphanIds = new Set(activeOrphans.map((j) => j.id));
+  const batchIds = new Set(activeBatches.map((b) => b.id));
+
+  for (const el of [...activeEl.querySelectorAll("[data-queue-active-job]")]) {
+    const id = Number(el.dataset.queueActiveJob);
+    if (!orphanIds.has(id)) {
+      el.remove();
+    }
+  }
+  for (const el of [...activeEl.querySelectorAll("[data-queue-active-batch]")]) {
+    const id = Number(el.dataset.queueActiveBatch);
+    if (!batchIds.has(id)) {
+      el.remove();
+    }
+  }
+  activeEl.querySelector(".queue-active-empty")?.remove();
+
   if (!activeOrphans.length && !activeBatches.length) {
     const empty = document.createElement("p");
-    empty.className = "hint";
+    empty.className = "hint queue-active-empty";
     empty.textContent = t("queue.empty");
     activeEl.appendChild(empty);
   } else {
     for (const job of activeOrphans) {
-      activeEl.appendChild(renderActiveJobCard(job));
+      let card = activeEl.querySelector(`[data-queue-active-job="${job.id}"]`);
+      if (card) {
+        updateActiveJobCardProgress(card, job);
+      } else {
+        card = renderActiveJobCard(job);
+        activeEl.appendChild(card);
+      }
     }
     for (const batch of activeBatches) {
-      activeEl.appendChild(renderActiveBatchCard(batch));
+      activeEl.querySelector(`[data-queue-active-batch="${batch.id}"]`)?.remove();
+      const card = renderActiveBatchCard(batch);
+      card.dataset.queueActiveBatch = String(batch.id);
+      activeEl.appendChild(card);
     }
   }
 

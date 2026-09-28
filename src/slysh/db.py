@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import sqlite3
 import threading
@@ -92,6 +93,8 @@ class Database:
             self._conn.execute("ALTER TABLE jobs ADD COLUMN started_at TEXT")
         if "last_export_path" not in cols:
             self._conn.execute("ALTER TABLE jobs ADD COLUMN last_export_path TEXT")
+        if "last_export_paths" not in cols:
+            self._conn.execute("ALTER TABLE jobs ADD COLUMN last_export_paths TEXT")
         if "batch_id" not in cols:
             self._conn.execute("ALTER TABLE jobs ADD COLUMN batch_id INTEGER")
         if "position" not in cols:
@@ -440,9 +443,26 @@ class Database:
 
     @_locked
     def set_last_export_path(self, job_id: int, path: str) -> None:
+        self.set_last_export_paths(job_id, [path])
+
+    @_locked
+    def set_last_export_paths(self, job_id: int, paths: list[str]) -> None:
+        normalized: list[str] = []
+        seen: set[str] = set()
+        for raw in paths:
+            text = str(raw or "").strip()
+            if not text or text in seen:
+                continue
+            seen.add(text)
+            normalized.append(text)
+        last = normalized[-1] if normalized else None
+        payload = json.dumps(normalized, ensure_ascii=False) if normalized else None
         self._conn.execute(
-            "UPDATE jobs SET last_export_path = ? WHERE id = ?",
-            (path, job_id),
+            """
+            UPDATE jobs SET last_export_paths = ?, last_export_path = ?
+            WHERE id = ?
+            """,
+            (payload, last, job_id),
         )
         self._conn.commit()
 

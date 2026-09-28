@@ -176,18 +176,44 @@ export function formatBatchCountsSummary(batch, separator = " · ") {
   return `${formatBatchFilesLabel(batch)}${separator}${formatBatchTranscriptsLabel(batch)}`;
 }
 
+export function estimateSpeakerWorkSeconds(job) {
+  const dur = Number(job?.duration_s);
+  if (Number.isFinite(dur) && dur > 0) {
+    return Math.max(20, Math.min(600, dur * 0.35));
+  }
+  return 120;
+}
+
+export function speakerProgressPct(job) {
+  if (!job?.speakers_running) {
+    return null;
+  }
+  const elapsed = Number(job.speakers_elapsed_s);
+  if (!Number.isFinite(elapsed) || elapsed < 0) {
+    return 0;
+  }
+  const estimate = estimateSpeakerWorkSeconds(job);
+  return Math.min(95, Math.round((elapsed / estimate) * 100));
+}
+
 export function jobProgressPct(job) {
-  if (job.speakers_running) {
-    return 100;
+  const speakerPct = speakerProgressPct(job);
+  if (speakerPct != null) {
+    return speakerPct;
   }
   return Math.round(Number(job.progress || 0) * 100);
 }
 
+export function jobProgressPctLabel(job) {
+  const pct = jobProgressPct(job);
+  if (isProgressIndeterminate(job) && pct <= 0) {
+    return "…";
+  }
+  return `${pct}%`;
+}
+
 export function isProgressIndeterminate(job) {
   if (!job) {
-    return false;
-  }
-  if (job.speakers_running) {
     return false;
   }
   if (job.status === "queued" || job.engine_starting) {
@@ -206,9 +232,30 @@ export function batchProgressPct(batch) {
   const current = (batch.jobs || []).find((j) => isJobActive(j));
   if (current) {
     const slot = 100 / total;
-    pct = Math.min(99, Math.round(done * slot + (jobProgressPct(current) / 100) * slot));
+    const currentPct = jobProgressPct(current);
+    pct = Math.min(99, Math.round(done * slot + (currentPct / 100) * slot));
   }
   return pct;
+}
+
+export function updateProgressBarFill(fill, pct, indeterminate, tone = "primary", wrap = null) {
+  if (!fill) {
+    return;
+  }
+  const value = Math.max(0, Math.min(100, Number(pct) || 0));
+  if (wrap) {
+    wrap.setAttribute("aria-valuenow", indeterminate ? "0" : String(value));
+  }
+  fill.className = `queue-progress-fill queue-progress-fill--${tone}`;
+  if (indeterminate) {
+    fill.classList.add("progress-bar-stripes", "is-indeterminate");
+    fill.style.width = fill.closest(".job-progress") ? "" : "34%";
+    fill.style.transform = "";
+  } else {
+    fill.classList.remove("progress-bar-stripes", "is-indeterminate");
+    fill.style.width = `${value}%`;
+    fill.style.transform = "none";
+  }
 }
 
 export function createProgressBar(pct, tone = "primary", className = "", indeterminate = false) {
@@ -217,17 +264,9 @@ export function createProgressBar(pct, tone = "primary", className = "", indeter
   wrap.setAttribute("role", "progressbar");
   wrap.setAttribute("aria-valuemin", "0");
   wrap.setAttribute("aria-valuemax", "100");
-  const value = Math.max(0, Math.min(100, Number(pct) || 0));
-  wrap.setAttribute("aria-valuenow", indeterminate ? "0" : String(value));
   const fill = document.createElement("div");
-  fill.className = `queue-progress-fill queue-progress-fill--${tone}`;
-  if (indeterminate) {
-    fill.classList.add("progress-bar-stripes", "is-indeterminate");
-    fill.style.width = "34%";
-  } else {
-    fill.style.width = `${value}%`;
-  }
   wrap.appendChild(fill);
+  updateProgressBarFill(fill, pct, indeterminate, tone, wrap);
   return wrap;
 }
 
