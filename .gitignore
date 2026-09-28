@@ -33,23 +33,27 @@ models/*
 bin/ffmpeg.exe
 bin/ffprobe.exe
 
-# Application sources in git: src/, web/, pyproject.toml, uv.lock, installer/, launcher/.
-# Everything below is local development / tooling — not shipped in Slysh runtime.
+# In git: app sources, installer/, launcher/, scripts for build/run (see README).
+# Not in git: tests, internal docs, agent configs, one-off maintainer scripts (below).
 
-# Tests, docs, agent rules, maintainer scripts
 tests/
 docs/
 wiki/
-scripts/
 .cursor/
 .claude/
 AGENTS.md
 AI_GUIDE.md
 
-# Frontend toolchain (shipped CSS: web/app.css)
-package.json
-package-lock.json
-tailwind.config.js
+# Maintainer-only scripts (not needed to run or rebuild Setup)
+scripts/benchmark_api.py
+scripts/probe_yt_meta.py
+scripts/install-slysh-test.ps1
+scripts/reset-engine-first-run-qa.ps1
+scripts/verify_engine_setup_modal.py
+scripts/verify_slysh_exe_launch.ps1
+scripts/measure_startup.py
+scripts/smoke_test_startup.py
+scripts/smoke_model.py
 
 # See also: dist/, design/, local logs
 
