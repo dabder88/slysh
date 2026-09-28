@@ -33,7 +33,25 @@ models/*
 bin/ffmpeg.exe
 bin/ffprobe.exe
 
-# See docs/core/WORKFLOW.md — dist/, design/, local logs are not committed
+# Application sources in git: src/, web/, pyproject.toml, uv.lock, installer/, launcher/.
+# Everything below is local development / tooling — not shipped in Slysh runtime.
+
+# Tests, docs, agent rules, maintainer scripts
+tests/
+docs/
+wiki/
+scripts/
+.cursor/
+.claude/
+AGENTS.md
+AI_GUIDE.md
+
+# Frontend toolchain (shipped CSS: web/app.css)
+package.json
+package-lock.json
+tailwind.config.js
+
+# See also: dist/, design/, local logs
 
 # Local dev / pytest home in repo root
 .test-home/
