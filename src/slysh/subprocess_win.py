@@ -13,3 +13,22 @@ def subprocess_no_console_kwargs() -> dict:
         kwargs["startupinfo"] = startupinfo
         kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
     return kwargs
+
+
+def terminate_process_tree(proc: subprocess.Popen, *, timeout: float = 10.0) -> None:
+    """Stop a child process and its descendants (engine, yt-dlp, etc.)."""
+    if proc.poll() is not None:
+        return
+    if sys.platform == "win32":
+        subprocess.run(
+            ["taskkill", "/PID", str(proc.pid), "/T", "/F"],
+            check=False,
+            **subprocess_no_console_kwargs(),
+        )
+    else:
+        proc.terminate()
+    try:
+        proc.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.wait(timeout=timeout)

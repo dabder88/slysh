@@ -45,7 +45,7 @@ from slysh.batch_runner import (
 from slysh.chunking import SAMPLE_RATE, offset_segments, slice_pcm_range
 from slysh.cuda_fallback import format_job_asr_error
 from slysh.decode import decode_pcm_16k_mono
-from slysh.db import Database
+from slysh.db import Database, SegmentsRevisionConflictError
 from slysh.engine_client import cancel as engine_cancel
 from slysh.engine_client import health as engine_health
 from slysh.engine_client import transcribe_chunk
@@ -110,7 +110,7 @@ from slysh.runtime_setup import (
     setup_status,
     start_engine_install,
 )
-from slysh.subprocess_win import subprocess_no_console_kwargs
+from slysh.subprocess_win import subprocess_no_console_kwargs, terminate_process_tree
 from slysh.updates import (
     app_info,
     apply_update,
@@ -200,6 +200,7 @@ class SegmentBody(BaseModel):
 class PatchSegmentsBody(BaseModel):
     segments: list[SegmentBody] | None = None
     transcript: str | None = None
+    expected_revision: int | None = None
 
 
 class ExportBody(BaseModel):
@@ -933,11 +934,7 @@ def _spawn_engine(app: FastAPI) -> dict[str, int]:
             time.sleep(0.1)
         if port is None:
             if proc.poll() is None:
-                proc.terminate()
-                try:
-                    proc.wait(timeout=5)
-                except Exception:
-                    proc.kill()
+                terminate_process_tree(proc, timeout=5)
             detail = _engine_spawn_failure_detail(proc, boot_lines)
             raise HTTPException(status_code=500, detail=detail)
 
@@ -949,15 +946,10 @@ def _spawn_engine(app: FastAPI) -> dict[str, int]:
 def _stop_engine(app: FastAPI) -> None:
     proc = getattr(app.state, "engine_proc", None)
     if proc is not None and proc.poll() is None:
-        proc.terminate()
         try:
-            proc.wait(timeout=8)
+            terminate_process_tree(proc, timeout=8)
         except Exception:
-            proc.kill()
-            try:
-                proc.wait(timeout=3)
-            except Exception:
-                pass
+            logging.debug("engine terminate failed", exc_info=True)
     app.state.engine_proc = None
     app.state.engine_url = None
     app.state.engine_starting = False
@@ -1237,12 +1229,27 @@ def _start_youtube_job(
     threading.Thread(target=boot, daemon=True).start()
 
 
+def _transcription_blocks_editor_save(job: dict) -> bool:
+    if job.get("status") != JobStatus.RUNNING.value:
+        return False
+    if job.get("speakers_running"):
+        return True
+    kind = str(job.get("kind") or "")
+    return kind in {
+        JobKind.FILE.value,
+        JobKind.YOUTUBE.value,
+        JobKind.LIVE.value,
+        JobKind.MEETING.value,
+    }
+
+
 def _empty_live_state() -> dict:
     return {
         "listening": False,
         "paused": False,
         "session": None,
         "stream": None,
+        "ingest": None,
         "thread": None,
         "stop_event": None,
         "job_id": None,
@@ -1256,6 +1263,30 @@ def _empty_live_state() -> dict:
     }
 
 
+def _close_live_ingest(state: dict) -> None:
+    from slysh.audio_ingest import AudioIngestQueue
+
+    ingest = state.pop("ingest", None)
+    if isinstance(ingest, AudioIngestQueue):
+        ingest.close()
+
+
+def _ensure_live_ingest(state: dict) -> None:
+    if state.get("ingest") is not None:
+        return
+    from slysh.audio_ingest import AudioIngestQueue
+
+    def on_pcm(pcm: np.ndarray) -> None:
+        session = state.get("session")
+        if session is None:
+            return
+        session.push(pcm)
+        if len(pcm):
+            state["rms"] = float(np.sqrt(np.mean(np.square(pcm))))
+
+    state["ingest"] = AudioIngestQueue(on_pcm, name="live-ingest")
+
+
 def _live_session_active(state: dict) -> bool:
     return state.get("session") is not None
 
@@ -1266,13 +1297,11 @@ def _live_mic_callback(app: FastAPI, capture_rate: int):
         if state.get("paused"):
             state["rms"] = 0.0
             return
-        current = state.get("session")
-        if current is None:
+        ingest = state.get("ingest")
+        if ingest is None:
             return
         pcm = resample_to_16k(np.asarray(indata, dtype=np.float32).reshape(-1), capture_rate)
-        current.push(pcm)
-        if len(pcm):
-            state["rms"] = float(np.sqrt(np.mean(np.square(pcm))))
+        ingest.push(pcm)
 
     return _on_audio
 
@@ -1541,15 +1570,16 @@ def _live_worker(app: FastAPI, db: Database) -> None:
 
 
 def _stop_live_stream(app: FastAPI) -> None:
-    stream = app.state.live.get("stream")
-    if stream is None:
-        return
-    try:
-        stream.stop()
-        stream.close()
-    except Exception:
-        pass
-    app.state.live["stream"] = None
+    state = app.state.live
+    stream = state.get("stream")
+    if stream is not None:
+        try:
+            stream.stop()
+            stream.close()
+        except Exception:
+            pass
+        state["stream"] = None
+    _close_live_ingest(state)
 
 
 def _finalize_capture_job(db: Database, state: dict, job_id: int) -> None:
@@ -1847,8 +1877,27 @@ def create_ui_app(
             raise HTTPException(
                 status_code=400, detail="Нужен transcript или segments"
             )
-        db.replace_segments(job_id, segments)
-        return {"ok": True}
+        job = _require_job(db, job_id)
+        if _transcription_blocks_editor_save(job):
+            raise HTTPException(
+                status_code=409,
+                detail="Расшифровка ещё идёт. Дождитесь завершения или отмените задание.",
+            )
+        try:
+            revision = db.replace_segments(
+                job_id,
+                segments,
+                expected_revision=body.expected_revision,
+            )
+        except SegmentsRevisionConflictError as exc:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "Текст на сервере уже обновился (другая вкладка или расшифровка). "
+                    f"Текущая версия: {exc.args[0] if exc.args else '?'}"
+                ),
+            ) from exc
+        return {"ok": True, "segments_revision": revision}
 
     @app.post("/api/jobs/{job_id}/export")
     def export_job(job_id: int, body: ExportBody) -> dict:
@@ -2463,6 +2512,7 @@ def create_ui_app(
             "paused": False,
             "session": session,
             "stream": None,
+            "ingest": None,
             "thread": None,
             "stop_event": stop_event,
             "job_id": job_id,
@@ -2474,6 +2524,7 @@ def create_ui_app(
             "total_paused_s": 0.0,
             "kind": "live",
         }
+        _ensure_live_ingest(app.state.live)
 
         def _callback_for_rate(capture_rate: int):
             return _live_mic_callback(app, capture_rate)
@@ -2483,12 +2534,14 @@ def create_ui_app(
             stream.start()
         except MeetingCaptureError as exc:
             session.flush()
+            _close_live_ingest(app.state.live)
             app.state.live = _empty_live_state()
             db.set_error(job_id, str(exc))
             db.set_status(job_id, JobStatus.FAILED)
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         except Exception as exc:
             session.flush()
+            _close_live_ingest(app.state.live)
             app.state.live = _empty_live_state()
             db.set_error(job_id, str(exc))
             db.set_status(job_id, JobStatus.FAILED)
@@ -2531,6 +2584,7 @@ def create_ui_app(
             )
         state["paused"] = False
         state["paused_at"] = None
+        _ensure_live_ingest(state)
 
         def _callback_for_rate(capture_rate: int):
             return _live_mic_callback(app, capture_rate)

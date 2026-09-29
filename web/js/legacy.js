@@ -89,6 +89,7 @@ let pendingExportJobs = null;
 let exportTargetJobId = null;
 
 let selectedId = null;
+let segmentsRevision = 0;
 let pollTimer = null;
 let jobs = [];
 let batches = [];
@@ -910,7 +911,10 @@ async function selectJob(id) {
       playerEl.src = `/api/jobs/${id}/media`;
     }
   }
-  renderTranscript(job.transcript || "");
+  if (!isEditingTranscript()) {
+    segmentsRevision = Number(job.segments_revision) || 0;
+    renderTranscript(job.transcript || "");
+  }
   syncSpeakersUi(job);
   syncExportActions(job);
   syncTranscribeUi(job);
@@ -1895,15 +1899,37 @@ function refreshLibraryViews() {
 }
 
 async function saveSegments() {
-  if (selectedId == null) {
+  const jobId = getRoute() === "editor" ? window.__editorCurrentJobId?.() ?? selectedId : selectedId;
+  if (jobId == null) {
     return;
   }
-  await api(`/api/jobs/${selectedId}/segments`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ transcript: transcriptEl.value }),
-  });
-  showToast("common.saved");
+  const payload = {
+    transcript: transcriptEl.value,
+    expected_revision: segmentsRevision,
+  };
+  try {
+    const res = await api(`/api/jobs/${jobId}/segments`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (res?.segments_revision != null) {
+      segmentsRevision = Number(res.segments_revision) || segmentsRevision;
+    }
+    window.__editorMarkDraftSaved?.();
+    showToast("common.saved");
+  } catch (err) {
+    if (err.status === 409) {
+      showToast(err.message || String(err));
+      const job = await api(`/api/jobs/${jobId}`);
+      segmentsRevision = Number(job.segments_revision) || segmentsRevision;
+      if (!isEditingTranscript()) {
+        renderTranscript(job.transcript || "");
+      }
+      return;
+    }
+    throw err;
+  }
 }
 
 function sourceStem(sourcePath) {

@@ -6,6 +6,7 @@ import threading
 
 import numpy as np
 
+from slysh.audio_ingest import AudioIngestQueue
 from slysh.chunking import SAMPLE_RATE
 from slysh.sounddevice_lazy import sd
 from slysh.live_buffer import LiveSession
@@ -454,6 +455,8 @@ class MeetingCapture:
         self._sys_rate = SAMPLE_RATE
         self._mic_rate = SAMPLE_RATE
         self._paused = False
+        self._sys_ingest: AudioIngestQueue | None = None
+        self._mic_ingest: AudioIngestQueue | None = None
 
     def pause(self) -> None:
         self._paused = True
@@ -467,6 +470,14 @@ class MeetingCapture:
         self._paused = False
 
     def start(self) -> None:
+        if self._sys_ingest is None:
+            self._sys_ingest = AudioIngestQueue(
+                self._ingest_block, name="meeting-sys-ingest"
+            )
+        if self._mic_ingest is None:
+            self._mic_ingest = AudioIngestQueue(
+                self._ingest_mic_block, name="meeting-mic-ingest"
+            )
         if not loopback_supported():
             raise MeetingCaptureError(NOT_WINDOWS_HINT)
         endpoint_name = None
@@ -538,6 +549,23 @@ class MeetingCapture:
                 pass
         self._sys_stream = None
         self._mic_stream = None
+        for attr in ("_sys_ingest", "_mic_ingest"):
+            ingest = getattr(self, attr)
+            setattr(self, attr, None)
+            if ingest is not None:
+                ingest.close()
+
+    def _ingest_block(self, pcm: np.ndarray) -> None:
+        if self._paused:
+            return
+        self.mixer.push_system(pcm)
+        self._flush_mix()
+
+    def _ingest_mic_block(self, pcm: np.ndarray) -> None:
+        if self._paused:
+            return
+        self.mixer.push_mic(pcm)
+        self._flush_mix()
 
     def _flush_mix(self) -> None:
         if self._paused:
@@ -551,18 +579,20 @@ class MeetingCapture:
     def _on_wasapi_system(self, frames) -> None:
         if self._paused:
             return
+        if self._sys_ingest is None:
+            self._sys_ingest = AudioIngestQueue(
+                self._ingest_block, name="meeting-sys-ingest"
+            )
         pcm = resample_to_16k(frames, self._sys_rate)
-        self.mixer.push_system(pcm)
-        self._flush_mix()
+        self._sys_ingest.push(pcm)
 
     def _open_mic(self, device_id: int | None):
         def callback_for_rate(capture_rate: int):
             def _on_mic(indata, frames, time_info, status) -> None:
-                if self._paused:
+                if self._paused or self._mic_ingest is None:
                     return
                 pcm = resample_to_16k(indata, capture_rate)
-                self.mixer.push_mic(pcm)
-                self._flush_mix()
+                self._mic_ingest.push(pcm)
 
             return _on_mic
 

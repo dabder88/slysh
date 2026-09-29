@@ -23,6 +23,7 @@ let renderedSegmentCount = 0;
 let renderedSegmentJobId = null;
 let editorPollTimer = null;
 let editorDraftDirty = false;
+const editorDrafts = new Map();
 let editorPollFetchId = 0;
 let transcriptFollowTail = true;
 const PLAYER_COLLAPSE_KEY = "editor-player-collapsed-v2";
@@ -877,7 +878,50 @@ function renderEditor(job) {
   }
 }
 
+export function editorCurrentJobId() {
+  return currentJobId;
+}
+
+export function markEditorDraftSaved() {
+  editorDraftDirty = false;
+  if (currentJobId != null && editorDrafts.has(currentJobId)) {
+    const draft = editorDrafts.get(currentJobId);
+    draft.dirty = false;
+  }
+}
+
+if (typeof window !== "undefined") {
+  window.__editorCurrentJobId = editorCurrentJobId;
+  window.__editorMarkDraftSaved = markEditorDraftSaved;
+}
+
+function stashEditorDraft(jobId) {
+  const textarea = document.getElementById("transcript-edit");
+  if (jobId == null || !textarea || !editorDraftDirty) {
+    return;
+  }
+  editorDrafts.set(jobId, {
+    text: textarea.value,
+    dirty: true,
+    revision: Number(currentJob?.segments_revision) || 0,
+  });
+}
+
+function restoreEditorDraft(job) {
+  const draft = editorDrafts.get(job.id);
+  const textarea = document.getElementById("transcript-edit");
+  if (!draft?.dirty || !textarea) {
+    return false;
+  }
+  textarea.value = draft.text;
+  editorDraftDirty = true;
+  return true;
+}
+
 export async function onEditorShow(jobId) {
+  if (currentJobId !== jobId && currentJobId != null) {
+    stashEditorDraft(currentJobId);
+  }
   if (currentJobId !== jobId) {
     editorDraftDirty = false;
     editorPollFetchId += 1;
@@ -898,7 +942,11 @@ export async function onEditorShow(jobId) {
   try {
     await refreshLibrary();
     const job = await selectJob(jobId);
-    setEditorMode("view");
+    if (restoreEditorDraft(job)) {
+      setEditorMode("edit");
+    } else {
+      setEditorMode("view");
+    }
     renderEditor(job);
   } catch (err) {
     reportError(t("topbar.editor"), err);
@@ -1133,7 +1181,7 @@ export function initEditor() {
       return;
     }
     currentJob = job;
-    if (editorMode === "view") {
+    if (editorMode === "view" && !editorDraftDirty) {
       renderSegments(job);
     }
     renderBatchPanel(job);

@@ -75,6 +75,10 @@ def _locked(method):
     return wrapped
 
 
+class SegmentsRevisionConflictError(Exception):
+    """Editor save expected_revision does not match the job row."""
+
+
 class Database:
     def __init__(self, path: Path) -> None:
         self._path = Path(path)
@@ -112,6 +116,10 @@ class Database:
         if "run_id" not in cols:
             self._conn.execute(
                 "ALTER TABLE jobs ADD COLUMN run_id INTEGER NOT NULL DEFAULT 0"
+            )
+        if "segments_revision" not in cols:
+            self._conn.execute(
+                "ALTER TABLE jobs ADD COLUMN segments_revision INTEGER NOT NULL DEFAULT 0"
             )
         batch_cols = {row[1] for row in self._conn.execute("PRAGMA table_info(batches)")}
         if "archived" not in batch_cols:
@@ -489,7 +497,27 @@ class Database:
         self._conn.commit()
 
     @_locked
-    def replace_segments(self, job_id: int, segments: list[Segment]) -> None:
+    def segments_revision(self, job_id: int) -> int:
+        row = self._conn.execute(
+            "SELECT segments_revision FROM jobs WHERE id = ?",
+            (job_id,),
+        ).fetchone()
+        if row is None:
+            raise KeyError(job_id)
+        return int(row[0])
+
+    @_locked
+    def replace_segments(
+        self,
+        job_id: int,
+        segments: list[Segment],
+        *,
+        expected_revision: int | None = None,
+    ) -> int:
+        if expected_revision is not None:
+            current = self.segments_revision(job_id)
+            if current != expected_revision:
+                raise SegmentsRevisionConflictError(current)
         self._conn.execute("DELETE FROM segments WHERE job_id = ?", (job_id,))
         self._conn.executemany(
             """
@@ -501,7 +529,12 @@ class Database:
                 for seg in segments
             ],
         )
+        self._conn.execute(
+            "UPDATE jobs SET segments_revision = segments_revision + 1 WHERE id = ?",
+            (job_id,),
+        )
         self._conn.commit()
+        return self.segments_revision(job_id)
 
     @_locked
     def append_segments(self, job_id: int, segments: list[Segment]) -> None:
@@ -516,6 +549,10 @@ class Database:
                 (job_id, seg.start_ms, seg.end_ms, seg.text, seg.speaker)
                 for seg in segments
             ],
+        )
+        self._conn.execute(
+            "UPDATE jobs SET segments_revision = segments_revision + 1 WHERE id = ?",
+            (job_id,),
         )
         self._conn.commit()
 

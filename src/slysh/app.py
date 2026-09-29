@@ -537,8 +537,9 @@ def main() -> None:
         proc = getattr(app.state, "engine_proc", None)
         if proc is not None:
             try:
-                proc.terminate()
-                proc.wait(timeout=10)
+                from slysh.subprocess_win import terminate_process_tree
+
+                terminate_process_tree(proc, timeout=10)
             except Exception:
                 logging.debug("engine terminate on exit", exc_info=True)
         instance_lock.release()
