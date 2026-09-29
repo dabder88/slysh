@@ -24,6 +24,27 @@ function resolvePath(obj, path) {
   return path.split(".").reduce((acc, part) => (acc && acc[part] != null ? acc[part] : undefined), obj);
 }
 
+const MESSAGE_KEY_LIKE = /^[a-z][\w\u0400-\u04FF]*(?:\.[\w\u0400-\u04FF]+)+$/i;
+
+/** Follow locale values that point at other keys (max depth 4). */
+export function resolveMessageChain(text) {
+  if (typeof text !== "string") {
+    return text;
+  }
+  let value = text;
+  for (let depth = 0; depth < 4; depth += 1) {
+    if (!MESSAGE_KEY_LIKE.test(value)) {
+      break;
+    }
+    const next = resolvePath(messages, value);
+    if (next == null || typeof next !== "string" || next === value) {
+      break;
+    }
+    value = next;
+  }
+  return value;
+}
+
 export function getLocale() {
   return currentLocale;
 }
@@ -49,7 +70,7 @@ function notifyLocaleChange() {
 }
 
 async function loadMessages(locale) {
-  const res = await fetch(`/locales/${locale}.json?v=10`);
+  const res = await fetch(`/locales/${locale}.json?v=13`);
   if (!res.ok) {
     throw new Error(`locale ${locale}`);
   }
@@ -88,6 +109,7 @@ export function t(key, vars) {
   if (typeof value !== "string") {
     return key;
   }
+  value = resolveMessageChain(value);
   if (!vars) {
     return value;
   }

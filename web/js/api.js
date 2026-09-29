@@ -1,4 +1,4 @@
-﻿import { t } from "./i18n.js";
+﻿import { t, resolveMessageChain } from "./i18n.js";
 
 export function translateKnownApiError(message, status) {
   const text = String(message || "").trim();
@@ -46,18 +46,10 @@ function resolveToastMessage(message) {
     return String(message);
   }
   const keyLike = /^[a-z][\w\u0400-\u04FF]*(?:\.[\w\u0400-\u04FF]+)+$/i;
-  let text = message;
-  for (let depth = 0; depth < 4; depth += 1) {
-    if (!keyLike.test(text)) {
-      break;
-    }
-    const translated = t(text);
-    if (translated === text) {
-      break;
-    }
-    text = translated;
+  if (keyLike.test(message)) {
+    return t(message);
   }
-  return text;
+  return resolveMessageChain(message);
 }
 
 export function showToast(message) {

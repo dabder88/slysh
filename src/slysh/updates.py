@@ -55,6 +55,18 @@ def app_info() -> dict[str, Any]:
     if isinstance(updates, dict) and updates.get("last_check_at"):
         last_check = updates.get("last_check_at")
     slug = github_repo_slug()
+    about_raw = settings.get("about_url")
+    about_url = ""
+    if isinstance(about_raw, str):
+        about_url = about_raw.strip()
+    if not about_url:
+        about_url = os.environ.get("SLYSH_ABOUT_URL", "").strip()
+    support_raw = settings.get("support_url")
+    support_url = ""
+    if isinstance(support_raw, str):
+        support_url = support_raw.strip()
+    if not support_url:
+        support_url = os.environ.get("SLYSH_SUPPORT_URL", "").strip()
     return {
         "version": release_version(),
         "install_kind": "installed" if installed_app_layout() else "development",
@@ -62,6 +74,8 @@ def app_info() -> dict[str, Any]:
         "github_repo": slug,
         "releases_url": f"https://github.com/{slug}/releases/latest",
         "last_check_at": last_check,
+        "about_url": about_url,
+        "support_url": support_url,
     }
 
 
@@ -231,14 +245,17 @@ def start_download() -> dict[str, Any]:
         if not pending:
             raise ValueError("Сначала проверьте обновления")
         if _state["phase"] == "downloading":
-            return download_status()
-        if _state["phase"] == "ready" and _state.get("path"):
-            return download_status()
-        _state["phase"] = "downloading"
-        _state["error"] = None
-        _state["bytes_done"] = 0
-        _state["bytes_total"] = int(pending.get("size") or 0)
-    threading.Thread(target=_run_download, args=(dict(pending),), daemon=True).start()
+            already = True
+        elif _state["phase"] == "ready" and _state.get("path"):
+            already = True
+        else:
+            already = False
+            _state["phase"] = "downloading"
+            _state["error"] = None
+            _state["bytes_done"] = 0
+            _state["bytes_total"] = int(pending.get("size") or 0)
+    if not already:
+        threading.Thread(target=_run_download, args=(dict(pending),), daemon=True).start()
     return download_status()
 
 

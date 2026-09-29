@@ -22,6 +22,8 @@ let activeSegmentIndex = -1;
 let renderedSegmentCount = 0;
 let renderedSegmentJobId = null;
 let editorPollTimer = null;
+let editorDraftDirty = false;
+let editorPollFetchId = 0;
 let transcriptFollowTail = true;
 const PLAYER_COLLAPSE_KEY = "editor-player-collapsed-v2";
 const TRANSCRIPT_COLLAPSE_KEY = "editor-transcript-collapsed";
@@ -194,12 +196,13 @@ function syncEditModeAvailability(job) {
 }
 
 function shouldPollEditorJob(job) {
-  return (
-    job &&
-    job.kind === "file" &&
-    job.status === "running" &&
-    !job.speakers_running
-  );
+  if (!job) {
+    return false;
+  }
+  if (isYoutubeJob(job)) {
+    return job.status === "queued" || job.status === "running";
+  }
+  return job.kind === "file" && job.status === "running" && !job.speakers_running;
 }
 
 function stopEditorPoll() {
@@ -214,10 +217,15 @@ async function pollEditorJob() {
     stopEditorPoll();
     return;
   }
-  const job = await api(`/api/jobs/${currentJobId}`);
+  const jobId = currentJobId;
+  const fetchId = ++editorPollFetchId;
+  const job = await api(`/api/jobs/${jobId}`);
+  if (jobId !== currentJobId || fetchId !== editorPollFetchId) {
+    return;
+  }
   currentJob = job;
   syncEditModeAvailability(job);
-  if (editorMode === "view") {
+  if (editorMode === "view" && !editorDraftDirty) {
     renderSegments(job);
   }
   updateTransport(job);
@@ -594,6 +602,9 @@ function streamingStatusText(job) {
     return "";
   }
   const n = (job.segments || []).length;
+  if (isYoutubeJob(job) && n === 0) {
+    return t("youtube.k4983190");
+  }
   if (n > 0) {
     const pct = Math.round((Number(job.progress) || 0) * 100);
     return t("editor.transcribingSegments", { n, pct });
@@ -868,6 +879,8 @@ function renderEditor(job) {
 
 export async function onEditorShow(jobId) {
   if (currentJobId !== jobId) {
+    editorDraftDirty = false;
+    editorPollFetchId += 1;
     rangeFilledForJob = null;
     renderedSegmentCount = 0;
     renderedSegmentJobId = null;
@@ -1203,6 +1216,9 @@ export function initEditor() {
   });
 
   const textarea = document.getElementById("transcript-edit");
+  textarea?.addEventListener("input", () => {
+    editorDraftDirty = true;
+  });
   textarea?.addEventListener("click", () => {
     const pos = textarea.selectionStart;
     const before = textarea.value.slice(0, pos);

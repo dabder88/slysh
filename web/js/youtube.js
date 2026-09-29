@@ -1,7 +1,8 @@
 ﻿import { api, showToast, isAbsolutePath } from "./api.js";
 import { reportError } from "./errors.js";
-import { navigate } from "./router.js";
+import { navigate, getRoute, getEditorJobId } from "./router.js";
 import { ensureIntakeAllowed } from "./intake-duplicate.js";
+import { selectJob } from "./legacy.js";
 import { localeDateTag, t } from "./i18n.js";
 
 const METHOD_KEY = "youtube-method";
@@ -270,26 +271,47 @@ async function pollIngestJob(jobId) {
   const job = await api(`/api/jobs/${jobId}`);
   const statusEl = document.getElementById("youtube-ingest-status");
   const btn = document.getElementById("btn-youtube-ingest");
+  const onEditor = getRoute() === "editor" && getEditorJobId() === jobId;
+
   if (job.status === "completed") {
     stopIngestPoll();
     if (btn) {
       btn.disabled = false;
     }
-    navigate("editor", { jobId });
-    if (statusEl) {
-      statusEl.textContent = "";
+    if (onEditor) {
+      if (statusEl) {
+        statusEl.textContent = "";
+      }
+      await selectJob(jobId);
+    } else {
+      navigate("editor", { jobId });
+      if (statusEl) {
+        statusEl.textContent = "";
+      }
     }
     return;
   }
   if (job.status === "failed") {
     stopIngestPoll();
-    if (statusEl) {
-      statusEl.textContent = job.error_text || t("youtube.k6715193");
-    }
     if (btn) {
       btn.disabled = false;
     }
+    if (onEditor) {
+      if (statusEl) {
+        statusEl.textContent = "";
+      }
+      await selectJob(jobId);
+    } else if (statusEl) {
+      statusEl.textContent = job.error_text || t("youtube.k6715193");
+    }
     showToast(job.error_text || t("youtube.k5630576"));
+    return;
+  }
+  if (onEditor) {
+    if (statusEl) {
+      statusEl.textContent = "";
+    }
+    await selectJob(jobId);
     return;
   }
   if (statusEl) {
@@ -359,12 +381,12 @@ async function ingestYoutube() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url, method: ingestMethod(), language: "ru" }),
     });
-    if (job.status === "completed") {
-      await pollIngestJob(job.id);
-      return;
+    if (statusEl) {
+      statusEl.textContent = "";
     }
+    navigate("editor", { jobId: job.id });
     stopIngestPoll();
-    ingestPollTimer = setInterval(() => {
+    const runPoll = () =>
       pollIngestJob(job.id).catch((err) => {
         stopIngestPoll();
         if (btn) {
@@ -372,7 +394,12 @@ async function ingestYoutube() {
         }
         reportError(t("youtube.k6357375"), err);
       });
-    }, 1000);
+    if (job.status === "completed" || job.status === "failed") {
+      await runPoll();
+      return;
+    }
+    runPoll();
+    ingestPollTimer = setInterval(runPoll, 1000);
   } catch (err) {
     if (btn) {
       btn.disabled = false;

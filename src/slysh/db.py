@@ -109,6 +109,10 @@ class Database:
             self._conn.execute("ALTER TABLE jobs ADD COLUMN range_end_ms INTEGER")
         if "source_title" not in cols:
             self._conn.execute("ALTER TABLE jobs ADD COLUMN source_title TEXT")
+        if "run_id" not in cols:
+            self._conn.execute(
+                "ALTER TABLE jobs ADD COLUMN run_id INTEGER NOT NULL DEFAULT 0"
+            )
         batch_cols = {row[1] for row in self._conn.execute("PRAGMA table_info(batches)")}
         if "archived" not in batch_cols:
             self._conn.execute(
@@ -434,7 +438,8 @@ class Database:
         self._conn.execute(
             """
             UPDATE jobs
-            SET status = ?, started_at = ?, finished_at = NULL, progress = 0, error_text = NULL
+            SET status = ?, started_at = ?, finished_at = NULL, progress = 0,
+                error_text = NULL, run_id = run_id + 1
             WHERE id = ?
             """,
             (JobStatus.QUEUED.value, now, job_id),
@@ -525,6 +530,22 @@ class Database:
             (job_id, speaker_key, display_name),
         )
         self._conn.commit()
+
+    @_locked
+    def list_speaker_names(self, job_id: int) -> dict[str, str]:
+        rows = self._conn.execute(
+            """
+            SELECT speaker_key, display_name
+            FROM speakers
+            WHERE job_id = ?
+            """,
+            (job_id,),
+        ).fetchall()
+        return {
+            str(row["speaker_key"]): str(row["display_name"])
+            for row in rows
+            if row["speaker_key"]
+        }
 
     @_locked
     def apply_speaker_names(self, job_id: int) -> None:

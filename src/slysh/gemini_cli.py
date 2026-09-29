@@ -80,8 +80,6 @@ def transcribe_gemini_file(
         prompt,
         "--output-format",
         "json",
-        "--approval-mode",
-        "yolo",
     ]
     run = runner or subprocess.run
     try:

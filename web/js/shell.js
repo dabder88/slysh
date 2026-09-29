@@ -406,9 +406,47 @@ function initAppUpdates() {
   const githubBtn = document.getElementById("update-modal-github");
   const closeBtn = document.getElementById("update-modal-close");
   const versionSettings = document.getElementById("settings-app-version");
+  const sidebarVersion = document.getElementById("sidebar-app-version");
+  const aboutLink = document.getElementById("nav-about");
+  const supportLink = document.getElementById("nav-support");
   let pollTimer = null;
   let lastCheck = null;
   let releasesUrl = "";
+
+  function wireExternalNavLink(link, url) {
+    if (!link) {
+      return;
+    }
+    const trimmed = String(url || "").trim();
+    if (trimmed) {
+      link.href = trimmed;
+      link.classList.remove("is-disabled");
+      link.removeAttribute("aria-disabled");
+    } else {
+      link.href = "#";
+      link.classList.add("is-disabled");
+      link.setAttribute("aria-disabled", "true");
+    }
+  }
+
+  function bindExternalNavClick(link, titleKey) {
+    link?.addEventListener("click", async (event) => {
+      const url = String(link.getAttribute("href") || "").trim();
+      if (!url || url === "#") {
+        event.preventDefault();
+        return;
+      }
+      const bridge = window.pywebview?.api;
+      if (bridge?.open_url) {
+        event.preventDefault();
+        try {
+          await bridge.open_url(url);
+        } catch (err) {
+          reportError(t(titleKey), err);
+        }
+      }
+    });
+  }
 
   function stopPoll() {
     if (pollTimer) {
@@ -554,6 +592,12 @@ function initAppUpdates() {
         versionSettings.hidden = false;
         versionSettings.textContent = t("updates.currentVersion", { version: info.version });
       }
+      if (sidebarVersion && info.version) {
+        sidebarVersion.hidden = false;
+        sidebarVersion.textContent = t("common.appVersionShort", { version: info.version });
+      }
+      wireExternalNavLink(aboutLink, info.about_url);
+      wireExternalNavLink(supportLink, info.support_url);
     } catch (err) {
       console.error(err);
     }
@@ -609,6 +653,9 @@ function initAppUpdates() {
     }
     window.open(url, "_blank", "noopener");
   });
+
+  bindExternalNavClick(aboutLink, "nav.about");
+  bindExternalNavClick(supportLink, "nav.supportThanks");
 
   bootstrapInfo();
 }

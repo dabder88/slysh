@@ -22,6 +22,7 @@ class BatchStatus(str, Enum):
     RUNNING = "running"
     PAUSED = "paused"
     COMPLETED = "completed"
+    COMPLETED_WITH_ERRORS = "completed_with_errors"
 
 @dataclass
 class Segment:

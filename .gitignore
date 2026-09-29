@@ -59,6 +59,8 @@ scripts/smoke_model.py
 
 # Local dev / pytest home in repo root
 .test-home/
+.review/
+
 
 # Runtime logs at repo root (install copy is outside git)
 launch-last-error.txt

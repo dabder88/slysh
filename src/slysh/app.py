@@ -438,12 +438,21 @@ def log_startup_crash(exc: BaseException) -> None:
 
 
 def main() -> None:
+    import faulthandler
     import threading
     import time
 
     from slysh.logging_setup import setup_logging
 
     setup_logging()
+    try:
+        from slysh.paths import logs_dir
+
+        crash_log = logs_dir() / "faulthandler.log"
+        crash_log.parent.mkdir(parents=True, exist_ok=True)
+        faulthandler.enable(file=crash_log.open("a", encoding="utf-8"), all_threads=True)
+    except OSError:
+        faulthandler.enable()
 
     from slysh.runtime_setup import apply_fresh_install_marker
 
@@ -459,7 +468,15 @@ def main() -> None:
 
     from slysh.api import create_ui_app
     from slysh.db import Database
-    from slysh.paths import app_icon_path, db_path
+    from slysh.paths import app_dir, app_icon_path, db_path
+    from slysh.single_instance import SingleInstanceError, SingleInstanceLock
+
+    instance_lock = SingleInstanceLock(app_dir())
+    try:
+        instance_lock.acquire()
+    except SingleInstanceError as exc:
+        logging.error("%s", exc)
+        return
 
     if not webview2_runtime_installed():
         _tell_webview2_missing()
@@ -503,15 +520,28 @@ def main() -> None:
     start_kwargs: dict[str, str] = {}
     if icon is not None:
         start_kwargs["icon"] = str(icon.resolve())
+    logging.info("webview.start (host UI)")
     try:
-        webview.start(**start_kwargs)
-    except Exception:
-        if "icon" in start_kwargs:
-            logging.exception("webview.start failed with icon, retrying without icon")
-            start_kwargs.pop("icon", None)
+        try:
             webview.start(**start_kwargs)
-        else:
-            raise
+        except Exception:
+            if "icon" in start_kwargs:
+                logging.exception("webview.start failed with icon, retrying without icon")
+                start_kwargs.pop("icon", None)
+                webview.start(**start_kwargs)
+            else:
+                raise
+    finally:
+        server.should_exit = True
+        thread.join(timeout=10)
+        proc = getattr(app.state, "engine_proc", None)
+        if proc is not None:
+            try:
+                proc.terminate()
+                proc.wait(timeout=10)
+            except Exception:
+                logging.debug("engine terminate on exit", exc_info=True)
+        instance_lock.release()
 
 
 if __name__ == "__main__":

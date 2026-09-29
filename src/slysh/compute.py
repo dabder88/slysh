@@ -72,10 +72,9 @@ def _read_settings() -> dict:
 
 
 def _write_settings(data: dict) -> None:
-    settings_path().write_text(
-        json.dumps(data, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
+    from slysh.settings_store import save_json
+
+    save_json(settings_path(), data)
 
 
 def load_preference() -> str:

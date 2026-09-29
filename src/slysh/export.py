@@ -1,4 +1,6 @@
 from __future__ import annotations
+
+import json
 import re
 from datetime import datetime
 from pathlib import Path
@@ -37,8 +39,8 @@ def unique_export_path(directory: Path, stem: str, fmt: str, used: set[str]) -> 
         index += 1
 
 
-def _yaml_quote(value: str) -> str:
-    return str(value or "").replace('"', "'")
+def _yaml_scalar(value: str) -> str:
+    return json.dumps(str(value or ""), ensure_ascii=False)
 
 
 def _markdown_transcript_timestamps(segments: list[Segment]) -> str:
@@ -167,16 +169,16 @@ def write_media_markdown(
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     today = datetime.now().strftime("%Y-%m-%d")
-    safe_title = _yaml_quote(title)
-    safe_source = _yaml_quote(source)
-    safe_kind = _yaml_quote(kind)
+    safe_title = _yaml_scalar(title)
+    safe_source = _yaml_scalar(source)
+    safe_kind = _yaml_scalar(kind)
     body = _markdown_transcript_timestamps(segments)
     source_line = f"**Source:** `{source}`\n" if source else ""
     content = f"""---
-title: "{safe_title}"
-source: "{safe_source}"
-kind: "{safe_kind}"
-transcribed_at: "{today}"
+title: {safe_title}
+source: {safe_source}
+kind: {safe_kind}
+transcribed_at: {json.dumps(today)}
 ---
 
 # {title}

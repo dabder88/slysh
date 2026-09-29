@@ -13,7 +13,6 @@ from datetime import datetime
 from pathlib import Path
 
 import numpy as np
-import sounddevice as sd
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -44,6 +43,7 @@ from slysh.batch_runner import (
     start_batch,
 )
 from slysh.chunking import SAMPLE_RATE, offset_segments, slice_pcm_range
+from slysh.cuda_fallback import format_job_asr_error
 from slysh.decode import decode_pcm_16k_mono
 from slysh.db import Database
 from slysh.engine_client import cancel as engine_cancel
@@ -71,7 +71,7 @@ from slysh.meeting_capture import (
     resample_to_16k,
 )
 from slysh.models import BatchStatus, JobKind, JobStatus, Segment
-from slysh.open_paths import open_file, reveal_in_folder
+from slysh.open_paths import open_file, resolve_existing, reveal_in_folder
 from slysh.paths import (
     catalog_roots,
     gigaam_download_root,
@@ -576,6 +576,7 @@ def _create_youtube_batch(app: FastAPI, db: Database, body: YoutubeBatchCreateBo
             app,
             db,
             batch_id,
+            run_file_job=_run_file_asr_job,
             ensure_engine=_ensure_engine_url,
             run_engine_job=_run_engine_job,
             engine_cancel=engine_cancel,
@@ -630,16 +631,45 @@ def _decorate_job(
     return payload
 
 
-def _segments_payload(segments: list[Segment]) -> list[dict]:
+def _display_segments(
+    db: Database,
+    job_id: int,
+    segments: list[Segment],
+) -> list[Segment]:
+    names = db.list_speaker_names(job_id)
+    if not names:
+        return segments
     return [
-        {
-            "start_ms": s.start_ms,
-            "end_ms": s.end_ms,
-            "text": s.text,
-            "speaker": s.speaker,
-        }
+        Segment(
+            s.start_ms,
+            s.end_ms,
+            s.text,
+            speaker=names.get(s.speaker, s.speaker) if s.speaker else None,
+        )
         for s in segments
     ]
+
+
+def _segments_payload(
+    segments: list[Segment],
+    speaker_names: dict[str, str] | None = None,
+) -> list[dict]:
+    rows: list[dict] = []
+    for s in segments:
+        key = s.speaker
+        display = key
+        if key and speaker_names:
+            display = speaker_names.get(key, key)
+        rows.append(
+            {
+                "start_ms": s.start_ms,
+                "end_ms": s.end_ms,
+                "text": s.text,
+                "speaker": display,
+                "speaker_key": key,
+            }
+        )
+    return rows
 
 
 def _require_job(db: Database, job_id: int) -> dict:
@@ -651,7 +681,7 @@ def _require_job(db: Database, job_id: int) -> dict:
 
 def _write_job_export_file(db: Database, job: dict, out: Path, fmt: str) -> None:
     job_id = int(job["id"])
-    segments = db.list_segments(job_id)
+    segments = _display_segments(db, job_id, db.list_segments(job_id))
     if _is_youtube_job(job):
         video = load_job_youtube_video(job_id) or {}
         _, language = load_job_ingest_meta(job_id)
@@ -727,6 +757,68 @@ def _model_status() -> str:
     return "ready" if model_is_ready() else "missing"
 
 
+ENGINE_START_PORT_WAIT_S = 60.0
+
+
+def _selected_asr_preflight_error() -> str | None:
+    """Human-readable reason when the current ASR choice cannot run."""
+    selected = _selected_model()
+    if selected is None:
+        return "Модель распознавания не выбрана. Укажите её в Настройках."
+    if selected.backend in REMOTE_BACKENDS:
+        if not selected.ready:
+            hint = (selected.hint or "").strip()
+            return hint or f"Настройте доступ к модели «{selected.label}» в Настройках."
+        return None
+    if is_cloud_only():
+        return CLOUD_ONLY_ENGINE_MSG
+    if not selected.ready:
+        if selected.downloadable:
+            return (
+                f"Модель «{selected.label}» не скачана. "
+                "Загрузите её в Настройках → ASR."
+            )
+        return (
+            f"Модель «{selected.label}» недоступна. "
+            "Проверьте файлы в каталоге models/."
+        )
+    if not engine_packages_ok():
+        return (
+            "Сначала установите локальные пакеты расшифровки "
+            "(torch и движки) в Настройках."
+        )
+    return None
+
+
+def _require_asr_ready() -> None:
+    message = _selected_asr_preflight_error()
+    if message:
+        raise HTTPException(status_code=400, detail=message)
+
+
+def _engine_spawn_failure_detail(proc: subprocess.Popen, lines: list[str]) -> str:
+    tail = "\n".join(lines[-10:]).strip()
+    lower = tail.lower()
+    if "not available" in lower or "install engine" in lower:
+        return tail[:500]
+    if "gigaam" in lower and "not" in lower:
+        return tail[:500] if tail else "GigaAM недоступен. Установите пакеты движка в Настройках."
+    code = proc.poll()
+    if code not in (None, 0):
+        if tail:
+            return f"Движок завершился с кодом {code}: {tail[:400]}"
+        return f"Движок завершился с кодом {code}. Проверьте логи и установку torch/GigaAM."
+    if tail:
+        return (
+            "Движок не сообщил порт запуска. "
+            f"Последние строки: {tail[:400]}"
+        )
+    return (
+        "Движок не запустился. Проверьте, что модель скачана, "
+        "пакеты torch/GigaAM установлены, и повторите попытку."
+    )
+
+
 def _engine_status(app: FastAPI) -> str:
     url = getattr(app.state, "engine_url", None)
     if not url:
@@ -764,6 +856,15 @@ def _drain_engine_output(stream) -> None:
 def _spawn_engine(app: FastAPI) -> dict[str, int]:
     if is_cloud_only():
         raise HTTPException(status_code=400, detail=CLOUD_ONLY_ENGINE_MSG)
+    selected = _selected_model()
+    if selected is not None and selected.backend in REMOTE_BACKENDS:
+        raise HTTPException(
+            status_code=500,
+            detail="Локальный движок не используется для облачной модели.",
+        )
+    preflight = _selected_asr_preflight_error()
+    if preflight:
+        raise HTTPException(status_code=400, detail=preflight)
     if _engine_status(app) != "down":
         existing = _existing_engine_port(app)
         if existing is not None:
@@ -800,18 +901,45 @@ def _spawn_engine(app: FastAPI) -> dict[str, int]:
     )
     port: int | None = None
     stdout = proc.stdout
+    boot_lines: list[str] = []
     if stdout is not None:
-        for line in stdout:
-            if line.startswith("PORT="):
-                port = int(line.strip().split("=", 1)[1])
+        port_box: list[int | None] = [None]
+        boot_lock = threading.Lock()
+
+        def _read_stdout() -> None:
+            try:
+                for line in stdout:
+                    text = line.rstrip()
+                    if port_box[0] is None:
+                        if text:
+                            with boot_lock:
+                                boot_lines.append(text)
+                            logging.info("engine: %s", text)
+                        if line.startswith("PORT="):
+                            port_box[0] = int(line.strip().split("=", 1)[1])
+                    elif text:
+                        logging.info("engine: %s", text)
+            except Exception:
+                logging.debug("engine stdout closed", exc_info=True)
+
+        threading.Thread(target=_read_stdout, daemon=True).start()
+        deadline = time.monotonic() + ENGINE_START_PORT_WAIT_S
+        while time.monotonic() < deadline:
+            if port_box[0] is not None:
+                port = port_box[0]
                 break
-        threading.Thread(
-            target=_drain_engine_output,
-            args=(stdout,),
-            daemon=True,
-        ).start()
-    if port is None:
-        raise HTTPException(status_code=500, detail="engine did not report PORT")
+            if proc.poll() is not None:
+                break
+            time.sleep(0.1)
+        if port is None:
+            if proc.poll() is None:
+                proc.terminate()
+                try:
+                    proc.wait(timeout=5)
+                except Exception:
+                    proc.kill()
+            detail = _engine_spawn_failure_detail(proc, boot_lines)
+            raise HTTPException(status_code=500, detail=detail)
 
     app.state.engine_proc = proc
     app.state.engine_url = f"http://127.0.0.1:{port}"
@@ -922,7 +1050,7 @@ def _run_engine_job(db: Database, engine_url: str, job_id: int, source_path: str
         if _engine_job_cancelled(db, job_id):
             return
         logging.exception("engine job %s failed", job_id)
-        db.set_error(job_id, str(exc))
+        db.set_error(job_id, format_job_asr_error(exc))
         db.set_status(job_id, JobStatus.FAILED)
 
 
@@ -976,6 +1104,17 @@ def _start_engine_job(app: FastAPI, db: Database, job_id: int, source_path: str)
             db.set_status(job_id, JobStatus.FAILED)
 
     threading.Thread(target=boot, daemon=True).start()
+
+
+def _run_file_asr_job(
+    app: FastAPI, db: Database, job_id: int, source_path: str
+) -> None:
+    selected = _selected_model()
+    if selected is not None and selected.backend in REMOTE_BACKENDS:
+        _run_remote_job(app, db, job_id, source_path)
+        return
+    engine_url = _ensure_engine_url(app)
+    _run_engine_job(db, engine_url, job_id, source_path)
 
 
 def _run_remote_job(app: FastAPI, db: Database, job_id: int, source_path: str) -> None:
@@ -1156,7 +1295,11 @@ def _live_status_payload(app: FastAPI, db: Database, state: dict) -> dict:
     }
     job_id = state.get("job_id")
     if job_id is not None:
-        payload["segments"] = _segments_payload(db.list_segments(int(job_id)))
+        jid = int(job_id)
+        segs = db.list_segments(jid)
+        payload["segments"] = _segments_payload(
+            segs, speaker_names=db.list_speaker_names(jid)
+        )
     if state.get("error"):
         payload["error"] = state["error"]
     return payload
@@ -1220,7 +1363,11 @@ def _meeting_status_payload(app: FastAPI, db: Database, state: dict) -> dict:
     }
     job_id = state.get("job_id")
     if job_id is not None:
-        payload["segments"] = _segments_payload(db.list_segments(int(job_id)))
+        jid = int(job_id)
+        segs = db.list_segments(jid)
+        payload["segments"] = _segments_payload(
+            segs, speaker_names=db.list_speaker_names(jid)
+        )
     if state.get("error"):
         payload["error"] = state["error"]
     return payload
@@ -1253,6 +1400,8 @@ def _mic_name_excluded(name: str) -> bool:
 
 
 def _mic_is_available(index: int) -> bool:
+    from slysh.sounddevice_lazy import sd
+
     try:
         info = sd.query_devices(index)
         native = int(float(info.get("default_samplerate") or 16000))
@@ -1403,13 +1552,15 @@ def _stop_live_stream(app: FastAPI) -> None:
     app.state.live["stream"] = None
 
 
-def _warm_compute_cache() -> None:
-    try:
-        from slysh.compute import warm_cuda_cache
-
-        warm_cuda_cache()
-    except Exception:
-        logging.debug("cuda cache warm-up skipped", exc_info=True)
+def _finalize_capture_job(db: Database, state: dict, job_id: int) -> None:
+    err = str(state.get("error") or "").strip()
+    job = db.get_job(job_id) or {}
+    if err or job.get("error_text"):
+        if job.get("status") != JobStatus.CANCELLED.value:
+            db.set_status(job_id, JobStatus.FAILED)
+        return
+    db.set_progress(job_id, 1)
+    db.set_status(job_id, JobStatus.COMPLETED)
 
 
 def create_ui_app(
@@ -1419,8 +1570,11 @@ def create_ui_app(
 ) -> FastAPI:
     if auto_start_engine is None:
         auto_start_engine = not is_cloud_only()
+    from slysh.local_auth import install_ui_auth
+
     app = FastAPI()
     app.state.db = db
+    install_ui_auth(app)
 
     @app.middleware("http")
     async def disable_static_cache(request: Request, call_next):
@@ -1449,7 +1603,6 @@ def create_ui_app(
     app.state.speaker_ytdlp_procs = {}
     app.state.batch_runner = None
     apply_preference(load_preference())
-    threading.Thread(target=_warm_compute_cache, daemon=True).start()
 
     @app.get("/api/library")
     def library() -> dict:
@@ -1572,6 +1725,7 @@ def create_ui_app(
             app,
             db,
             batch_id,
+            run_file_job=_run_file_asr_job,
             ensure_engine=_ensure_engine_url,
             run_engine_job=_run_engine_job,
             engine_cancel=engine_cancel,
@@ -1657,8 +1811,9 @@ def create_ui_app(
             if youtube_title and youtube_title != source_title:
                 db.set_job_source_title(job_id, youtube_title)
                 job["source_title"] = youtube_title
-        job["segments"] = _segments_payload(segments)
-        job["transcript"] = format_transcript(segments)
+        names = db.list_speaker_names(job_id)
+        job["segments"] = _segments_payload(segments, speaker_names=names)
+        job["transcript"] = format_transcript(_display_segments(db, job_id, segments))
         return job
 
     @app.patch("/api/jobs/{job_id}")
@@ -1740,6 +1895,7 @@ def create_ui_app(
             db.set_error(job_id, str(exc))
             db.set_status(job_id, JobStatus.FAILED)
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+        _require_asr_ready()
         db.begin_transcription(job_id)
         _start_asr_job(app, db, job_id, str(source))
         return _decorate_job(app, _job_payload(_require_job(db, job_id)))
@@ -1763,6 +1919,7 @@ def create_ui_app(
             db.set_error(job_id, str(exc))
             db.set_status(job_id, JobStatus.FAILED)
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+        _require_asr_ready()
         db.begin_transcription(job_id)
         _start_asr_job(app, db, job_id, str(source))
         return _decorate_job(app, _job_payload(_require_job(db, job_id)))
@@ -1877,8 +2034,7 @@ def create_ui_app(
     def rename_speakers(job_id: int, body: dict[str, str]) -> dict:
         _require_job(db, job_id)
         for speaker_key, display_name in body.items():
-            db.upsert_speaker(job_id, speaker_key, display_name)
-        db.apply_speaker_names(job_id)
+            db.upsert_speaker(job_id, speaker_key, str(display_name).strip())
         return {"ok": True}
 
     @app.get("/api/app/info")
@@ -2213,6 +2369,7 @@ def create_ui_app(
     @app.post("/api/open-path")
     def open_saved_path(body: OpenPathBody) -> dict:
         try:
+            resolve_existing(body.path)
             if body.reveal:
                 reveal_in_folder(body.path)
             else:
@@ -2292,6 +2449,7 @@ def create_ui_app(
         selected = _selected_model()
         if selected is not None and selected.backend == "cli":
             raise HTTPException(status_code=400, detail=LIVE_CLI_HINT)
+        _require_asr_ready()
         mics = _list_input_mics(app)
         if not mics:
             raise HTTPException(status_code=400, detail=NO_MIC_HINT)
@@ -2409,10 +2567,12 @@ def create_ui_app(
         state["session"] = None
         state["device_id"] = None
         if job_id is not None:
-            db.set_progress(job_id, 1)
-            db.set_status(job_id, JobStatus.COMPLETED)
+            _finalize_capture_job(db, state, job_id)
+            names = db.list_speaker_names(job_id)
             payload = _job_payload(_require_job(db, job_id))
-            payload["segments"] = _segments_payload(db.list_segments(job_id))
+            payload["segments"] = _segments_payload(
+                db.list_segments(job_id), speaker_names=names
+            )
             return payload
         return {"ok": True}
 
@@ -2458,6 +2618,7 @@ def create_ui_app(
         selected = _selected_model()
         if selected is not None and selected.backend == "cli":
             raise HTTPException(status_code=400, detail=MEETING_CLI_HINT)
+        _require_asr_ready()
         if not loopback_supported():
             raise HTTPException(status_code=400, detail=NOT_WINDOWS_HINT)
         outputs = list_output_devices()
@@ -2575,10 +2736,12 @@ def create_ui_app(
             state["thread"] = None
         state["session"] = None
         if job_id is not None:
-            db.set_progress(job_id, 1)
-            db.set_status(job_id, JobStatus.COMPLETED)
+            _finalize_capture_job(db, app.state.meeting, job_id)
+            names = db.list_speaker_names(job_id)
             payload = _job_payload(_require_job(db, job_id))
-            payload["segments"] = _segments_payload(db.list_segments(job_id))
+            payload["segments"] = _segments_payload(
+                db.list_segments(job_id), speaker_names=names
+            )
             return payload
         return {"ok": True}
 
@@ -2658,3 +2821,11 @@ def create_ui_app(
         app.mount("/", StaticFiles(directory=str(ui_dir), html=True), name="web")
 
     return app
+
+
+def __getattr__(name: str):
+    if name == "sd":
+        from slysh.sounddevice_lazy import sd
+
+        return sd
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Callable
 from slysh.batch_rules import is_youtube_batch_rules, normalize_rules
 from slysh.export import (
     suggested_export_path,
+    unique_export_path,
     write_job_export,
     youtube_export_meta_from_job,
     youtube_job_export_path,
@@ -66,6 +67,8 @@ def _export_batch_job(
     job_id: int,
     job: dict,
     rules: dict,
+    *,
+    used_names: set[str] | None = None,
 ) -> None:
     fmt = str(rules.get("export_fmt") or "srt")
     segments = db.list_segments(job_id)
@@ -98,7 +101,13 @@ def _export_batch_job(
         else:
             if target_rules.get("export_dir_mode") == "fixed" and target_rules.get("export_dir"):
                 stem = Path(job["source_path"]).stem or "transcript"
-                out = Path(str(target_rules["export_dir"])) / f"{stem}.{fmt}"
+                used = used_names if used_names is not None else set()
+                out = unique_export_path(
+                    Path(str(target_rules["export_dir"])),
+                    stem,
+                    fmt,
+                    used,
+                )
             else:
                 out = suggested_export_path(job["source_path"], fmt)
             write_job_export(out, segments, fmt, job=job)
@@ -162,13 +171,33 @@ def _run_youtube_batch_job(
     return True
 
 
+def _batch_pause_on_error(
+    runner: BatchRunnerControl,
+    db: Database,
+    batch_id: int,
+    *,
+    done: int,
+    failed: int,
+    skipped: int,
+) -> None:
+    db.update_batch(batch_id, status=BatchStatus.PAUSED)
+    runner.summary = {
+        "done": done,
+        "failed": failed,
+        "skipped": skipped,
+        "paused": True,
+        "pause_reason": "on_error_stop",
+    }
+
+
 def start_batch(
     app: FastAPI,
     db: Database,
     batch_id: int,
     *,
-    ensure_engine: Callable[[FastAPI], str],
-    run_engine_job: Callable[[Database, str, int, str], None],
+    run_file_job: Callable[[FastAPI, Database, int, str], None],
+    ensure_engine: Callable[[FastAPI], str] | None = None,
+    run_engine_job: Callable[[Database, str, int, str], None] | None = None,
     engine_cancel: Callable[[str], None],
 ) -> None:
     runner = get_runner(app)
@@ -192,7 +221,8 @@ def start_batch(
                 return
             rules = normalize_rules(batch.get("rules"))
             youtube_batch = is_youtube_batch_rules(rules)
-            engine_url: str | None = None
+            engine_url: str | None = getattr(app.state, "engine_url", None)
+            export_used: set[str] = set()
             delay_s = int(rules.get("delay_seconds") or 0)
             job_list = db.list_batch_jobs(batch_id)
             total_jobs = len(job_list)
@@ -235,7 +265,15 @@ def start_batch(
                     if not ok:
                         failed += 1
                         if rules.get("on_error") == "stop":
-                            break
+                            _batch_pause_on_error(
+                                runner,
+                                db,
+                                batch_id,
+                                done=done,
+                                failed=failed,
+                                skipped=skipped,
+                            )
+                            return
                         continue
                     done += 1
                     with runner.lock:
@@ -261,17 +299,26 @@ def start_batch(
 
                 db.begin_transcription(job_id)
                 try:
-                    if engine_url is None:
-                        engine_url = ensure_engine(app)
                     current = db.get_job(job_id) or {}
                     if current.get("status") == JobStatus.CANCELLED.value:
                         continue
-                    run_engine_job(db, engine_url, job_id, str(source))
+                    run_file_job(app, db, job_id, str(source))
                 except Exception as exc:
                     logging.exception("batch job %s failed", job_id)
-                    db.set_error(job_id, str(exc))
+                    detail = getattr(exc, "detail", None)
+                    db.set_error(job_id, str(detail or exc))
                     db.set_status(job_id, JobStatus.FAILED)
                     failed += 1
+                    if rules.get("on_error") == "stop":
+                        _batch_pause_on_error(
+                            runner,
+                            db,
+                            batch_id,
+                            done=done,
+                            failed=failed,
+                            skipped=skipped,
+                        )
+                        return
                     continue
 
                 current = db.get_job(job_id) or {}
@@ -279,6 +326,16 @@ def start_batch(
                     continue
                 if current.get("status") != JobStatus.COMPLETED.value:
                     failed += 1
+                    if rules.get("on_error") == "stop":
+                        _batch_pause_on_error(
+                            runner,
+                            db,
+                            batch_id,
+                            done=done,
+                            failed=failed,
+                            skipped=skipped,
+                        )
+                        return
                     continue
 
                 if rules.get("speakers"):
@@ -291,7 +348,13 @@ def start_batch(
 
                 if rules.get("export"):
                     try:
-                        _export_batch_job(db, job_id, job, rules)
+                        _export_batch_job(
+                            db,
+                            job_id,
+                            job,
+                            rules,
+                            used_names=export_used,
+                        )
                     except Exception as exc:
                         logging.exception("batch export failed for job %s", job_id)
                         db.set_error(job_id, str(exc))
@@ -318,7 +381,14 @@ def start_batch(
             if active_batch == batch_id:
                 batch = db.get_batch(batch_id)
                 if batch and batch.get("status") == BatchStatus.RUNNING.value:
-                    db.update_batch(batch_id, status=BatchStatus.COMPLETED)
+                    if failed > 0 and done > 0:
+                        db.update_batch(
+                            batch_id, status=BatchStatus.COMPLETED_WITH_ERRORS
+                        )
+                    elif failed > 0:
+                        db.update_batch(batch_id, status=BatchStatus.PAUSED)
+                    else:
+                        db.update_batch(batch_id, status=BatchStatus.COMPLETED)
                 if runner.summary is None:
                     runner.summary = {
                         "done": done,

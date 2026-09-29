@@ -195,6 +195,19 @@ function selectedBatchLabel(batchId = selectedBatchId) {
   return batch ? batch.name : t("queue.batchLabel");
 }
 
+/** File/folder intake target: null if none selected or YouTube batch is selected. */
+function fileBatchTargetId() {
+  const id = getSelectedBatchId();
+  if (id == null) {
+    return null;
+  }
+  const batch = batchById(id);
+  if (batch && isYoutubeBatch(batch)) {
+    return null;
+  }
+  return id;
+}
+
 function syncBatchTargetSelect() {
   if (!batchTargetSelectEl) {
     return;
@@ -1318,11 +1331,15 @@ async function addOrphanFiles(paths) {
   showToast(t("legacy.filesAdded", { count: pathsToAdd.length }));
 }
 
-async function addFilesToSelectedBatch(paths) {
-  const batchId = selectedBatchId;
+async function addFilesToSelectedBatch(paths, batchId = selectedBatchId) {
   if (batchId == null) {
     showToast("legacy.k7264921");
     switchLegacyTab("batches");
+    return;
+  }
+  const batch = batchById(batchId);
+  if (batch && isYoutubeBatch(batch)) {
+    showToast(t("legacy.youtubeBatchNoFiles"));
     return;
   }
   const unique = [...new Set((paths || []).filter(Boolean))];
@@ -1456,6 +1473,11 @@ async function confirmFolderAdd() {
       await refreshLibrary();
       showToast(t("legacy.batchCreatedNamed", { name }));
     } else {
+      const batch = batchById(batchId);
+      if (batch && isYoutubeBatch(batch)) {
+        showToast(t("legacy.youtubeBatchNoFiles"));
+        return;
+      }
       await addToBatch(batchId, paths, recursive);
       await refreshLibrary();
       showToast(t("legacy.folderAddedToBatch", { name: selectedBatchLabel(batchId) }));
@@ -1509,11 +1531,8 @@ async function addFolder() {
   if (!folder) {
     return;
   }
-  if (selectedBatchId == null) {
-    await openFolderAddModal([folder], null);
-    return;
-  }
-  await openFolderAddModal([folder], selectedBatchId);
+  const targetId = fileBatchTargetId();
+  await openFolderAddModal([folder], targetId);
 }
 
 async function createEmptyBatch() {
@@ -2906,11 +2925,7 @@ export async function addPathsForDashboard(target, paths) {
   }
   const onlyFolders = unique.every(pathLooksLikeFolder);
   if (onlyFolders) {
-    if (selectedBatchId == null) {
-      await openFolderAddModal(unique, null);
-    } else {
-      await openFolderAddModal(unique, selectedBatchId);
-    }
+    await openFolderAddModal(unique, fileBatchTargetId());
     return;
   }
   if (unique.some(pathLooksLikeFolder)) {
@@ -2918,14 +2933,15 @@ export async function addPathsForDashboard(target, paths) {
     return;
   }
   if (target === "batch") {
-    if (selectedBatchId == null) {
+    const targetId = fileBatchTargetId();
+    if (targetId == null) {
       const batch = await createBatchNamed(defaultBatchName(unique), unique);
       if (batch?.id != null) {
         navigate("legacy", { batchId: batch.id, tab: "batches" });
       }
       return;
     }
-    await addFilesToSelectedBatch(unique);
+    await addFilesToSelectedBatch(unique, targetId);
   } else {
     await resolveUploadTarget(unique);
   }

@@ -5,9 +5,9 @@ import sys
 import threading
 
 import numpy as np
-import sounddevice as sd
 
 from slysh.chunking import SAMPLE_RATE
+from slysh.sounddevice_lazy import sd
 from slysh.live_buffer import LiveSession
 from slysh.wasapi_loopback import (
     WasapiLoopback,

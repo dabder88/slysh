@@ -1,0 +1,29 @@
+name: pytest
+
+on:
+  push:
+    branches: [main, master, prod-launch]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dev deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]" httpx pytest
+      - name: JS syntax check
+        run: node --check web/js/main.js
+      - name: CSS build
+        run: |
+          npm ci
+          npm run build:css
+      - name: Pytest
+        env:
+          PYTHONPATH: src
+        run: python -m pytest tests -q

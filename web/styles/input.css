@@ -260,6 +260,16 @@
     border-top: 1px solid var(--outline-variant);
   }
 
+  .sidebar-app-version {
+    margin: 10px 16px 4px;
+    font-size: 12px;
+    color: var(--on-surface-variant);
+  }
+
+  .app-shell.is-sidebar-collapsed .sidebar-app-version {
+    display: none;
+  }
+
   .main-area {
     display: flex;
     min-width: 0;

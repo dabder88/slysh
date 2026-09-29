@@ -226,7 +226,6 @@ def save_openrouter(
 def public_openrouter() -> dict:
     key = openrouter_api_key()
     return {
-        "api_key": key,
         "api_key_set": bool(key),
         "api_key_tail": mask_secret(key),
         "model": openrouter_model(),
@@ -258,7 +257,6 @@ def save_apify(api_key: str | None = None) -> dict:
 def public_apify() -> dict:
     key = apify_api_key()
     return {
-        "api_key": key,
         "api_key_set": bool(key),
         "api_key_tail": mask_secret(key),
     }
@@ -321,7 +319,6 @@ def _public_http_preset(preset: HttpPreset) -> dict:
         "hint": preset.hint,
         "key_placeholder": preset.key_placeholder,
         "env_key": preset.env_key,
-        "api_key": key,
         "api_key_set": bool(key),
         "api_key_tail": mask_secret(key),
         "ready": bool(key),
@@ -417,7 +414,6 @@ def _public_custom(item: dict) -> dict:
         "protocol": protocol,
         "endpoint": item["endpoint"],
         "model": item["model"],
-        "api_key": key,
         "api_key_set": bool(key),
         "api_key_tail": mask_secret(key),
         "ready": custom_is_ready(item),

@@ -82,6 +82,7 @@
   "common": {
     "all": "All",
     "any": "Any",
+    "appVersionShort": "v{version}",
     "back": "Back",
     "batch": "Batch",
     "browse": "Browse…",
@@ -577,7 +578,9 @@
     "queue": "Queue",
     "settings": "Settings",
     "transcripts": "Transcripts",
-    "youtube": "YouTube"
+    "youtube": "YouTube",
+    "about": "About",
+    "supportThanks": "Say thanks"
   },
   "orphanFiles": {
     "actions": "Actions",
@@ -655,7 +658,7 @@
     "585b38ac2082": "Add folder",
     "5c838d5bdbac": "Lines with timestamps [HH:MM:SS]. Click a line to seek.",
     "5d48b34c249a": "Empty means the whole file. Click the waveform to seek; drag to set a range.",
-    "5d614e78c09c": "Upload audio",
+    "5d614e78c09c": "Upload file",
     "5eb8427bd12f": "Export folder",
     "5f384074724e": "Save edits",
     "62ec01817f96": "After editing UI files, reload the window to pick up changes.",

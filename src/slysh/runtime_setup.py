@@ -471,17 +471,19 @@ def start_engine_install(
     if engine_packages_ok(python=python, runner=runner):
         return setup_status(python=python, runner=runner)
     clear_prompt_engine_setup()
+    started = False
     with _lock:
-        if _install["running"]:
-            return setup_status(python=python, runner=runner)
-        _install["running"] = True
-        _install["error"] = None
-        _install["returncode"] = None
-        _install["log_fingerprint"] = ""
-        _install["log_fingerprint_at"] = time.monotonic()
-    if mark_pending_model:
-        set_pending_model_setup()
-    _spawn_install_thread()
+        if not _install["running"]:
+            _install["running"] = True
+            _install["error"] = None
+            _install["returncode"] = None
+            _install["log_fingerprint"] = ""
+            _install["log_fingerprint_at"] = time.monotonic()
+            started = True
+    if started:
+        if mark_pending_model:
+            set_pending_model_setup()
+        _spawn_install_thread()
     return setup_status(python=python, runner=runner)
 
 

@@ -114,6 +114,7 @@ def create_app(backend, decode) -> FastAPI:
 
     @app.post("/transcribe_chunk")
     def transcribe_chunk(body: TranscribeChunkBody):
+        cancelled.clear()
         try:
             pcm = np.asarray(body.samples, dtype=np.float32)
             segments = backend.transcribe_chunk(pcm, is_cancelled)
