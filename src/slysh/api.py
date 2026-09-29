@@ -43,6 +43,13 @@ from slysh.batch_runner import (
     start_batch,
 )
 from slysh.chunking import SAMPLE_RATE, offset_segments, slice_pcm_range
+from slysh.asr_coordinator import (
+    AsrCoordinator,
+    job_run_active,
+    job_run_id,
+    pump_local_queued,
+    pump_remote_queued,
+)
 from slysh.cuda_fallback import format_job_asr_error
 from slysh.decode import decode_pcm_16k_mono
 from slysh.db import Database, SegmentsRevisionConflictError
@@ -1001,11 +1008,18 @@ def _engine_job_cancelled(db: Database, job_id: int) -> bool:
 
 
 def _run_engine_job(db: Database, engine_url: str, job_id: int, source_path: str) -> None:
+    job = db.get_job(job_id) or {}
+    run_id = job_run_id(db, job_id)
+    if not job_run_active(db, job_id, run_id):
+        return
     db.set_status(job_id, JobStatus.RUNNING)
     db.set_progress(job_id, 0)
     db.replace_segments(job_id, [])
     try:
         job = db.get_job(job_id) or {}
+        run_id = job_run_id(db, job_id)
+        if not job_run_active(db, job_id, run_id):
+            return
         pcm, _sr = decode_pcm_16k_mono(source_path)
         pcm, offset_ms = slice_pcm_range(
             pcm, job.get("range_start_ms"), job.get("range_end_ms")
@@ -1020,18 +1034,26 @@ def _run_engine_job(db: Database, engine_url: str, job_id: int, source_path: str
             return _segments_from_engine(payload)
 
         def on_segments(piece: list[Segment]) -> None:
+            if not job_run_active(db, job_id, run_id):
+                return
             db.append_segments(job_id, piece)
+
+        def on_progress(value: float) -> None:
+            if not job_run_active(db, job_id, run_id):
+                return
+            db.set_progress(job_id, 0.01 + 0.99 * float(value))
 
         status, _segs = transcribe_pcm_chunks(
             pcm,
             transcribe_chunk_fn=transcribe_chunk_fn,
-            cancelled=lambda: _engine_job_cancelled(db, job_id),
-            on_progress=lambda value: db.set_progress(
-                job_id, 0.01 + 0.99 * float(value)
-            ),
+            cancelled=lambda: not job_run_active(db, job_id, run_id)
+            or _engine_job_cancelled(db, job_id),
+            on_progress=on_progress,
             on_segments=on_segments,
             start_ms_offset=int(offset_ms or 0),
         )
+        if not job_run_active(db, job_id, run_id):
+            return
         if status == "cancelled" or _engine_job_cancelled(db, job_id):
             if not _engine_job_cancelled(db, job_id):
                 db.set_status(job_id, JobStatus.CANCELLED)
@@ -1039,7 +1061,7 @@ def _run_engine_job(db: Database, engine_url: str, job_id: int, source_path: str
         db.set_progress(job_id, 1)
         db.set_status(job_id, JobStatus.COMPLETED)
     except Exception as exc:
-        if _engine_job_cancelled(db, job_id):
+        if not job_run_active(db, job_id, run_id) or _engine_job_cancelled(db, job_id):
             return
         logging.exception("engine job %s failed", job_id)
         db.set_error(job_id, format_job_asr_error(exc))
@@ -1053,11 +1075,37 @@ def _engine_needs_start(app: FastAPI) -> bool:
     return _engine_status(app) == "down"
 
 
+def _pump_asr_queues(app: FastAPI, db: Database) -> None:
+    pump_local_queued(
+        app,
+        db,
+        is_youtube_job=_is_youtube_job,
+        is_remote_model=lambda: (
+            _selected_model() is not None
+            and _selected_model().backend in REMOTE_BACKENDS
+        ),
+        start_engine_job=_start_engine_job,
+    )
+    pump_remote_queued(
+        app,
+        db,
+        is_youtube_job=_is_youtube_job,
+        is_remote_model=lambda: (
+            _selected_model() is not None
+            and _selected_model().backend in REMOTE_BACKENDS
+        ),
+        start_remote_job=_schedule_remote_job,
+    )
+
+
 def _start_engine_job(app: FastAPI, db: Database, job_id: int, source_path: str) -> None:
     skip = os.environ.get("GIGAAM_SKIP_ENGINE") == "1"
     auto_start = bool(getattr(app.state, "auto_start_engine", False))
 
     def boot() -> None:
+        coord: AsrCoordinator = app.state.asr_coordinator
+        if not coord.try_begin_local(job_id):
+            return
         try:
             if is_cloud_only():
                 db.set_error(job_id, CLOUD_ONLY_ENGINE_MSG)
@@ -1094,6 +1142,27 @@ def _start_engine_job(app: FastAPI, db: Database, job_id: int, source_path: str)
             logging.exception("engine job %s failed to start", job_id)
             db.set_error(job_id, str(exc))
             db.set_status(job_id, JobStatus.FAILED)
+        finally:
+            coord.end_local(job_id)
+            _pump_asr_queues(app, db)
+
+    threading.Thread(target=boot, daemon=True).start()
+
+
+def _schedule_remote_job(app: FastAPI, db: Database, job_id: int, source_path: str) -> None:
+    def boot() -> None:
+        coord: AsrCoordinator = app.state.asr_coordinator
+        if not coord.try_begin_remote(job_id):
+            return
+        try:
+            _run_remote_job(app, db, job_id, source_path)
+        except Exception as exc:
+            logging.exception("remote job %s failed", job_id)
+            db.set_error(job_id, str(exc))
+            db.set_status(job_id, JobStatus.FAILED)
+        finally:
+            coord.end_remote(job_id)
+            _pump_asr_queues(app, db)
 
     threading.Thread(target=boot, daemon=True).start()
 
@@ -1103,13 +1172,35 @@ def _run_file_asr_job(
 ) -> None:
     selected = _selected_model()
     if selected is not None and selected.backend in REMOTE_BACKENDS:
-        _run_remote_job(app, db, job_id, source_path)
+        coord: AsrCoordinator = app.state.asr_coordinator
+        if not coord.begin_remote_wait(job_id):
+            db.set_error(job_id, "Не удалось дождаться облачного исполнителя.")
+            db.set_status(job_id, JobStatus.FAILED)
+            return
+        try:
+            _run_remote_job(app, db, job_id, source_path)
+        finally:
+            coord.end_remote(job_id)
+            _pump_asr_queues(app, db)
         return
-    engine_url = _ensure_engine_url(app)
-    _run_engine_job(db, engine_url, job_id, source_path)
+    coord = app.state.asr_coordinator
+    if not coord.begin_local_wait(job_id):
+        db.set_error(job_id, "Не удалось дождаться локального движка.")
+        db.set_status(job_id, JobStatus.FAILED)
+        return
+    try:
+        engine_url = _ensure_engine_url(app)
+        _run_engine_job(db, engine_url, job_id, source_path)
+    finally:
+        coord.end_local(job_id)
+        _pump_asr_queues(app, db)
 
 
 def _run_remote_job(app: FastAPI, db: Database, job_id: int, source_path: str) -> None:
+    job = db.get_job(job_id) or {}
+    run_id = job_run_id(db, job_id)
+    if not job_run_active(db, job_id, run_id):
+        return
     db.set_status(job_id, JobStatus.RUNNING)
     db.set_progress(job_id, 0)
     db.replace_segments(job_id, [])
@@ -1124,7 +1215,14 @@ def _run_remote_job(app: FastAPI, db: Database, job_id: int, source_path: str) -
         job = db.get_job(job_id) or {}
 
         def on_segments(piece: list[Segment]) -> None:
+            if not job_run_active(db, job_id, run_id):
+                return
             db.append_segments(job_id, piece)
+
+        def on_progress(value: float) -> None:
+            if not job_run_active(db, job_id, run_id):
+                return
+            db.set_progress(job_id, 0.01 + 0.99 * float(value))
 
         transcribe_media(
             backend=selected.backend,
@@ -1132,12 +1230,12 @@ def _run_remote_job(app: FastAPI, db: Database, job_id: int, source_path: str) -
             source_path=source_path,
             start_ms=job.get("range_start_ms"),
             end_ms=job.get("range_end_ms"),
-            cancelled=cancel_event.is_set,
-            on_progress=lambda value: db.set_progress(
-                job_id, 0.01 + 0.99 * float(value)
-            ),
+            cancelled=lambda: cancel_event.is_set() or not job_run_active(db, job_id, run_id),
+            on_progress=on_progress,
             on_segments=on_segments,
         )
+        if not job_run_active(db, job_id, run_id):
+            return
         current = db.get_job(job_id) or {}
         if current.get("status") == JobStatus.CANCELLED.value or cancel_event.is_set():
             if current.get("status") != JobStatus.CANCELLED.value:
@@ -1146,6 +1244,8 @@ def _run_remote_job(app: FastAPI, db: Database, job_id: int, source_path: str) -
         db.set_progress(job_id, 1)
         db.set_status(job_id, JobStatus.COMPLETED)
     except Exception as exc:
+        if not job_run_active(db, job_id, run_id):
+            return
         current = db.get_job(job_id) or {}
         if current.get("status") == JobStatus.CANCELLED.value:
             return
@@ -1159,15 +1259,7 @@ def _run_remote_job(app: FastAPI, db: Database, job_id: int, source_path: str) -
 def _start_asr_job(app: FastAPI, db: Database, job_id: int, source_path: str) -> None:
     selected = _selected_model()
     if selected is not None and selected.backend in REMOTE_BACKENDS:
-        def boot_remote() -> None:
-            try:
-                _run_remote_job(app, db, job_id, source_path)
-            except Exception as exc:
-                logging.exception("remote job %s failed to start", job_id)
-                db.set_error(job_id, str(exc))
-                db.set_status(job_id, JobStatus.FAILED)
-
-        threading.Thread(target=boot_remote, daemon=True).start()
+        _schedule_remote_job(app, db, job_id, source_path)
         return
     _start_engine_job(app, db, job_id, source_path)
 
@@ -1632,6 +1724,7 @@ def create_ui_app(
     app.state.speaker_cancels = {}
     app.state.speaker_ytdlp_procs = {}
     app.state.batch_runner = None
+    app.state.asr_coordinator = AsrCoordinator()
     apply_preference(load_preference())
 
     @app.get("/api/library")
@@ -1952,9 +2045,7 @@ def create_ui_app(
     @app.post("/api/jobs/{job_id}/start")
     def start_job(job_id: int, body: JobTranscribeBody = JobTranscribeBody()) -> dict:
         job = _require_job(db, job_id)
-        if job["status"] == JobStatus.RUNNING.value:
-            raise HTTPException(status_code=400, detail="Расшифровка уже идёт.")
-        if job["status"] == JobStatus.QUEUED.value:
+        if job["status"] in (JobStatus.RUNNING.value, JobStatus.QUEUED.value):
             return _decorate_job(app, _job_payload(job))
         if _is_youtube_job(job):
             method, language = load_job_ingest_meta(job_id)
@@ -1992,7 +2083,8 @@ def create_ui_app(
         if queue is not None:
             queue.cancel(job_id)
         url = getattr(app.state, "engine_url", None)
-        if url and job["status"] == JobStatus.RUNNING.value:
+        coord: AsrCoordinator = app.state.asr_coordinator
+        if url and job["status"] == JobStatus.RUNNING.value and coord.local_job_id() == job_id:
             try:
                 engine_cancel(url)
             except Exception:
