@@ -296,6 +296,16 @@ def start_batch(
                     db.set_error(job_id, str(exc))
                     db.set_status(job_id, JobStatus.FAILED)
                     failed += 1
+                    if rules.get("on_error") == "stop":
+                        _batch_pause_on_error(
+                            runner,
+                            db,
+                            batch_id,
+                            done=done,
+                            failed=failed,
+                            skipped=skipped,
+                        )
+                        return
                     continue
 
                 db.begin_transcription(job_id)

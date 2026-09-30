@@ -33,6 +33,8 @@ def normalize_rules(raw: dict[str, Any] | None) -> dict[str, Any]:
         rules["export_dir_mode"] = "beside_source"
     if rules["export_fmt"] not in {"srt", "vtt", "txt", "md"}:
         rules["export_fmt"] = "srt"
+    on_error = str(rules.get("on_error") or "continue").strip().lower()
+    rules["on_error"] = on_error if on_error in {"continue", "stop"} else "continue"
     method = str(rules.get("youtube_method") or "apify").strip().lower()
     rules["youtube_method"] = method if method in {"apify", "ytdlp"} else "apify"
     try:
