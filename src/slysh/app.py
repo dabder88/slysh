@@ -17,6 +17,10 @@ def window_size() -> tuple[int, int]:
 class JsApi:
     def __init__(self) -> None:
         self._window = None
+        self._ui_bootstrap_token = ""
+
+    def ui_bootstrap_token(self) -> str:
+        return str(self._ui_bootstrap_token or "")
 
     def _active_window(self):
         import webview
@@ -439,6 +443,7 @@ def log_startup_crash(exc: BaseException) -> None:
 
 def main() -> None:
     import faulthandler
+    import os
     import threading
     import time
 
@@ -487,6 +492,9 @@ def main() -> None:
     if recovered:
         logging.info("recovered %s stale job/batch states after restart", recovered)
 
+    os.environ.setdefault("GIGAAM_UI_AUTH", "1")
+    os.environ.setdefault("GIGAAM_LOOPBACK_STRICT", "1")
+    os.environ.setdefault("SLYSH_DISABLE_OPENAPI", "1")
     app = create_ui_app(db, engine=None)
     config = uvicorn.Config(app, host="127.0.0.1", port=0, log_level="warning")
     server = uvicorn.Server(config)
@@ -496,6 +504,7 @@ def main() -> None:
         time.sleep(0.05)
     port = server.servers[0].sockets[0].getsockname()[1]
     api = JsApi()
+    api._ui_bootstrap_token = str(getattr(app.state, "ui_bootstrap_token", "") or "")
     width, height = window_size()
     min_w = max(WINDOW_MIN_SIZE[0], width)
     window = webview.create_window(

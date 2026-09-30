@@ -4,6 +4,20 @@ import { navigate, getRoute, getEditorJobId } from "./router.js";
 import { ensureIntakeAllowed } from "./intake-duplicate.js";
 import { selectJob } from "./legacy.js";
 import { localeDateTag, t } from "./i18n.js";
+import { bindSecretInput, readSecretForSave } from "./secret-field.js";
+
+function applyYoutubeApifyField(provider) {
+  const input = document.getElementById("youtube-apify-key");
+  if (!input) {
+    return;
+  }
+  const p = provider || {};
+  bindSecretInput(input, {
+    full: p.api_key || "",
+    masked: p.api_key_masked || p.api_key_tail || "",
+    isSet: Boolean(p.api_key_set),
+  });
+}
 
 const METHOD_KEY = "youtube-method";
 const BATCH_PREVIEW_KEY = "youtube-batch-preview-videos";
@@ -124,7 +138,7 @@ function updateApifyHint(status) {
   }
   const apify = status.apify || {};
   const keySet = Boolean(status.apify_key_set || apify.api_key_set);
-  const tail = apify.api_key_tail || "";
+  const tail = apify.api_key_masked || apify.api_key_tail || "";
   hint.textContent = keySet
     ? tail
       ? t("youtube.apifyKeyWithTail", { tail })
@@ -194,7 +208,9 @@ async function refreshYoutubeStatus() {
       t("youtube.k6508318")
     );
     updateCookiesMeta(status);
-    updateApifyHint({ ...status, apify: apifyInfo || status.apify || {} });
+    const mergedApify = apifyInfo || status.apify || {};
+    applyYoutubeApifyField(mergedApify);
+    updateApifyHint({ ...status, apify: mergedApify });
   } catch (err) {
     reportError(t("youtube.k632702"), err);
   }
@@ -413,7 +429,11 @@ async function ingestYoutube() {
 
 async function saveApifyKey() {
   const input = document.getElementById("youtube-apify-key");
-  const key = (input?.value || "").trim();
+  const key = readSecretForSave(input);
+  if (key === undefined) {
+    showToast("shell.k9432551");
+    return;
+  }
   if (!key) {
     showToast("youtube.k8956287");
     input?.focus();
@@ -425,9 +445,6 @@ async function saveApifyKey() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ api_key: key }),
     });
-    if (input) {
-      input.value = "";
-    }
     showToast("shell.k9432551");
     await refreshYoutubeStatus();
   } catch (err) {

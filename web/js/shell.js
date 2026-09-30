@@ -2,6 +2,27 @@
 import { reportError } from "./errors.js";
 import { SELECTED_BATCH_KEY } from "./library-store.js";
 import { getLocale, setLocale, t, onLocaleChange } from "./i18n.js";
+import { bindSecretInput, readSecretForSave } from "./secret-field.js";
+
+function applyProviderSecretField(input, provider) {
+  if (!input) {
+    return;
+  }
+  const p = provider || {};
+  bindSecretInput(input, {
+    full: p.api_key || "",
+    masked: p.api_key_masked || p.api_key_tail || "",
+    isSet: Boolean(p.api_key_set),
+  });
+}
+
+function secretBodyPatch(input) {
+  const key = readSecretForSave(input);
+  if (key === undefined) {
+    return {};
+  }
+  return { api_key: key };
+}
 
 const NAV_STACK_KEY = "nav-stack";
 
@@ -1642,9 +1663,7 @@ function initProvidersSettings() {
       const hint = root.querySelector("[data-http-key-hint]");
       const modelField = root.querySelector("[data-http-model]");
       const keyField = root.querySelector("[data-http-key]");
-      if (keyField && item.api_key) {
-        keyField.value = item.api_key;
-      }
+      applyProviderSecretField(keyField, item);
       if (summary) {
         summary.textContent = item.api_key_set ? t("shell.k2661382") : t("shell.k7848969");
       }
@@ -1681,7 +1700,7 @@ function initProvidersSettings() {
         try {
           const body = {
             model: modelField?.value || "",
-            api_key: keyField?.value ?? "",
+            ...secretBodyPatch(keyField),
           };
           await api(`/api/providers/http/${encodeURIComponent(id)}`, {
             method: "POST",
@@ -1748,9 +1767,7 @@ function initProvidersSettings() {
     const data = await api("/api/providers");
     const openrouter = data.openrouter || {};
     const apify = data.apify || {};
-    if (keyInput && openrouter.api_key) {
-      keyInput.value = openrouter.api_key;
-    }
+    applyProviderSecretField(keyInput, openrouter);
     if (keyHint) {
       keyHint.textContent = openrouter.api_key_set
         ? t("shell.k9673863")
@@ -1760,9 +1777,7 @@ function initProvidersSettings() {
       orSummary.textContent = openrouter.api_key_set ? t("shell.k2661382") : t("shell.k7848969");
     }
     setProviderReady(document.getElementById("spoiler-openrouter"), Boolean(openrouter.api_key_set));
-    if (apifyKeyInput && apify.api_key) {
-      apifyKeyInput.value = apify.api_key;
-    }
+    applyProviderSecretField(apifyKeyInput, apify);
     if (apifyKeyHint) {
       apifyKeyHint.textContent = apify.api_key_set
         ? t("shell.k9673863")
@@ -1809,7 +1824,7 @@ function initProvidersSettings() {
       await api("/api/providers/apify", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ api_key: apifyKeyInput?.value ?? "" }),
+        body: JSON.stringify(secretBodyPatch(apifyKeyInput)),
       });
       await loadProviders();
       showToast("shell.k9432551");
@@ -1843,7 +1858,7 @@ function initProvidersSettings() {
   document.getElementById("btn-openrouter-save")?.addEventListener("click", async () => {
     try {
       const body = {
-        api_key: keyInput?.value ?? "",
+        ...secretBodyPatch(keyInput),
       };
       if (orModelSelect?.value) {
         body.model = orModelSelect.value;
@@ -1890,13 +1905,15 @@ function initProvidersSettings() {
           protocol: protocolSelect?.value || "openai",
           endpoint: endpoint?.value || "",
           model: model?.value || "",
-          api_key: key?.value || "",
+          ...secretBodyPatch(key),
         }),
       });
       if (name) name.value = "";
       if (endpoint) endpoint.value = "";
       if (model) model.value = "";
-      if (key) key.value = "";
+      if (key) {
+        bindSecretInput(key, { full: "", masked: "", isSet: false });
+      }
       await loadProviders();
       if (window.refreshAsrModels) {
         await window.refreshAsrModels();

@@ -1,7 +1,7 @@
 ﻿import { initI18n, applyI18n, onLocaleChange } from "./i18n.js";
 import { initRouter, onRouteChange, navigate, notifyCurrentRoute } from "./router.js";
 import { initShell } from "./shell.js";
-import { initSecretFields } from "./secret-field.js?v=1";
+import { initSecretFields } from "./secret-field.js?v=46";
 import { initDashboard, onDashboardShow } from "./dashboard.js";
 import { initLive, onLiveShow } from "./live.js";
 import { initMeeting, onMeetingShow } from "./meeting.js";
@@ -11,6 +11,7 @@ import { initQueue, onQueueShow, onQueueHide } from "./queue.js";
 import { initArchive, onArchiveShow } from "./archive.js";
 import { initTranscripts, onTranscriptsShow } from "./transcripts.js";
 import { initLegacyWorkspace, onLegacyShow } from "./legacy.js";
+import { establishUiSession } from "./ui-session.js?v=1";
 
 function hideBootSplash() {
   document.body?.classList.remove("is-booting");
@@ -35,6 +36,12 @@ function scheduleEngineSetupModal(status) {
 
 async function bootstrap() {
   const bootFallback = window.setTimeout(hideBootSplash, 15000);
+
+  try {
+    await establishUiSession();
+  } catch (err) {
+    console.error(err);
+  }
 
   initSecretFields();
   await initI18n();

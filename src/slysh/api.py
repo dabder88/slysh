@@ -4,6 +4,7 @@ import importlib
 import json
 import logging
 import os
+import secrets
 import subprocess
 import sys
 import tempfile
@@ -51,6 +52,9 @@ from slysh.asr_coordinator import (
     pump_remote_queued,
 )
 from slysh.cuda_fallback import format_job_asr_error
+from slysh.engine_auth import ENGINE_TOKEN_ENV
+from slysh.loopback_security import install_loopback_guards, production_openapi_disabled
+from slysh.media_access import resolve_job_media_path
 from slysh.decode import decode_pcm_16k_mono
 from slysh.db import Database, SegmentsRevisionConflictError
 from slysh.engine_client import cancel as engine_cancel
@@ -882,7 +886,10 @@ def _spawn_engine(app: FastAPI) -> dict[str, int]:
     if os.environ.get("GIGAAM_ENGINE_FAKE") == "1":
         cmd.append("--fake")
 
+    engine_token = secrets.token_urlsafe(32)
     env = os.environ.copy()
+    env[ENGINE_TOKEN_ENV] = engine_token
+    os.environ[ENGINE_TOKEN_ENV] = engine_token
     write_env(env, load_preference())
     selected = _selected_model()
     write_asr_env(
@@ -1692,11 +1699,19 @@ def create_ui_app(
 ) -> FastAPI:
     if auto_start_engine is None:
         auto_start_engine = not is_cloud_only()
-    from slysh.local_auth import install_ui_auth
+    from slysh.local_auth import (
+        inject_bootstrap_index,
+        install_ui_auth,
+        register_ui_session_route,
+    )
 
-    app = FastAPI()
+    docs_url = None if production_openapi_disabled() else "/docs"
+    openapi_url = None if production_openapi_disabled() else "/openapi.json"
+    app = FastAPI(docs_url=docs_url, openapi_url=openapi_url)
     app.state.db = db
     install_ui_auth(app)
+    register_ui_session_route(app)
+    install_loopback_guards(app)
 
     @app.middleware("http")
     async def disable_static_cache(request: Request, call_next):
@@ -2017,9 +2032,7 @@ def create_ui_app(
     @app.get("/api/jobs/{job_id}/media")
     def job_media(job_id: int) -> FileResponse:
         job = _require_job(db, job_id)
-        path = Path(job["source_path"])
-        if not path.is_file():
-            raise HTTPException(status_code=404, detail="media not found")
+        path = resolve_job_media_path(str(job.get("source_path") or ""))
         return FileResponse(path)
 
     @app.post("/api/jobs/{job_id}/retranscribe")
@@ -2336,13 +2349,19 @@ def create_ui_app(
         payload["engine_restarted"] = restarted
         return payload
 
+    from slysh.provider_reveal import enrich_providers_payload, should_reveal_provider_secrets
+
     @app.get("/api/providers")
-    def get_providers() -> dict:
-        return public_providers()
+    def get_providers(request: Request) -> dict:
+        payload = public_providers()
+        reveal = should_reveal_provider_secrets(request, app)
+        return enrich_providers_payload(payload, reveal=reveal)
 
     @app.get("/api/providers/apify")
-    def get_apify() -> dict:
-        return public_apify()
+    def get_apify(request: Request) -> dict:
+        payload = public_apify()
+        reveal = should_reveal_provider_secrets(request, app)
+        return enrich_providers_payload({"apify": payload}, reveal=reveal)["apify"]
 
     @app.put("/api/providers/apify")
     def put_apify(body: ApifyBody) -> dict:
@@ -2964,6 +2983,9 @@ def create_ui_app(
 
     ui_dir = web_dir()
     if ui_dir.is_dir():
+        index_path = ui_dir / "index.html"
+        if index_path.is_file():
+            inject_bootstrap_index(app, index_path)
         app.mount("/", StaticFiles(directory=str(ui_dir), html=True), name="web")
 
     return app

@@ -4,6 +4,8 @@ import json
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+from slysh.engine_auth import engine_auth_headers
+
 
 class EngineError(Exception):
     """Raised when the engine HTTP API returns an error body."""
@@ -28,16 +30,19 @@ def _error_message(exc: HTTPError) -> str:
 
 
 def _get(base_url: str, path: str) -> dict:
-    with urlopen(_url(base_url, path), timeout=30) as resp:
+    req = Request(_url(base_url, path), headers=engine_auth_headers())
+    with urlopen(req, timeout=30) as resp:
         return json.loads(resp.read().decode("utf-8"))
 
 
 def _post(base_url: str, path: str, payload: dict | None = None) -> dict:
     data = json.dumps(payload or {}, ensure_ascii=False).encode("utf-8")
+    headers = {"Content-Type": "application/json; charset=utf-8"}
+    headers.update(engine_auth_headers())
     req = Request(
         _url(base_url, path),
         data=data,
-        headers={"Content-Type": "application/json; charset=utf-8"},
+        headers=headers,
         method="POST",
     )
     try:

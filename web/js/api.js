@@ -8,8 +8,11 @@ export function translateKnownApiError(message, status) {
   return message;
 }
 
+export { establishUiSession } from "./ui-session.js";
+
 export function api(path, options) {
-  return fetch(path, options).then(async (r) => {
+  const opts = { credentials: "include", ...options };
+  return fetch(path, opts).then(async (r) => {
     if (!r.ok) {
       const raw = await r.text();
       let message = raw;

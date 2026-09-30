@@ -70,7 +70,7 @@ function notifyLocaleChange() {
 }
 
 async function loadMessages(locale) {
-  const res = await fetch(`/locales/${locale}.json?v=13`);
+  const res = await fetch(`/locales/${locale}.json?v=13`, { credentials: "include" });
   if (!res.ok) {
     throw new Error(`locale ${locale}`);
   }
@@ -78,7 +78,7 @@ async function loadMessages(locale) {
 }
 
 async function localeApiGet(path) {
-  const res = await fetch(path);
+  const res = await fetch(path, { credentials: "include" });
   if (!res.ok) {
     throw new Error(`locale api ${res.status}`);
   }
@@ -88,6 +88,7 @@ async function localeApiGet(path) {
 async function localeApiPut(path, body) {
   const res = await fetch(path, {
     method: "PUT",
+    credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });

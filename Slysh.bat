@@ -60,6 +60,10 @@ if not exist "%PYTHON%" (
     exit /b 1
 )
 
+set "GIGAAM_UI_AUTH=1"
+set "GIGAAM_LOOPBACK_STRICT=1"
+set "SLYSH_DISABLE_OPENAPI=1"
+
 :start
 if exist "%ROOT%\Slysh.exe" (
     start "" "%ROOT%\Slysh.exe"

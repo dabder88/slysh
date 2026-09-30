@@ -15,6 +15,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from slysh.decode import DecodeError
+from slysh.engine_auth import ENGINE_TOKEN_HEADER, engine_token_from_env
 from slysh.models import Segment
 from slysh.transcribe import FilePipeline
 
@@ -50,8 +51,25 @@ class _CliFakeBackend:
         return [Segment(0, 100, "fake")]
 
 
+def _install_engine_token_guard(app: FastAPI) -> None:
+    expected = engine_token_from_env()
+    if not expected:
+        return
+
+    @app.middleware("http")
+    async def engine_token_guard(request, call_next):
+        token = (request.headers.get(ENGINE_TOKEN_HEADER) or "").strip()
+        auth = (request.headers.get("authorization") or "").strip()
+        if auth.lower().startswith("bearer "):
+            token = token or auth[7:].strip()
+        if token != expected:
+            return JSONResponse(status_code=401, content={"error": "Unauthorized"})
+        return await call_next(request)
+
+
 def create_app(backend, decode) -> FastAPI:
     app = FastAPI()
+    _install_engine_token_guard(app)
     cancelled = threading.Event()
     pipeline = FilePipeline(backend)
     progress_state = {"progress": 0.0, "phase": "idle"}

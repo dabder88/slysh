@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Any, Callable
 
 from slysh.compute import _read_settings, _write_settings
+from slysh.secrets_dpapi import clear_nested, get_nested, set_nested
 
 OPENROUTER_DEFAULT_MODEL = "openai/whisper-1"
 OPENROUTER_STT_URL = "https://openrouter.ai/api/v1/audio/transcriptions"
@@ -131,13 +132,28 @@ def normalize_protocol(protocol: str | None) -> str:
     return value
 
 
-def mask_secret(value: str | None) -> str:
+def mask_secret_preview(value: str | None, *, head: int = 4, tail: int = 4) -> str:
     text = str(value or "")
     if not text:
         return ""
-    if len(text) <= 4:
-        return "…"
-    return "…" + text[-4:]
+    if len(text) <= head + tail + 1:
+        if len(text) <= 4:
+            return "…"
+        return text[:2] + "…" + text[-2:]
+    return text[:head] + "…" + text[-tail:]
+
+
+def mask_secret(value: str | None) -> str:
+    return mask_secret_preview(value)
+
+
+def _public_key_fields(key: str) -> dict:
+    masked = mask_secret_preview(key)
+    return {
+        "api_key_set": bool(key),
+        "api_key_masked": masked,
+        "api_key_tail": masked,
+    }
 
 
 def normalize_stt_endpoint(endpoint: str) -> str:
@@ -161,14 +177,107 @@ def _save_providers(block: dict) -> None:
     _write_settings(data)
 
 
+def _secret_key_path(*parts: str) -> tuple[str, ...]:
+    return ("providers", *parts)
+
+
+def _read_stored_api_key(*path_parts: str) -> str:
+    stored = get_nested(_secret_key_path(*path_parts, "api_key"))
+    if stored:
+        return stored
+    block_name = path_parts[0]
+    if len(path_parts) == 1:
+        raw = _providers_block().get(block_name)
+    elif block_name == "custom" and len(path_parts) == 2:
+        raw = next(
+            (
+                item
+                for item in (_providers_block().get("custom") or [])
+                if isinstance(item, dict) and str(item.get("id") or "") == path_parts[1]
+            ),
+            None,
+        )
+    else:
+        http = _http_block()
+        raw = http.get(path_parts[1])
+    if not isinstance(raw, dict):
+        return ""
+    plain = str(raw.get("api_key") or "").strip()
+    if not plain:
+        return ""
+    set_nested(_secret_key_path(*path_parts, "api_key"), plain)
+    data = dict(raw)
+    data.pop("api_key", None)
+    if len(path_parts) == 1:
+        block = _providers_block()
+        block[block_name] = data
+        _save_providers(block)
+    elif block_name == "custom" and len(path_parts) == 2:
+        block = _providers_block()
+        items = block.get("custom")
+        if isinstance(items, list):
+            cid = path_parts[1]
+            block["custom"] = [
+                data if isinstance(row, dict) and str(row.get("id") or "") == cid else row
+                for row in items
+            ]
+            _save_providers(block)
+    else:
+        block = _providers_block()
+        http = dict(block.get("http") or {})
+        http[path_parts[1]] = data
+        block["http"] = http
+        _save_providers(block)
+    return plain
+
+
+def _write_stored_api_key(*path_parts: str, value: str | None) -> None:
+    if value is None:
+        return
+    key_path = _secret_key_path(*path_parts, "api_key")
+    text = str(value).strip()
+    if text:
+        set_nested(key_path, text)
+    else:
+        clear_nested(key_path)
+    if len(path_parts) == 1:
+        block = _providers_block()
+        current = block.get(path_parts[0])
+        data = dict(current) if isinstance(current, dict) else {}
+        data.pop("api_key", None)
+        block[path_parts[0]] = data
+        _save_providers(block)
+    elif path_parts[0] == "custom" and len(path_parts) == 2:
+        block = _providers_block()
+        items = block.get("custom")
+        if isinstance(items, list):
+            cid = path_parts[1]
+            new_items = []
+            for row in items:
+                if not isinstance(row, dict) or str(row.get("id") or "") != cid:
+                    new_items.append(row)
+                    continue
+                data = dict(row)
+                data.pop("api_key", None)
+                new_items.append(data)
+            block["custom"] = new_items
+            _save_providers(block)
+    else:
+        block = _providers_block()
+        http = dict(block.get("http") or {})
+        current = http.get(path_parts[1])
+        data = dict(current) if isinstance(current, dict) else {}
+        data.pop("api_key", None)
+        http[path_parts[1]] = data
+        block["http"] = http
+        _save_providers(block)
+
+
 def openrouter_api_key() -> str:
     env = (os.environ.get("OPENROUTER_API_KEY") or "").strip()
     if env:
         return env
-    raw = _providers_block().get("openrouter")
-    if not isinstance(raw, dict):
-        return ""
-    return str(raw.get("api_key") or "").strip()
+    return _read_stored_api_key("openrouter")
 
 
 def openrouter_model() -> str:
@@ -212,7 +321,7 @@ def save_openrouter(
     current = block.get("openrouter")
     data = dict(current) if isinstance(current, dict) else {}
     if api_key is not None:
-        data["api_key"] = str(api_key).strip()
+        _write_stored_api_key("openrouter", value=str(api_key))
     if model is not None:
         value = str(model).strip()
         data["model"] = value or OPENROUTER_DEFAULT_MODEL
@@ -226,8 +335,7 @@ def save_openrouter(
 def public_openrouter() -> dict:
     key = openrouter_api_key()
     return {
-        "api_key_set": bool(key),
-        "api_key_tail": mask_secret(key),
+        **_public_key_fields(key),
         "model": openrouter_model(),
         "models": openrouter_cached_models(),
     }
@@ -237,10 +345,7 @@ def apify_api_key() -> str:
     env = (os.environ.get("APIFY_API_TOKEN") or os.environ.get("APIFY_TOKEN") or "").strip()
     if env:
         return env
-    raw = _providers_block().get("apify")
-    if not isinstance(raw, dict):
-        return ""
-    return str(raw.get("api_key") or "").strip()
+    return _read_stored_api_key("apify")
 
 
 def save_apify(api_key: str | None = None) -> dict:
@@ -248,7 +353,7 @@ def save_apify(api_key: str | None = None) -> dict:
     current = block.get("apify")
     data = dict(current) if isinstance(current, dict) else {}
     if api_key is not None:
-        data["api_key"] = str(api_key).strip()
+        _write_stored_api_key("apify", value=str(api_key))
     block["apify"] = data
     _save_providers(block)
     return public_apify()
@@ -256,10 +361,7 @@ def save_apify(api_key: str | None = None) -> dict:
 
 def public_apify() -> dict:
     key = apify_api_key()
-    return {
-        "api_key_set": bool(key),
-        "api_key_tail": mask_secret(key),
-    }
+    return _public_key_fields(key)
 
 
 def _http_block() -> dict:
@@ -274,10 +376,7 @@ def http_api_key(preset_id: str) -> str:
     env = (os.environ.get(preset.env_key) or "").strip()
     if env:
         return env
-    raw = _http_block().get(preset.id)
-    if not isinstance(raw, dict):
-        return ""
-    return str(raw.get("api_key") or "").strip()
+    return _read_stored_api_key("http", preset.id)
 
 
 def http_model(preset_id: str) -> str:
@@ -319,8 +418,7 @@ def _public_http_preset(preset: HttpPreset) -> dict:
         "hint": preset.hint,
         "key_placeholder": preset.key_placeholder,
         "env_key": preset.env_key,
-        "api_key_set": bool(key),
-        "api_key_tail": mask_secret(key),
+        **_public_key_fields(key),
         "ready": bool(key),
     }
 
@@ -343,7 +441,7 @@ def save_http_preset(
     current = http.get(preset.id)
     data = dict(current) if isinstance(current, dict) else {}
     if api_key is not None:
-        data["api_key"] = str(api_key).strip()
+        _write_stored_api_key("http", preset.id, value=str(api_key))
     if model is not None:
         value = str(model).strip()
         data["model"] = value or preset.default_model
@@ -381,10 +479,14 @@ def list_custom_providers() -> list[dict]:
                 "protocol": protocol,
                 "endpoint": str(item.get("endpoint") or "").strip(),
                 "model": str(item.get("model") or "").strip(),
-                "api_key": str(item.get("api_key") or "").strip(),
+                "api_key": custom_api_key(cid),
             }
         )
     return out
+
+
+def custom_api_key(provider_id: str) -> str:
+    return _read_stored_api_key("custom", str(provider_id or "").strip())
 
 
 def get_custom_provider(provider_id: str) -> dict | None:
@@ -406,17 +508,17 @@ def custom_is_ready(item: dict) -> bool:
 
 
 def _public_custom(item: dict) -> dict:
-    key = str(item.get("api_key") or "")
+    key = custom_api_key(str(item.get("id") or ""))
     protocol = str(item.get("protocol") or "openai")
+    row = {**item, "api_key": key}
     return {
         "id": item["id"],
         "name": item["name"],
         "protocol": protocol,
         "endpoint": item["endpoint"],
         "model": item["model"],
-        "api_key_set": bool(key),
-        "api_key_tail": mask_secret(key),
-        "ready": custom_is_ready(item),
+        **_public_key_fields(key),
+        "ready": custom_is_ready(row),
     }
 
 
@@ -445,18 +547,16 @@ def upsert_custom_provider(
     items = list_custom_providers()
     cid = str(provider_id or "").strip() or _slug_id(title)
     existing = next((item for item in items if item["id"] == cid), None)
-    key = ""
     if api_key is not None:
-        key = str(api_key).strip()
-    elif keep_key and existing:
-        key = str(existing.get("api_key") or "")
+        _write_stored_api_key("custom", cid, value=str(api_key))
+    elif not keep_key and existing is None:
+        _write_stored_api_key("custom", cid, value="")
     row = {
         "id": cid,
         "name": title,
         "protocol": kind,
         "endpoint": url,
         "model": model_id,
-        "api_key": key,
     }
     if existing is None:
         items.append(row)
