@@ -17,8 +17,14 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[dev]" httpx pytest
-      - name: JS syntax check
-        run: node --check web/js/main.js
+      - name: JS syntax check (web/js)
+        shell: pwsh
+        run: |
+          if (Test-Path scripts/check-web-js.ps1) {
+            powershell -NoProfile -File scripts/check-web-js.ps1
+          } else {
+            node --check web/js/main.js
+          }
       - name: CSS build
         run: |
           npm ci
@@ -26,4 +32,8 @@ jobs:
       - name: Pytest
         env:
           PYTHONPATH: src
+          GIGAAM_UI_AUTH: "0"
+          GIGAAM_LOOPBACK_STRICT: "0"
+          SLYSH_DISABLE_OPENAPI: "1"
+          GIGAAM_SKIP_ENGINE: "1"
         run: python -m pytest tests -q

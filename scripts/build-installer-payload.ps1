@@ -104,6 +104,10 @@ $lgpl = Join-Path $Root "installer\ffmpeg-LGPL.txt"
 if (Test-Path -LiteralPath $lgpl) {
     Copy-Item -LiteralPath $lgpl -Destination (Join-Path $Payload "licenses\ffmpeg-LGPL.txt") -Force
 }
+$notices = Join-Path $Root "installer\licenses\THIRD-PARTY-NOTICES.md"
+if (Test-Path -LiteralPath $notices) {
+    Copy-Item -LiteralPath $notices -Destination (Join-Path $Payload "licenses\THIRD-PARTY-NOTICES.md") -Force
+}
 
 $ffmpegSrc = Resolve-FfmpegSource
 Copy-Item -LiteralPath $ffmpegSrc -Destination (Join-Path $Payload "bin\ffmpeg.exe") -Force

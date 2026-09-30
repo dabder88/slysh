@@ -62,7 +62,9 @@ Filename: "{app}\Slysh.exe"; WorkingDir: "{app}"; Description: "{cm:LaunchProgra
 [UninstallDelete]
 ; uv sync after install adds files outside the setup manifest — remove whole venv.
 Type: filesandordirs; Name: "{app}\.venv"
+Type: filesandordirs; Name: "{app}\.venv-engine"
 Type: filesandordirs; Name: "{app}\runtime"
+Type: files; Name: "{app}\runtime-env.json"
 Type: files; Name: "{app}\launch-last-error.txt"
 Type: files; Name: "{app}\.install-ui-locale"
 Type: files; Name: "{app}\.fresh-install"

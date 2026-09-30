@@ -164,7 +164,12 @@ def resolve_uv() -> str | None:
 
 def engine_packages_ok(python: str | None = None, runner=None) -> bool:
     global _engine_packages_cache
-    exe = python or sys.executable
+    if python is None:
+        from slysh.runtime_env import resolve_engine_python
+
+        exe = resolve_engine_python()
+    else:
+        exe = python
     if python is None and runner is None and _engine_packages_cache is not None:
         ok, at = _engine_packages_cache
         if time.monotonic() - at < ENGINE_PACKAGES_CACHE_TTL_S:
@@ -519,10 +524,17 @@ def _run_install() -> None:
                 "Переустановите Slysh или положите uv.exe в bin рядом с Slysh.bat."
             )
         log_path.parent.mkdir(parents=True, exist_ok=True)
+        root = project_root()
+        sync_cmd: list[str] = [uv, *uv_sync_engine_argv()]
+        from slysh.runtime_env import ensure_engine_venv, use_split_engine_venv, write_runtime_manifest
+
+        if use_split_engine_venv():
+            engine_py = ensure_engine_venv(uv)
+            sync_cmd.extend(["--python", str(engine_py)])
         with log_path.open("w", encoding="utf-8") as log:
             proc = subprocess.run(
-                [uv, *uv_sync_engine_argv()],
-                cwd=str(project_root()),
+                sync_cmd,
+                cwd=str(root),
                 stdout=log,
                 stderr=subprocess.STDOUT,
                 check=False,
@@ -542,6 +554,7 @@ def _run_install() -> None:
                     from slysh.updates import save_lock_fingerprint
 
                     save_lock_fingerprint()
+                    write_runtime_manifest()
                 except Exception:
                     logging.debug("could not save uv.lock fingerprint", exc_info=True)
     except Exception as exc:

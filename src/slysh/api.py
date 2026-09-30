@@ -882,7 +882,9 @@ def _spawn_engine(app: FastAPI) -> dict[str, int]:
         if existing is not None:
             return {"port": existing}
 
-    cmd = [sys.executable, "-m", "slysh.engine_server"]
+    from slysh.runtime_env import resolve_engine_python
+
+    cmd = [resolve_engine_python(), "-m", "slysh.engine_server"]
     if os.environ.get("GIGAAM_ENGINE_FAKE") == "1":
         cmd.append("--fake")
 
