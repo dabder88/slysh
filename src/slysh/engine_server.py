@@ -51,6 +51,30 @@ class _CliFakeBackend:
         return [Segment(0, 100, "fake")]
 
 
+class _OperationCancel:
+    """Per-request cancel scope: /cancel only affects the active operation id."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._active_id = 0
+        self._cancelled_id: int | None = None
+
+    def start(self) -> Callable[[], bool]:
+        with self._lock:
+            self._active_id += 1
+            op_id = self._active_id
+
+        def is_cancelled() -> bool:
+            with self._lock:
+                return self._cancelled_id == op_id
+
+        return is_cancelled
+
+    def cancel(self) -> None:
+        with self._lock:
+            self._cancelled_id = self._active_id
+
+
 def _install_engine_token_guard(app: FastAPI) -> None:
     expected = engine_token_from_env()
     if not expected:
@@ -70,12 +94,9 @@ def _install_engine_token_guard(app: FastAPI) -> None:
 def create_app(backend, decode) -> FastAPI:
     app = FastAPI()
     _install_engine_token_guard(app)
-    cancelled = threading.Event()
+    operation_cancel = _OperationCancel()
     pipeline = FilePipeline(backend)
     progress_state = {"progress": 0.0, "phase": "idle"}
-
-    def is_cancelled() -> bool:
-        return cancelled.is_set()
 
     def set_progress(value: float, phase: str) -> None:
         progress_state["progress"] = float(value)
@@ -91,7 +112,7 @@ def create_app(backend, decode) -> FastAPI:
 
     @app.post("/transcribe_file")
     def transcribe_file(body: TranscribeFileBody):
-        cancelled.clear()
+        is_cancelled = operation_cancel.start()
         set_progress(0.0, "starting")
 
         def tracked_decode(path: str):
@@ -132,7 +153,7 @@ def create_app(backend, decode) -> FastAPI:
 
     @app.post("/transcribe_chunk")
     def transcribe_chunk(body: TranscribeChunkBody):
-        cancelled.clear()
+        is_cancelled = operation_cancel.start()
         try:
             pcm = np.asarray(body.samples, dtype=np.float32)
             segments = backend.transcribe_chunk(pcm, is_cancelled)
@@ -144,7 +165,7 @@ def create_app(backend, decode) -> FastAPI:
 
     @app.post("/cancel")
     def cancel() -> dict:
-        cancelled.set()
+        operation_cancel.cancel()
         return {"ok": True}
 
     return app
