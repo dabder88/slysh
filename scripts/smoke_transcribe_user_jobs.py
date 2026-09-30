@@ -78,6 +78,9 @@ def main() -> int:
         print("no idle/failed mp3 jobs in", DB)
         return 0
     env = os.environ.copy()
+    for key in list(env):
+        if key in ("VIRTUAL_ENV", "UV_PROJECT_ENVIRONMENT"):
+            del env[key]
     env.setdefault("GIGAAM_DESKTOP_HOME", str(HOME))
     env.setdefault("GIGAAM_MODEL_ROOT", str(ROOT / "models"))
     env.setdefault("GIGAAM_PROJECT_MODELS", str(ROOT / "models"))
