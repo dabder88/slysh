@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Callable
 
 from slysh.batch_rules import is_youtube_batch_rules, normalize_rules
+from slysh.compute import is_cloud_only
 from slysh.export import (
     suggested_export_path,
     unique_export_path,
@@ -339,12 +340,18 @@ def start_batch(
                     continue
 
                 if rules.get("speakers"):
-                    try:
-                        module = importlib.import_module("slysh.speakers_msdd")
-                        assign_speakers(db, job_id, module.MsddSpeakersBackend())
-                    except Exception as exc:
-                        logging.exception("batch speakers failed for job %s", job_id)
-                        db.set_error(job_id, str(exc))
+                    if is_cloud_only():
+                        logger.info(
+                            "skip batch speakers for job %s (cloud_only mode)",
+                            job_id,
+                        )
+                    else:
+                        try:
+                            module = importlib.import_module("slysh.speakers_msdd")
+                            assign_speakers(db, job_id, module.MsddSpeakersBackend())
+                        except Exception as exc:
+                            logging.exception("batch speakers failed for job %s", job_id)
+                            db.set_error(job_id, str(exc))
 
                 if rules.get("export"):
                     try:

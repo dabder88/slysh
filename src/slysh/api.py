@@ -584,6 +584,7 @@ def _create_youtube_batch(app: FastAPI, db: Database, body: YoutubeBatchCreateBo
                 status_code=400,
                 detail="Пакет создан, но уже выполняется другой пакет.",
             )
+        _require_asr_ready()
         start_batch(
             app,
             db,
@@ -744,6 +745,11 @@ def _selected_model():
         if candidate.id == GIGAAM_ID:
             return candidate
     return items[0] if items else None
+
+
+def _selected_asr_is_remote() -> bool:
+    selected = _selected_model()
+    return selected is not None and selected.backend in REMOTE_BACKENDS
 
 
 def model_is_ready() -> bool:
@@ -1179,8 +1185,7 @@ def _schedule_remote_job(app: FastAPI, db: Database, job_id: int, source_path: s
 def _run_file_asr_job(
     app: FastAPI, db: Database, job_id: int, source_path: str
 ) -> None:
-    selected = _selected_model()
-    if selected is not None and selected.backend in REMOTE_BACKENDS:
+    if _selected_asr_is_remote():
         coord: AsrCoordinator = app.state.asr_coordinator
         if not coord.begin_remote_wait(job_id):
             db.set_error(job_id, "Не удалось дождаться облачного исполнителя.")
@@ -1266,8 +1271,7 @@ def _run_remote_job(app: FastAPI, db: Database, job_id: int, source_path: str) -
 
 
 def _start_asr_job(app: FastAPI, db: Database, job_id: int, source_path: str) -> None:
-    selected = _selected_model()
-    if selected is not None and selected.backend in REMOTE_BACKENDS:
+    if _selected_asr_is_remote():
         _schedule_remote_job(app, db, job_id, source_path)
         return
     _start_engine_job(app, db, job_id, source_path)
@@ -1861,6 +1865,7 @@ def create_ui_app(
         mismatch = _batch_job_kind_mismatch(batch, jobs)
         if mismatch:
             raise HTTPException(status_code=400, detail=mismatch)
+        _require_asr_ready()
         start_batch(
             app,
             db,
