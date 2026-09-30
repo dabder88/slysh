@@ -17,6 +17,7 @@ HOME = Path(os.environ.get("LOCALAPPDATA", "")) / "Slysh"
 DB = HOME / "app.db"
 MAX_FILES = 3
 CHUNK_TIMEOUT_S = 600.0
+ENGINE_BOOT_WAIT_S = float(os.environ.get("SLYSH_SMOKE_ENGINE_BOOT", "120"))
 
 
 def _jobs() -> list[tuple[int, str, str]]:
@@ -92,7 +93,7 @@ def main() -> int:
         bufsize=1,
     )
     try:
-        port = _wait_port(proc, time.monotonic() + 120)
+        port = _wait_port(proc, time.monotonic() + ENGINE_BOOT_WAIT_S)
         base = f"http://127.0.0.1:{port}"
         health = json.loads(
             urllib.request.urlopen(f"{base}/health", timeout=10).read().decode("utf-8")

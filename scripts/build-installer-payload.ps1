@@ -176,6 +176,9 @@ $hasBundledPython = @(Get-ChildItem -LiteralPath $RuntimePython -Filter "python.
 
 Push-Location $Payload
 try {
+    # Stale VIRTUAL_ENV (e.g. from Slysh-test) makes uv sync target the wrong project.
+    Remove-Item Env:VIRTUAL_ENV -ErrorAction SilentlyContinue
+    Remove-Item Env:UV_PROJECT_ENVIRONMENT -ErrorAction SilentlyContinue
     if (-not $hasBundledPython) {
         Write-Host "uv python install 3.12 (portable under runtime\python)..."
         & $BundledUv python install 3.12
