@@ -384,13 +384,21 @@ def compute_model_download_progress(
     return progress, last_bytes_done, last_growth_monotonic
 
 
+def _download_python_executable() -> str:
+    """Weights download needs engine deps (huggingface_hub, torch, gigaam)."""
+    from slysh.runtime_env import resolve_engine_subprocess_python
+
+    return resolve_engine_subprocess_python()
+
+
 def _download_command(model_id: str) -> list[str]:
+    py = _download_python_executable()
     if model_id == GIGAAM_ID:
-        return [sys.executable, "-m", "slysh.rnnt_backend", "--download-only"]
+        return [py, "-m", "slysh.rnnt_backend", "--download-only"]
     size = whisper_size_from_model_id(model_id)
     if size:
         return [
-            sys.executable,
+            py,
             "-m",
             "slysh.whisper_download",
             "--id",

@@ -2227,22 +2227,34 @@ function initEngineSetup() {
     return ip.fraction == null || ip.indeterminate !== false;
   }
 
+  function installScreenActive() {
+    return Boolean(stepInstall && !stepInstall.hidden);
+  }
+
+  function shouldShowEngineInstallProgress(status) {
+    return (
+      Boolean(status.installing) ||
+      (installScreenActive() && !status.engine_packages)
+    );
+  }
+
   function applyInstallProgress(status) {
     const ip = status.install_progress || {};
     if (status.installing) {
       setEngineSetupPhase("install");
     }
+    const showProgress = shouldShowEngineInstallProgress(status);
     if (progressWrap) {
-      progressWrap.hidden = !status.installing;
+      progressWrap.hidden = !showProgress;
     }
     if (choicesEl) {
       choicesEl.hidden = Boolean(status.installing);
     }
     if (progressEl) {
-      if (status.installing && ip.fraction != null && ip.indeterminate === false) {
+      if (showProgress && status.installing && ip.fraction != null && ip.indeterminate === false) {
         progressEl.indeterminate = false;
         progressEl.value = Math.round(Number(ip.fraction) * 100);
-      } else if (status.installing) {
+      } else if (showProgress) {
         progressEl.removeAttribute("value");
         progressEl.indeterminate = true;
       } else {
@@ -2258,6 +2270,8 @@ function initEngineSetup() {
       if (status.installing) {
         progressLabel.textContent =
           ip.message || t("firstRun.engineProgressWorking");
+      } else if (showProgress) {
+        progressLabel.textContent = t("firstRun.engineProgressWorking");
       } else {
         progressLabel.textContent = "";
       }
@@ -2353,7 +2367,11 @@ function initEngineSetup() {
         finishInstallFlow(status);
       }
     } else if (!status.installing) {
-      stopPoll();
+      if (status.engine_packages || status.error || !installScreenActive()) {
+        stopPoll();
+      } else {
+        startPoll();
+      }
     }
   }
 
@@ -2389,7 +2407,7 @@ function initEngineSetup() {
         body: JSON.stringify(body),
       });
       apply(status);
-      if (status.installing) {
+      if (!status.engine_packages) {
         startPoll();
       }
     } catch (err) {

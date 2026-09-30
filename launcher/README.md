@@ -2,7 +2,7 @@
 
 GUI launcher without a console window. Sets the same environment as `Slysh.bat` and runs:
 
-`.venv\Scripts\pythonw.exe -m slysh.app`
+`.venv\Scripts\pythonw.exe -m slysh.app` (uv may briefly re-exec `pyvenv.cfg` `home`; `single_instance` in `main()` drops the extra process before UI).
 
 ## Rebuild prebuilt (maintainer)
 

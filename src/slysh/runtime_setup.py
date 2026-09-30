@@ -165,9 +165,9 @@ def resolve_uv() -> str | None:
 def engine_packages_ok(python: str | None = None, runner=None) -> bool:
     global _engine_packages_cache
     if python is None:
-        from slysh.runtime_env import resolve_engine_python
+        from slysh.runtime_env import resolve_engine_subprocess_python
 
-        exe = resolve_engine_python()
+        exe = resolve_engine_subprocess_python()
     else:
         exe = python
     if python is None and runner is None and _engine_packages_cache is not None:
@@ -181,6 +181,7 @@ def engine_packages_ok(python: str | None = None, runner=None) -> bool:
             capture_output=True,
             timeout=60,
             check=False,
+            **subprocess_no_console_kwargs(),
         )
     except Exception:
         ok = False
@@ -526,8 +527,14 @@ def _run_install() -> None:
         log_path.parent.mkdir(parents=True, exist_ok=True)
         root = project_root()
         sync_cmd: list[str] = [uv, *uv_sync_engine_argv()]
-        from slysh.runtime_env import ensure_engine_venv, use_split_engine_venv, write_runtime_manifest
+        from slysh.runtime_env import (
+            ensure_engine_venv,
+            engine_sync_subprocess_env,
+            use_split_engine_venv,
+            write_runtime_manifest,
+        )
 
+        sync_env = engine_sync_subprocess_env()
         if use_split_engine_venv():
             engine_py = ensure_engine_venv(uv)
             sync_cmd.extend(["--python", str(engine_py)])
@@ -538,12 +545,19 @@ def _run_install() -> None:
                 stdout=log,
                 stderr=subprocess.STDOUT,
                 check=False,
+                env=sync_env,
                 **subprocess_no_console_kwargs(),
             )
         with _lock:
             _install["returncode"] = proc.returncode
             if proc.returncode != 0:
                 _install["error"] = f"uv sync завершился с кодом {proc.returncode}"
+            elif not engine_packages_ok():
+                _install["error"] = (
+                    "Пакеты расшифровки не установились в окружение engine "
+                    "(torch/gigaam). Закройте VPN и нажмите «Начать загрузку» снова "
+                    "или переустановите Slysh."
+                )
             else:
                 _install["error"] = None
                 try:

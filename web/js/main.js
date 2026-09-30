@@ -21,6 +21,10 @@ function hideBootSplash() {
   }
 }
 
+if (new URLSearchParams(window.location.search).get("skip_boot_splash") === "1") {
+  hideBootSplash();
+}
+
 function scheduleEngineSetupModal(status) {
   if (
     !status ||

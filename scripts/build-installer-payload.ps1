@@ -24,6 +24,49 @@ function Resolve-FfmpegSource {
     throw "ffmpeg.exe not found. Put it in bin\ffmpeg.exe or keep dist\payload\bin\ffmpeg.exe from a prior build."
 }
 
+function Resolve-UvExe {
+    param([string]$DestPath)
+    $uvZip = Join-Path $env:TEMP "slysh-uv-$UvVersion.zip"
+    $uvDir = Join-Path $env:TEMP "slysh-uv-$UvVersion"
+    $localCandidates = @(
+        (Join-Path $PayloadFinal "bin\uv.exe"),
+        (Join-Path $Root "dist\payload.prev\bin\uv.exe"),
+        (Join-Path $DestPath "bin\uv.exe")
+    )
+    foreach ($path in $localCandidates) {
+        if (Test-Path -LiteralPath $path) {
+            Write-Host "Using cached uv: $path"
+            Copy-Item -LiteralPath $path -Destination $DestPath -Force
+            return
+        }
+    }
+    $onPath = Get-Command uv.exe -ErrorAction SilentlyContinue
+    if ($onPath -and $onPath.Source -and (Test-Path -LiteralPath $onPath.Source)) {
+        Write-Host "Using uv from PATH: $($onPath.Source)"
+        Copy-Item -LiteralPath $onPath.Source -Destination $DestPath -Force
+        return
+    }
+    if (Test-Path -LiteralPath $uvZip) {
+        Write-Host "Using existing uv zip in TEMP..."
+    } else {
+        Write-Host "Downloading uv $UvVersion..."
+        try {
+            Invoke-WebRequest -Uri $UvUrl -OutFile $uvZip -UseBasicParsing
+        } catch {
+            throw "uv download failed and no local uv.exe found. Put uv in dist\payload\bin or install uv on PATH."
+        }
+    }
+    if (Test-Path -LiteralPath $uvDir) {
+        Remove-Item -LiteralPath $uvDir -Recurse -Force
+    }
+    Expand-Archive -LiteralPath $uvZip -DestinationPath $uvDir -Force
+    $uvExe = Get-ChildItem -LiteralPath $uvDir -Filter "uv.exe" -Recurse | Select-Object -First 1
+    if (-not $uvExe) {
+        throw "uv.exe not found in $uvDir"
+    }
+    Copy-Item -LiteralPath $uvExe.FullName -Destination $DestPath -Force
+}
+
 $PrebuiltExe = Join-Path $Root "installer\prebuilt\Slysh.exe"
 if (-not (Test-Path -LiteralPath $PrebuiltExe)) {
     throw "Missing $PrebuiltExe. Run scripts\build-slysh-launcher.ps1 (see launcher\README.md)."
@@ -114,36 +157,48 @@ Copy-Item -LiteralPath $ffmpegSrc -Destination (Join-Path $Payload "bin\ffmpeg.e
 
 Copy-Item -LiteralPath $PrebuiltExe -Destination (Join-Path $Payload "Slysh.exe") -Force
 
-$uvZip = Join-Path $env:TEMP "slysh-uv-$UvVersion.zip"
-$uvDir = Join-Path $env:TEMP "slysh-uv-$UvVersion"
-if (Test-Path -LiteralPath $uvDir) {
-    Remove-Item -LiteralPath $uvDir -Recurse -Force
-}
-Write-Host "Downloading uv $UvVersion..."
-Invoke-WebRequest -Uri $UvUrl -OutFile $uvZip -UseBasicParsing
-Expand-Archive -LiteralPath $uvZip -DestinationPath $uvDir -Force
-$uvExe = Get-ChildItem -LiteralPath $uvDir -Filter "uv.exe" -Recurse | Select-Object -First 1
-if (-not $uvExe) {
-    throw "uv.exe not found in $uvDir"
-}
-Copy-Item -LiteralPath $uvExe.FullName -Destination (Join-Path $Payload "bin\uv.exe") -Force
-
+$BundledUvDest = Join-Path $Payload "bin\uv.exe"
+Resolve-UvExe -DestPath $BundledUvDest
 $BundledUv = Join-Path $Payload "bin\uv.exe"
 $RuntimePython = Join-Path $Payload "runtime\python"
+$PrevRuntime = Join-Path $PayloadFinal "runtime\python"
+if (Test-Path -LiteralPath $PrevRuntime) {
+    Write-Host "Reusing runtime\python from previous payload..."
+    if (Test-Path -LiteralPath $RuntimePython) {
+        Remove-Item -LiteralPath $RuntimePython -Recurse -Force
+    }
+    New-Item -ItemType Directory -Path (Split-Path -Parent $RuntimePython) -Force | Out-Null
+    Copy-Item -LiteralPath $PrevRuntime -Destination $RuntimePython -Recurse -Force
+}
 New-Item -ItemType Directory -Path $RuntimePython -Force | Out-Null
 $env:UV_PYTHON_INSTALL_DIR = $RuntimePython
+$hasBundledPython = @(Get-ChildItem -LiteralPath $RuntimePython -Filter "python.exe" -Recurse -ErrorAction SilentlyContinue).Count -gt 0
 
 Push-Location $Payload
 try {
-    Write-Host "uv python install 3.12 (portable under runtime\python)..."
-    & $BundledUv python install 3.12
-    if ($LASTEXITCODE -ne 0) {
-        throw "uv python install failed with exit code $LASTEXITCODE"
+    if (-not $hasBundledPython) {
+        Write-Host "uv python install 3.12 (portable under runtime\python)..."
+        & $BundledUv python install 3.12
+        if ($LASTEXITCODE -ne 0) {
+            throw "uv python install failed with exit code $LASTEXITCODE"
+        }
+    } else {
+        Write-Host "Bundled Python present under runtime\python - skip uv python install"
     }
     Write-Host "uv sync --no-editable (light UI venv)..."
     & $BundledUv sync --no-editable
     if ($LASTEXITCODE -ne 0) {
-        throw "uv sync failed with exit code $LASTEXITCODE"
+        $prevVenv = Join-Path $PayloadFinal ".venv"
+        if (Test-Path -LiteralPath $prevVenv) {
+            Write-Host "uv sync failed; reusing .venv from previous payload..."
+            $destVenv = Join-Path $Payload ".venv"
+            if (Test-Path -LiteralPath $destVenv) {
+                Remove-Item -LiteralPath $destVenv -Recurse -Force
+            }
+            Copy-Item -LiteralPath $prevVenv -Destination $destVenv -Recurse -Force
+        } else {
+            throw "uv sync failed with exit code $LASTEXITCODE"
+        }
     }
 }
 finally {
@@ -184,7 +239,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 $whCount = (Get-ChildItem -LiteralPath $Wheelhouse -Filter "*.whl").Count
 if ($whCount -lt 10) {
-    throw "wheelhouse too small ($whCount wheels): $Wheelhouse"
+    throw "wheelhouse too small ($($whCount) wheels): $Wheelhouse"
 }
 Write-Host "wheelhouse: $whCount wheels"
 
@@ -192,6 +247,35 @@ $html = Get-Content -LiteralPath (Join-Path $Payload "web\index.html") -Raw -Enc
 foreach ($needle in @("btn-download-model", "engine-setup-settings", "btn-install-engine")) {
     if ($html -notmatch [regex]::Escape($needle)) {
         throw "web/index.html missing $needle"
+    }
+}
+
+if (Test-Path -LiteralPath $PayloadFinal) {
+    if (Test-Path -LiteralPath $PayloadPrev) {
+        Remove-Item -LiteralPath $PayloadPrev -Recurse -Force
+    }
+    Move-Item -LiteralPath $PayloadFinal -Destination $PayloadPrev
+}
+Move-Item -LiteralPath $PayloadStaging -Destination $PayloadFinal
+$Payload = $PayloadFinal
+
+$pyvenvCfg = Join-Path $PayloadFinal ".venv\pyvenv.cfg"
+if (Test-Path -LiteralPath $pyvenvCfg) {
+    $cfgText = Get-Content -LiteralPath $pyvenvCfg -Encoding UTF8
+    $stagingSeg = [regex]::Escape("payload.staging")
+    $cfgFixed = $cfgText | ForEach-Object { $_ -replace $stagingSeg, "payload" }
+    $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+    [System.IO.File]::WriteAllLines($pyvenvCfg, $cfgFixed, $utf8NoBom)
+}
+$sitePackages = Join-Path $PayloadFinal ".venv\Lib\site-packages"
+if (Test-Path -LiteralPath $sitePackages) {
+    $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+    Get-ChildItem -LiteralPath $sitePackages -Filter "*.pth" -File | ForEach-Object {
+        $pthText = [System.IO.File]::ReadAllText($_.FullName)
+        if ($pthText -match "payload\.staging") {
+            $pthFixed = $pthText -replace "payload\.staging", "payload"
+            [System.IO.File]::WriteAllText($_.FullName, $pthFixed, $utf8NoBom)
+        }
     }
 }
 
@@ -204,15 +288,6 @@ if (-not (Test-Path -LiteralPath $SmokePy)) {
 if ($LASTEXITCODE -ne 0) {
     throw "smoke_installer_layout.py failed"
 }
-
-if (Test-Path -LiteralPath $PayloadFinal) {
-    if (Test-Path -LiteralPath $PayloadPrev) {
-        Remove-Item -LiteralPath $PayloadPrev -Recurse -Force
-    }
-    Move-Item -LiteralPath $PayloadFinal -Destination $PayloadPrev
-}
-Move-Item -LiteralPath $PayloadStaging -Destination $PayloadFinal
-$Payload = $PayloadFinal
 
 Write-Host "Payload OK: $Payload"
 if (Test-Path -LiteralPath $PayloadPrev) {

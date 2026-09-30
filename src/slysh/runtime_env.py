@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -30,6 +31,10 @@ def _venv_python(venv_root: Path) -> Path:
     return venv_root / "Scripts" / "python.exe"
 
 
+def _venv_pythonw(venv_root: Path) -> Path:
+    return venv_root / "Scripts" / "pythonw.exe"
+
+
 def ui_python_executable() -> Path:
     return _venv_python(ui_venv_dir())
 
@@ -39,7 +44,7 @@ def engine_python_executable() -> Path | None:
     return path if path.is_file() else None
 
 
-def resolve_engine_python() -> str:
+def _resolve_engine_python_exe() -> str:
     if use_split_engine_venv():
         eng = engine_python_executable()
         if eng is not None:
@@ -48,6 +53,79 @@ def resolve_engine_python() -> str:
         if ui.is_file():
             return str(ui)
     return sys.executable
+
+
+def _prefer_pythonw_for_subprocess(exe: str) -> str:
+    if sys.platform != "win32":
+        return exe
+    path = Path(exe)
+    if path.name.lower() != "python.exe":
+        return exe
+    pyw = path.with_name("pythonw.exe")
+    return str(pyw) if pyw.is_file() else exe
+
+
+def read_ui_venv_home() -> Path | None:
+    """``pyvenv.cfg`` ``home`` for the light UI ``.venv`` (uv managed runtime)."""
+    cfg = ui_venv_dir() / "pyvenv.cfg"
+    if not cfg.is_file():
+        return None
+    try:
+        text = cfg.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    for line in text.splitlines():
+        if line.startswith("home = "):
+            raw = line.split("=", 1)[1].strip()
+            if raw:
+                return Path(raw)
+    return None
+
+
+def uv_ui_shim_should_yield() -> bool:
+    """True when this process is ``.venv\\Scripts\\pythonw`` and uv will run ``home\\pythonw``."""
+    if not use_split_engine_venv():
+        return False
+    try:
+        exe = Path(sys.executable).resolve()
+    except OSError:
+        return False
+    ui = ui_venv_dir()
+    shim_pyw = _venv_pythonw(ui).resolve()
+    shim_py = _venv_python(ui).resolve()
+    if exe not in (shim_pyw, shim_py):
+        return False
+    home = read_ui_venv_home()
+    if home is None or not home.is_dir():
+        return False
+    try:
+        home = home.resolve()
+        root = install_root().resolve()
+    except OSError:
+        return False
+    if not str(home).startswith(str(root)):
+        return False
+    return (home / "pythonw.exe").is_file()
+
+
+def resolve_engine_python() -> str:
+    """Engine venv ``python.exe`` (for ``uv --python``, paths)."""
+    return _resolve_engine_python_exe()
+
+
+def resolve_engine_subprocess_python() -> str:
+    """Hidden child processes: probe, engine_server, model download."""
+    return _prefer_pythonw_for_subprocess(_resolve_engine_python_exe())
+
+
+def engine_sync_subprocess_env() -> dict[str, str]:
+    """Environment so ``uv sync`` targets the engine venv, not the light UI ``.venv``."""
+    env = os.environ.copy()
+    if use_split_engine_venv():
+        venv = engine_venv_dir()
+        env["UV_PROJECT_ENVIRONMENT"] = str(venv)
+        env["VIRTUAL_ENV"] = str(venv)
+    return env
 
 
 def ensure_engine_venv(uv: str) -> Path:

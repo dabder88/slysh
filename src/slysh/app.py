@@ -14,6 +14,15 @@ def window_size() -> tuple[int, int]:
     return SIDEBAR_EXPANDED_MIN_WIDTH, DEFAULT_WINDOW_HEIGHT
 
 
+def webview_ui_url(port: int) -> str:
+    from slysh.release_version import installed_app_layout
+
+    base = f"http://127.0.0.1:{port}/"
+    if installed_app_layout():
+        return f"{base}?skip_boot_splash=1"
+    return base
+
+
 class JsApi:
     def __init__(self) -> None:
         self._window = None
@@ -442,10 +451,22 @@ def log_startup_crash(exc: BaseException) -> None:
 
 
 def main() -> None:
-    import faulthandler
     import os
     import threading
     import time
+
+    from slysh.paths import app_dir
+    from slysh.single_instance import SingleInstanceError, SingleInstanceLock
+
+    instance_lock = SingleInstanceLock(app_dir())
+    try:
+        instance_lock.acquire()
+    except SingleInstanceError:
+        import sys
+
+        sys.exit(0)
+
+    import faulthandler
 
     from slysh.logging_setup import setup_logging
 
@@ -473,15 +494,7 @@ def main() -> None:
 
     from slysh.api import create_ui_app
     from slysh.db import Database
-    from slysh.paths import app_dir, app_icon_path, db_path
-    from slysh.single_instance import SingleInstanceError, SingleInstanceLock
-
-    instance_lock = SingleInstanceLock(app_dir())
-    try:
-        instance_lock.acquire()
-    except SingleInstanceError as exc:
-        logging.error("%s", exc)
-        return
+    from slysh.paths import app_icon_path, db_path
 
     if not webview2_runtime_installed():
         _tell_webview2_missing()
@@ -509,7 +522,7 @@ def main() -> None:
     min_w = max(WINDOW_MIN_SIZE[0], width)
     window = webview.create_window(
         "Slysh",
-        f"http://127.0.0.1:{port}/",
+        webview_ui_url(port),
         js_api=api,
         width=width,
         height=height,

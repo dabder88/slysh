@@ -100,6 +100,12 @@ begin
   SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, 0, 0);
 end;
 
+function DefaultInstallDir: String;
+begin
+  { Must match [Setup] DefaultDirName; app constant is not valid in InitializeSetup. }
+  Result := ExpandConstant('{localappdata}\Programs\Slysh');
+end;
+
 procedure WriteStartMenuFolderDesktopIni;
 var
   IniPath: String;
@@ -116,21 +122,18 @@ end;
 function WebView2Installed: Boolean;
 var
   Ver: String;
-const
-  ClientKey = 'SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}';
-  ClientKey32 = 'SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}';
 begin
-  if RegQueryStringValue(HKLM, ClientKey, 'pv', Ver) and (Ver <> '') and (Ver <> '0.0.0.0') then
+  if RegQueryStringValue(HKLM, 'SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}', 'pv', Ver) and (Ver <> '') and (Ver <> '0.0.0.0') then
   begin
     Result := True;
     exit;
   end;
-  if RegQueryStringValue(HKLM, ClientKey32, 'pv', Ver) and (Ver <> '') and (Ver <> '0.0.0.0') then
+  if RegQueryStringValue(HKLM, 'SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}', 'pv', Ver) and (Ver <> '') and (Ver <> '0.0.0.0') then
   begin
     Result := True;
     exit;
   end;
-  if RegQueryStringValue(HKCU, ClientKey32, 'pv', Ver) and (Ver <> '') and (Ver <> '0.0.0.0') then
+  if RegQueryStringValue(HKCU, 'SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}', 'pv', Ver) and (Ver <> '') and (Ver <> '0.0.0.0') then
     Result := True
   else
     Result := False;
@@ -140,8 +143,8 @@ function InitializeSetup(): Boolean;
 begin
   { Обновление поверх существующей копии — не сбрасывать first-run через .fresh-install. }
   IsAppUpgrade :=
-    FileExists(ExpandConstant('{app}\Slysh.exe')) or
-    FileExists(ExpandConstant('{app}\.venv\Scripts\python.exe'));
+    FileExists(DefaultInstallDir + '\Slysh.exe') or
+    FileExists(DefaultInstallDir + '\.venv\Scripts\python.exe');
   Result := True;
 end;
 
