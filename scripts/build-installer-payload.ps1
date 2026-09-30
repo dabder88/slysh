@@ -9,10 +9,12 @@ $UvVersion = "0.8.22"
 $UvAsset = "uv-x86_64-pc-windows-msvc.zip"
 $UvUrl = "https://github.com/astral-sh/uv/releases/download/$UvVersion/$UvAsset"
 
+$PayloadFinal = Join-Path $Root "dist\payload"
+
 function Resolve-FfmpegSource {
     $candidates = @(
         (Join-Path $Root "bin\ffmpeg.exe"),
-        (Join-Path $Payload "bin\ffmpeg.exe")
+        (Join-Path $PayloadFinal "bin\ffmpeg.exe")
     )
     foreach ($path in $candidates) {
         if (Test-Path -LiteralPath $path) {
@@ -20,6 +22,21 @@ function Resolve-FfmpegSource {
         }
     }
     throw "ffmpeg.exe not found. Put it in bin\ffmpeg.exe or keep dist\payload\bin\ffmpeg.exe from a prior build."
+}
+
+$PrebuiltExe = Join-Path $Root "installer\prebuilt\Slysh.exe"
+if (-not (Test-Path -LiteralPath $PrebuiltExe)) {
+    throw "Missing $PrebuiltExe. Run scripts\build-slysh-launcher.ps1 (see launcher\README.md)."
+}
+$null = Resolve-FfmpegSource
+
+$LauncherScript = Join-Path $Root "scripts\build-slysh-launcher.ps1"
+if (Test-Path -LiteralPath $LauncherScript) {
+    Write-Host "Rebuilding Slysh.exe launcher..."
+    & powershell -NoProfile -File $LauncherScript
+    if ($LASTEXITCODE -ne 0) {
+        throw "build-slysh-launcher.ps1 failed with exit code $LASTEXITCODE"
+    }
 }
 
 Write-Host "Building installer payload (staging: $PayloadStaging)"
@@ -91,10 +108,6 @@ if (Test-Path -LiteralPath $lgpl) {
 $ffmpegSrc = Resolve-FfmpegSource
 Copy-Item -LiteralPath $ffmpegSrc -Destination (Join-Path $Payload "bin\ffmpeg.exe") -Force
 
-$PrebuiltExe = Join-Path $Root "installer\prebuilt\Slysh.exe"
-if (-not (Test-Path -LiteralPath $PrebuiltExe)) {
-    throw "Missing $PrebuiltExe. Run scripts\build-slysh-launcher.ps1 (see launcher\README.md)."
-}
 Copy-Item -LiteralPath $PrebuiltExe -Destination (Join-Path $Payload "Slysh.exe") -Force
 
 $uvZip = Join-Path $env:TEMP "slysh-uv-$UvVersion.zip"
@@ -149,6 +162,28 @@ if ($LASTEXITCODE -eq 0) {
     throw "payload venv must not include torch before first-run extras"
 }
 
+Write-Host "Building wheelhouse for offline UI venv repair..."
+$Wheelhouse = Join-Path $Payload "wheelhouse"
+New-Item -ItemType Directory -Path $Wheelhouse -Force | Out-Null
+$ReqExport = Join-Path $Wheelhouse "requirements-export.txt"
+& $BundledUv export --frozen --no-dev --no-emit-project --no-editable --format requirements.txt -o $ReqExport
+if ($LASTEXITCODE -ne 0) {
+    throw "uv export for wheelhouse failed with exit code $LASTEXITCODE"
+}
+& $BundledUv run --directory $Payload --with pip pip download -r $ReqExport -d $Wheelhouse
+if ($LASTEXITCODE -ne 0) {
+    throw "pip download for wheelhouse failed with exit code $LASTEXITCODE"
+}
+& $BundledUv build --wheel -o $Wheelhouse
+if ($LASTEXITCODE -ne 0) {
+    throw "uv build wheel for slysh failed with exit code $LASTEXITCODE"
+}
+$whCount = (Get-ChildItem -LiteralPath $Wheelhouse -Filter "*.whl").Count
+if ($whCount -lt 10) {
+    throw "wheelhouse too small ($whCount wheels): $Wheelhouse"
+}
+Write-Host "wheelhouse: $whCount wheels"
+
 $html = Get-Content -LiteralPath (Join-Path $Payload "web\index.html") -Raw -Encoding UTF8
 foreach ($needle in @("btn-download-model", "engine-setup-settings", "btn-install-engine")) {
     if ($html -notmatch [regex]::Escape($needle)) {
@@ -166,7 +201,6 @@ if ($LASTEXITCODE -ne 0) {
     throw "smoke_installer_layout.py failed"
 }
 
-$PayloadFinal = Join-Path $Root "dist\payload"
 if (Test-Path -LiteralPath $PayloadFinal) {
     if (Test-Path -LiteralPath $PayloadPrev) {
         Remove-Item -LiteralPath $PayloadPrev -Recurse -Force

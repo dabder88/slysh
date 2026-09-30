@@ -44,6 +44,7 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 ; models/ — отдельная строка; при удалении по умолчанию сносится (см. InitializeUninstall).
 Source: "{#Payload}\*"; DestDir: "{app}"; Excludes: "models,models\*,models\*"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#Payload}\models\*"; DestDir: "{app}\models"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "redist\MicrosoftEdgeWebview2Setup.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall; Check: not WebView2Installed
 
 [Dirs]
 ; Явная папка «Slysh» в меню Пуск (между Skype и Steam в «Все приложения»).
@@ -55,6 +56,7 @@ Name: "{group}\{cm:UninstallProgram,Slysh}"; Filename: "{uninstallexe}"; IconFil
 Name: "{autodesktop}\Slysh"; Filename: "{app}\Slysh.exe"; IconFilename: "{app}\slysh.ico"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Run]
+Filename: "{tmp}\MicrosoftEdgeWebview2Setup.exe"; Parameters: "/silent /install"; StatusMsg: "Microsoft Edge WebView2 Runtime…"; Check: not WebView2Installed; Flags: waituntilterminated
 Filename: "{app}\Slysh.exe"; WorkingDir: "{app}"; Description: "{cm:LaunchProgram,Slysh}"; Flags: nowait postinstall skipifsilent runascurrentuser
 
 [UninstallDelete]
@@ -107,6 +109,29 @@ begin
     'LocalizedResourceName=Slysh' + #13#10 +
     'ConfirmFileOp=0' + #13#10,
     False);
+end;
+
+function WebView2Installed: Boolean;
+var
+  Ver: String;
+const
+  ClientKey = 'SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}';
+  ClientKey32 = 'SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}';
+begin
+  if RegQueryStringValue(HKLM, ClientKey, 'pv', Ver) and (Ver <> '') and (Ver <> '0.0.0.0') then
+  begin
+    Result := True;
+    exit;
+  end;
+  if RegQueryStringValue(HKLM, ClientKey32, 'pv', Ver) and (Ver <> '') and (Ver <> '0.0.0.0') then
+  begin
+    Result := True;
+    exit;
+  end;
+  if RegQueryStringValue(HKCU, ClientKey32, 'pv', Ver) and (Ver <> '') and (Ver <> '0.0.0.0') then
+    Result := True
+  else
+    Result := False;
 end;
 
 function InitializeSetup(): Boolean;

@@ -26,6 +26,14 @@ Typical path: $env:LocalAppData\Programs\Inno Setup 6\ISCC.exe
 "@
 }
 
+$FetchRedist = Join-Path $Root "scripts\fetch-installer-redist.ps1"
+if (Test-Path -LiteralPath $FetchRedist) {
+    & powershell -NoProfile -File $FetchRedist
+    if ($LASTEXITCODE -ne 0) {
+        throw "fetch-installer-redist.ps1 failed with exit code $LASTEXITCODE"
+    }
+}
+
 $Payload = Join-Path $Root "dist\payload"
 if (-not (Test-Path -LiteralPath (Join-Path $Payload ".venv\Scripts\python.exe"))) {
     throw "Missing $Payload. Run scripts\build-installer-payload.ps1 first."

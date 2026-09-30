@@ -21,6 +21,24 @@ ENGINE_SETUP_LOG = "engine-setup.log"
 UV_EXTRAS = ("sync", "--extra", "engine", "--extra", "diarization", "--extra", "youtube")
 
 
+def ui_wheelhouse_dir() -> Path | None:
+    """Bundled wheels for offline repair of the light UI venv (installer payload)."""
+    wh = install_root() / "wheelhouse"
+    if not wh.is_dir():
+        return None
+    if not any(wh.glob("*.whl")):
+        return None
+    return wh
+
+
+def uv_sync_ui_argv() -> tuple[str, ...]:
+    """Light UI venv sync (Slysh.bat :ensure_venv). Uses wheelhouse when present."""
+    wh = ui_wheelhouse_dir()
+    if wh is None:
+        return ("sync",)
+    return ("sync", "--find-links", str(wh), "--offline")
+
+
 def uv_sync_engine_argv() -> tuple[str, ...]:
     """CLI args for engine package install. Set SLYSH_ENGINE_INSTALL_NO_CACHE=1 for QA without uv cache."""
     parts = ["sync"]

@@ -1,8 +1,11 @@
 """Validate dist/payload before Inno Setup. Run after build-installer-payload.ps1."""
 from __future__ import annotations
 
+import os
+import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -21,6 +24,11 @@ def _fail(msg: str) -> int:
 def main() -> int:
     if not PAYLOAD.is_dir():
         return _fail(f"missing directory {PAYLOAD}")
+
+    wheelhouse = PAYLOAD / "wheelhouse"
+    wh_count = len(list(wheelhouse.glob("*.whl"))) if wheelhouse.is_dir() else 0
+    if wh_count < 10:
+        return _fail(f"wheelhouse must have at least 10 wheels, got {wh_count}")
 
     required = [
         PAYLOAD / "bin" / "ffmpeg.exe",
@@ -138,6 +146,25 @@ def main() -> int:
     if proc.returncode != 0:
         err = proc.stderr.decode("utf-8", errors="replace")
         return _fail(f"resolve_uv bundled check failed: {err}")
+
+    with tempfile.TemporaryDirectory(prefix="slysh-payload-move-") as tmp:
+        moved = Path(tmp) / "payload"
+        shutil.copytree(PAYLOAD, moved)
+        env = {
+            **os.environ,
+            "SLYSH_INSTALL_ROOT": str(moved.resolve()),
+            "PATH": str((moved / "bin").resolve()),
+        }
+        pyw = moved / ".venv" / "Scripts" / "pythonw.exe"
+        proc = subprocess.run(
+            [str(pyw), "-c", "import slysh"],
+            env=env,
+            capture_output=True,
+            check=False,
+        )
+        if proc.returncode != 0:
+            err = proc.stderr.decode("utf-8", errors="replace")
+            return _fail(f"relocated payload import slysh failed: {err}")
 
     print("smoke_installer_layout: OK")
     return 0

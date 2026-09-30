@@ -32,6 +32,7 @@ models/*
 # Shipped ffmpeg binary (LGPL build, not committed)
 bin/ffmpeg.exe
 bin/ffprobe.exe
+installer/redist/*.exe
 
 # In git: app sources, installer/, launcher/, scripts for build/run (see README).
 # Not in git: tests, internal docs, agent configs, one-off maintainer scripts (below).
