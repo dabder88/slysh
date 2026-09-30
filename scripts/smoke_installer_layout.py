@@ -49,7 +49,11 @@ def main() -> int:
         if needle not in html:
             return _fail(f"web/index.html missing {needle}")
 
-    bat = BAT.read_text(encoding="utf-8")
+    bat_bytes = BAT.read_bytes()
+    if b"\r\n" not in bat_bytes and b"\n" in bat_bytes:
+        return _fail("Slysh.bat must use CRLF line endings (LF-only breaks cmd.exe)")
+
+    bat = bat_bytes.decode("utf-8")
     if 'PATH=%ROOT%\\bin;%PATH%' not in bat and "PATH=%ROOT%\\bin;%PATH%" not in bat:
         return _fail("Slysh.bat must prepend install bin to PATH")
     if "UV_PYTHON_INSTALL_DIR=%ROOT%\\runtime\\python" not in bat:

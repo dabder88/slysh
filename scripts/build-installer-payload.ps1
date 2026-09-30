@@ -110,6 +110,14 @@ foreach ($name in $copyNames) {
     Copy-Item -LiteralPath $src -Destination (Join-Path $Payload $name) -Recurse -Force
 }
 
+$payloadBat = Join-Path $Payload "Slysh.bat"
+if (Test-Path -LiteralPath $payloadBat) {
+    $batText = [System.IO.File]::ReadAllText($payloadBat)
+    $batText = $batText -replace "`r`n", "`n" -replace "`r", "`n"
+    $batText = $batText -replace "`n", "`r`n"
+    [System.IO.File]::WriteAllText($payloadBat, $batText, [System.Text.UTF8Encoding]::new($false))
+}
+
 $pyproject = Join-Path $Root "pyproject.toml"
 $pyText = Get-Content -LiteralPath $pyproject -Raw -Encoding UTF8
 if ($pyText -notmatch '(?m)^version\s*=\s*"([^"]+)"') {
