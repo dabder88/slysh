@@ -79,6 +79,7 @@ var
   UiLocaleCombo: TNewComboBox;
   SelectedUiLocale: String;
   KeepModelsOnUninstall: Boolean;
+  IsAppUpgrade: Boolean;
 
 procedure RemoveLegacyStartMenuShortcut;
 var
@@ -106,6 +107,15 @@ begin
     'LocalizedResourceName=Slysh' + #13#10 +
     'ConfirmFileOp=0' + #13#10,
     False);
+end;
+
+function InitializeSetup(): Boolean;
+begin
+  { Обновление поверх существующей копии — не сбрасывать first-run через .fresh-install. }
+  IsAppUpgrade :=
+    FileExists(ExpandConstant('{app}\Slysh.exe')) or
+    FileExists(ExpandConstant('{app}\.venv\Scripts\python.exe'));
+  Result := True;
 end;
 
 procedure InitializeWizard;
@@ -153,7 +163,8 @@ begin
       SelectedUiLocale := 'ru';
     LocalePath := ExpandConstant('{app}\.install-ui-locale');
     SaveStringToFile(LocalePath, SelectedUiLocale, False);
-    SaveStringToFile(ExpandConstant('{app}\.fresh-install'), '1', False);
+    if not IsAppUpgrade then
+      SaveStringToFile(ExpandConstant('{app}\.fresh-install'), '1', False);
     WriteStartMenuFolderDesktopIni;
     RefreshStartMenuCache;
   end;

@@ -237,6 +237,16 @@ def _validate_download_url(url: str) -> None:
         raise ValueError("Недопустимый URL загрузки")
 
 
+def _require_expected_sha256(pending: dict[str, Any]) -> str:
+    expected = str(pending.get("expected_sha256") or "").strip().lower()
+    if not re.fullmatch(r"[a-f0-9]{64}", expected):
+        raise ValueError(
+            "В описании релиза нет строки sha256: … (64 hex). "
+            "Скачивание и установка заблокированы."
+        )
+    return expected
+
+
 def start_download() -> dict[str, Any]:
     if not updates_enabled():
         raise ValueError("Загрузка обновлений доступна только в установленной копии")
@@ -244,6 +254,7 @@ def start_download() -> dict[str, Any]:
         pending = _state.get("pending")
         if not pending:
             raise ValueError("Сначала проверьте обновления")
+        _require_expected_sha256(pending)
         if _state["phase"] == "downloading":
             already = True
         elif _state["phase"] == "ready" and _state.get("path"):
@@ -285,8 +296,8 @@ def _run_download(pending: dict[str, Any]) -> None:
                         if total > 0:
                             _state["bytes_total"] = total
         digest = hasher.hexdigest().lower()
-        expected = pending.get("expected_sha256")
-        if expected and digest != str(expected).lower():
+        expected = _require_expected_sha256(pending)
+        if digest != expected:
             dest.unlink(missing_ok=True)
             raise ValueError("Контрольная сумма установщика не совпала")
         with _lock:
@@ -308,6 +319,11 @@ def apply_update() -> dict[str, Any]:
     with _lock:
         if _state["phase"] != "ready" or not _state.get("path"):
             raise ValueError("Сначала скачайте обновление")
+        pending = _state.get("pending") or {}
+        expected = _require_expected_sha256(pending)
+        digest = str(_state.get("sha256") or "").lower()
+        if digest != expected:
+            raise ValueError("Контрольная сумма установщика не совпала")
         installer = Path(str(_state["path"]))
     if not installer.is_file():
         raise ValueError("Файл установщика не найден")

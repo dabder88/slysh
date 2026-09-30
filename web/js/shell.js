@@ -584,7 +584,12 @@ function initAppUpdates() {
           notesEl.hidden = false;
           notesEl.textContent = result.release_notes;
         }
-        downloadBtn?.removeAttribute("hidden");
+        if (result.expected_sha256) {
+          downloadBtn?.removeAttribute("hidden");
+        } else if (statusEl) {
+          statusEl.textContent = t("updates.missingSha256");
+          downloadBtn?.setAttribute("hidden", "");
+        }
         githubBtn?.removeAttribute("hidden");
       } else if (result.newer_than_release) {
         if (statusEl) {

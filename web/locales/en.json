@@ -948,6 +948,7 @@
     "install": "Install",
     "installConfirm": "Slysh will close and the setup wizard will open. Continue?",
     "installLaunching": "Starting installer…",
+    "missingSha256": "The GitHub release notes are missing a sha256: … line. In-app download is blocked — open the release manually.",
     "newerThanRelease": "Your installed version is newer than the latest GitHub release",
     "openRelease": "Open on GitHub",
     "readyToInstall": "Installer is ready. Click Install.",

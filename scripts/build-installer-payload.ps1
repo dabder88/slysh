@@ -3,6 +3,8 @@ $ErrorActionPreference = "Stop"
 
 $Root = Split-Path -Parent $PSScriptRoot
 $Payload = Join-Path $Root "dist\payload"
+$PayloadStaging = Join-Path $Root "dist\payload.staging"
+$PayloadPrev = Join-Path $Root "dist\payload.prev"
 $UvVersion = "0.8.22"
 $UvAsset = "uv-x86_64-pc-windows-msvc.zip"
 $UvUrl = "https://github.com/astral-sh/uv/releases/download/$UvVersion/$UvAsset"
@@ -20,15 +22,16 @@ function Resolve-FfmpegSource {
     throw "ffmpeg.exe not found. Put it in bin\ffmpeg.exe or keep dist\payload\bin\ffmpeg.exe from a prior build."
 }
 
-Write-Host "Building installer payload in $Payload"
+Write-Host "Building installer payload (staging: $PayloadStaging)"
 
-if (Test-Path -LiteralPath $Payload) {
-    Remove-Item -LiteralPath $Payload -Recurse -Force
+if (Test-Path -LiteralPath $PayloadStaging) {
+    Remove-Item -LiteralPath $PayloadStaging -Recurse -Force
 }
-New-Item -ItemType Directory -Path $Payload -Force | Out-Null
-New-Item -ItemType Directory -Path (Join-Path $Payload "bin") -Force | Out-Null
-New-Item -ItemType Directory -Path (Join-Path $Payload "models") -Force | Out-Null
-New-Item -ItemType Directory -Path (Join-Path $Payload "licenses") -Force | Out-Null
+New-Item -ItemType Directory -Path $PayloadStaging -Force | Out-Null
+New-Item -ItemType Directory -Path (Join-Path $PayloadStaging "bin") -Force | Out-Null
+New-Item -ItemType Directory -Path (Join-Path $PayloadStaging "models") -Force | Out-Null
+New-Item -ItemType Directory -Path (Join-Path $PayloadStaging "licenses") -Force | Out-Null
+$Payload = $PayloadStaging
 
 $copyNames = @(
     "src",
@@ -62,7 +65,8 @@ $versionJson = @{
     channel     = "stable"
     github_repo = $githubRepo
 } | ConvertTo-Json -Compress
-Set-Content -LiteralPath (Join-Path $Payload "version.json") -Value $versionJson -Encoding UTF8 -NoNewline
+$versionPath = Join-Path $Payload "version.json"
+[System.IO.File]::WriteAllText($versionPath, $versionJson, [System.Text.UTF8Encoding]::new($false))
 Write-Host "version.json: $AppVersion ($githubRepo)"
 
 $gitkeep = Join-Path $Root "models\.gitkeep"
@@ -162,5 +166,18 @@ if ($LASTEXITCODE -ne 0) {
     throw "smoke_installer_layout.py failed"
 }
 
+$PayloadFinal = Join-Path $Root "dist\payload"
+if (Test-Path -LiteralPath $PayloadFinal) {
+    if (Test-Path -LiteralPath $PayloadPrev) {
+        Remove-Item -LiteralPath $PayloadPrev -Recurse -Force
+    }
+    Move-Item -LiteralPath $PayloadFinal -Destination $PayloadPrev
+}
+Move-Item -LiteralPath $PayloadStaging -Destination $PayloadFinal
+$Payload = $PayloadFinal
+
 Write-Host "Payload OK: $Payload"
+if (Test-Path -LiteralPath $PayloadPrev) {
+    Write-Host "Previous payload kept at: $PayloadPrev"
+}
 Write-Host "Next: powershell -File scripts\build-slysh-setup.ps1"
