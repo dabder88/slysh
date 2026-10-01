@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib
 import json
 import logging
+from contextlib import asynccontextmanager
 import os
 import secrets
 import subprocess
@@ -977,6 +978,19 @@ def _stop_engine(app: FastAPI) -> None:
     app.state.engine_starting = False
 
 
+def shutdown_ui_runtime(app: FastAPI) -> None:
+    """Stop child processes owned by the UI (engine, yt-dlp helpers, etc.)."""
+    procs: dict = getattr(app.state, "speaker_ytdlp_procs", None) or {}
+    for job_id, proc in list(procs.items()):
+        if proc is not None and proc.poll() is None:
+            try:
+                terminate_process_tree(proc, timeout=5)
+            except Exception:
+                logging.debug("ytdlp terminate failed job %s", job_id, exc_info=True)
+        procs.pop(job_id, None)
+    _stop_engine(app)
+
+
 def _pipeline_busy(app: FastAPI, db: Database) -> bool:
     if is_batch_active(app):
         return True
@@ -1723,7 +1737,19 @@ def create_ui_app(
 
     docs_url = None if production_openapi_disabled() else "/docs"
     openapi_url = None if production_openapi_disabled() else "/openapi.json"
-    app = FastAPI(docs_url=docs_url, openapi_url=openapi_url)
+
+    @asynccontextmanager
+    async def _ui_lifespan(app: FastAPI):
+        try:
+            yield
+        finally:
+            shutdown_ui_runtime(app)
+
+    app = FastAPI(
+        docs_url=docs_url,
+        openapi_url=openapi_url,
+        lifespan=_ui_lifespan,
+    )
     app.state.db = db
     install_ui_auth(app)
     register_ui_session_route(app)

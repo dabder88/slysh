@@ -492,7 +492,7 @@ def main() -> None:
     import uvicorn
     import webview
 
-    from slysh.api import create_ui_app
+    from slysh.api import create_ui_app, shutdown_ui_runtime
     from slysh.db import Database
     from slysh.paths import app_icon_path, db_path
 
@@ -556,14 +556,10 @@ def main() -> None:
     finally:
         server.should_exit = True
         thread.join(timeout=10)
-        proc = getattr(app.state, "engine_proc", None)
-        if proc is not None:
-            try:
-                from slysh.subprocess_win import terminate_process_tree
-
-                terminate_process_tree(proc, timeout=10)
-            except Exception:
-                logging.debug("engine terminate on exit", exc_info=True)
+        try:
+            shutdown_ui_runtime(app)
+        except Exception:
+            logging.debug("ui runtime shutdown", exc_info=True)
         instance_lock.release()
 
 
