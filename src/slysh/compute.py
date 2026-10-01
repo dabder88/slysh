@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
+import sys
 import threading
 from collections.abc import MutableMapping
 from pathlib import Path
@@ -199,17 +201,38 @@ _cuda_cache: bool | None = None
 _cuda_lock = threading.Lock()
 
 
+def _probe_cuda_subprocess() -> bool:
+    """CUDA probe in a child process so the UI never imports torch."""
+    if os.environ.get("GIGAAM_FORCE_CPU") == "1":
+        return False
+    script = (
+        "try:\n"
+        " import torch\n"
+        " print(1 if torch.cuda.is_available() else 0)\n"
+        "except Exception:\n"
+        " print(0)\n"
+    )
+    kwargs: dict = {
+        "capture_output": True,
+        "text": True,
+        "timeout": 45,
+        "check": False,
+    }
+    if sys.platform == "win32":
+        kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+    try:
+        completed = subprocess.run([sys.executable, "-c", script], **kwargs)
+        return completed.stdout.strip() == "1"
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
+
 def warm_cuda_cache() -> None:
     global _cuda_cache
     with _cuda_lock:
         if _cuda_cache is not None:
             return
-        try:
-            import torch
-
-            _cuda_cache = bool(torch.cuda.is_available())
-        except Exception:
-            _cuda_cache = False
+        _cuda_cache = _probe_cuda_subprocess()
 
 
 def cuda_available() -> bool:
