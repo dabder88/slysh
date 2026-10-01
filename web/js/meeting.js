@@ -21,6 +21,7 @@ let meetingLastExportPath = "";
 let meetingLastSpeakersError = null;
 let meetingSpeakerKeys = [];
 let meetingEnginePackagesOk = true;
+let meetingAwaitingTranscript = false;
 
 function formatElapsed(seconds) {
   const total = Math.max(0, Math.floor(Number(seconds) || 0));
@@ -125,12 +126,23 @@ function hasTextSelection() {
   return Boolean(sel && sel.toString().trim());
 }
 
-function syncMeetingTranscriptWait({ sessionActive, segments }) {
+function syncMeetingTranscriptWait({ sessionActive, segments, jobStatus, captureFinalizing }) {
   const wait = document.getElementById("meeting-transcript-wait");
   if (!wait) {
     return;
   }
-  const show = Boolean(sessionActive) && !hasMeetingTranscriptText(segments);
+  const hasText = hasMeetingTranscriptText(segments);
+  const finalizing = Boolean(captureFinalizing);
+  if (hasText) {
+    meetingAwaitingTranscript = false;
+  } else if ((jobStatus === "completed" || jobStatus === "failed") && !finalizing) {
+    meetingAwaitingTranscript = false;
+  } else if (finalizing) {
+    meetingAwaitingTranscript = true;
+  }
+  const show =
+    !hasText &&
+    (Boolean(sessionActive) || meetingAwaitingTranscript || finalizing);
   wait.hidden = !show;
 }
 
@@ -295,6 +307,18 @@ async function saveMeetingSpeakerNames() {
   meetingSpeakerKeys = speakerKeysForRename(job.segments || []);
   renderMeetingTranscript(job.segments || [], meetingJobId);
   syncMeetingSpeakersUi(job, { sessionActive: false, segments: job.segments || [] });
+}
+
+async function waitForMeetingCaptureFinalize(jobId) {
+  const deadline = Date.now() + 120_000;
+  while (Date.now() < deadline) {
+    const job = await api(`/api/jobs/${jobId}`);
+    if (!job.capture_finalizing && job.status !== "running") {
+      return job;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 400));
+  }
+  return api(`/api/jobs/${jobId}`);
 }
 
 async function runMeetingSpeakers() {
@@ -670,12 +694,16 @@ async function pollMeeting() {
     hint.dataset.stickyError = "1";
   }
   const jobId = status.job_id || meetingJobId;
+  let captureFinalizing = Boolean(status.capture_finalizing);
+  let jobStatus = "";
   if (jobId) {
     meetingJobId = jobId;
     let job = null;
     let segments = Array.isArray(status.segments) ? status.segments : null;
     if (!sessionActive) {
       job = await api(`/api/jobs/${jobId}`);
+      jobStatus = job.status || "";
+      captureFinalizing = captureFinalizing || Boolean(job.capture_finalizing);
       if (!segments) {
         segments = job.segments || [];
       }
@@ -694,18 +722,37 @@ async function pollMeeting() {
       appendMeetingSegments(segments, jobId);
     }
     const displaySegments = segments || meetingLastSegments;
-    syncMeetingTranscriptWait({ sessionActive, segments: displaySegments });
+    syncMeetingTranscriptWait({
+      sessionActive,
+      segments: displaySegments,
+      jobStatus,
+      captureFinalizing,
+    });
     syncMeetingPostActions({ sessionActive, segments: displaySegments });
     syncMeetingClearButton({ sessionActive, segments: displaySegments });
   } else {
-    syncMeetingTranscriptWait({ sessionActive, segments: meetingLastSegments });
+    syncMeetingTranscriptWait({
+      sessionActive,
+      segments: meetingLastSegments,
+      jobStatus: "",
+      captureFinalizing: false,
+    });
     syncMeetingPostActions({ sessionActive, segments: meetingLastSegments });
     syncMeetingClearButton({ sessionActive, segments: meetingLastSegments });
     syncMeetingAutoSpeakersOption(sessionActive);
   }
-  if (!sessionActive && meetingPollTimer && !meetingStarting) {
+  if (
+    !sessionActive &&
+    meetingPollTimer &&
+    !meetingStarting &&
+    !meetingAwaitingTranscript &&
+    !captureFinalizing
+  ) {
     clearInterval(meetingPollTimer);
     meetingPollTimer = null;
+  }
+  if (meetingAwaitingTranscript && !meetingPollTimer) {
+    startMeetingPoll();
   }
   return status;
 }
@@ -762,6 +809,7 @@ async function startMeeting() {
       body: JSON.stringify(body),
     });
     meetingJobId = job.id;
+    meetingAwaitingTranscript = false;
     showToast("meeting.k4613980");
     startMeetingPoll();
   } finally {
@@ -788,12 +836,22 @@ async function stopMeeting() {
   if (!window.confirm(t("meeting.k3917827"))) {
     return;
   }
+  if (!hasMeetingTranscriptText(meetingLastSegments)) {
+    meetingAwaitingTranscript = true;
+    syncMeetingTranscriptWait({
+      sessionActive: true,
+      segments: meetingLastSegments,
+      jobStatus: "running",
+      captureFinalizing: false,
+    });
+  }
   await api("/api/meeting/stop", { method: "POST" });
   setRecordingChrome(false);
   showToast("meeting.k5299764");
   await pollMeeting();
   await refreshLibrary();
-  if (document.getElementById("meeting-auto-speakers")?.checked) {
+  if (document.getElementById("meeting-auto-speakers")?.checked && meetingJobId != null) {
+    await waitForMeetingCaptureFinalize(meetingJobId);
     await runMeetingSpeakers();
   }
 }
