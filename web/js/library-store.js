@@ -2,6 +2,7 @@
 import { reportError } from "./errors.js";
 import { ensureIntakeAllowed } from "./intake-duplicate.js";
 import { t, jobStatusLabel as baseJobStatusLabel } from "./i18n.js";
+import { speakersProgressOverEstimate } from "./library-utils.js";
 
 export const SELECTED_BATCH_KEY = "selected_batch_id";
 
@@ -137,6 +138,9 @@ export function jobStatusLabel(job) {
   if (job.speakers_running) {
     const wait =
       job.speakers_elapsed_s != null ? ` · ${formatDuration(job.speakers_elapsed_s)}` : "";
+    if (speakersProgressOverEstimate(job)) {
+      return t("jobStatus.runningSpeakersLong", { wait });
+    }
     return t("jobStatus.runningSpeakers", { wait });
   }
   if ((job.status === "queued" || job.status === "running") && job.engine_starting) {

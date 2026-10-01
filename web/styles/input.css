@@ -3130,6 +3130,33 @@
     z-index: 111;
   }
 
+  .model-setup-modal .settings-model-download-progress-wrap {
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+    background: #fff;
+    margin: 8px 0 4px;
+  }
+
+  .model-setup-modal .settings-model-download-progress {
+    width: 100%;
+    height: 8px;
+    border-radius: 999px;
+    overflow: hidden;
+  }
+
+  .model-setup-modal .settings-bento-progress-native {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .model-setup-modal .settings-bento-progress-track {
+    position: relative;
+  }
+
   .modal-actions--stack {
     flex-direction: column;
     align-items: stretch;

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -35,7 +36,13 @@ def _get(base_url: str, path: str) -> dict:
         return json.loads(resp.read().decode("utf-8"))
 
 
-def _post(base_url: str, path: str, payload: dict | None = None) -> dict:
+def _post(
+    base_url: str,
+    path: str,
+    payload: dict | None = None,
+    *,
+    timeout: float | None = None,
+) -> dict:
     data = json.dumps(payload or {}, ensure_ascii=False).encode("utf-8")
     headers = {"Content-Type": "application/json; charset=utf-8"}
     headers.update(engine_auth_headers())
@@ -46,7 +53,7 @@ def _post(base_url: str, path: str, payload: dict | None = None) -> dict:
         method="POST",
     )
     try:
-        with urlopen(req, timeout=None) as resp:
+        with urlopen(req, timeout=timeout) as resp:
             return json.loads(resp.read().decode("utf-8"))
     except HTTPError as exc:
         raise EngineError(_error_message(exc)) from exc
@@ -82,3 +89,24 @@ def transcribe_chunk(base_url: str, samples: list[float]) -> dict:
 
 def cancel(base_url: str) -> dict:
     return _post(base_url, "/cancel")
+
+
+def label_speakers(
+    base_url: str,
+    path: str,
+    segments: list,
+) -> dict:
+    payload = {
+        "path": path,
+        "segments": [
+            {
+                "start_ms": s.start_ms,
+                "end_ms": s.end_ms,
+                "text": s.text,
+                "speaker": s.speaker,
+            }
+            for s in segments
+        ],
+    }
+    speaker_timeout = float(os.environ.get("SLYSH_SPEAKER_HTTP_TIMEOUT", "7200"))
+    return _post(base_url, "/label_speakers", payload, timeout=speaker_timeout)

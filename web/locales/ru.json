@@ -261,7 +261,8 @@
     "queued": "в очереди",
     "running": "в процессе",
     "runningPct": "в процессе · {pct}%{wait}",
-    "runningSpeakers": "в процессе · спикеры{wait}"
+    "runningSpeakers": "в процессе · спикеры{wait}",
+    "runningSpeakersLong": "в процессе · спикеры{wait} · дольше обычного, не закрывайте окно"
   },
   "legacy": {
     "addedToBatch": "Добавлено в «{name}»",

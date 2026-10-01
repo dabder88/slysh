@@ -2130,6 +2130,11 @@ def create_ui_app(
             speaker_cancel = app.state.speaker_cancels.get(job_id)
             if speaker_cancel is not None:
                 speaker_cancel.set()
+            if url:
+                try:
+                    engine_cancel(url)
+                except Exception:
+                    logging.exception("engine cancel failed for speakers job %s", job_id)
             app.state.speaker_jobs.pop(job_id, None)
             app.state.speaker_started.pop(job_id, None)
             app.state.speaker_errors[job_id] = SPEAKER_CANCELLED_MESSAGE
@@ -2172,11 +2177,13 @@ def create_ui_app(
 
         def work() -> None:
             try:
-                module = importlib.import_module("slysh.speakers_msdd")
+                engine_url = _ensure_engine_url(app)
+                from slysh.speakers_engine import EngineSpeakersBackend
+
                 labeled = assign_speakers(
                     db,
                     job_id,
-                    module.MsddSpeakersBackend(),
+                    EngineSpeakersBackend(engine_url),
                     cancelled=is_cancelled,
                 )
                 speakers: list[str] = []

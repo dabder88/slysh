@@ -8,7 +8,9 @@ import tempfile
 import time
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(
+    os.environ.get("SLYSH_SMOKE_ROOT", "")
+).resolve() if os.environ.get("SLYSH_SMOKE_ROOT") else Path(__file__).resolve().parents[1]
 
 
 def _fail(msg: str) -> int:

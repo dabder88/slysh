@@ -261,7 +261,8 @@
     "queued": "queued",
     "running": "in progress",
     "runningPct": "in progress · {pct}%{wait}",
-    "runningSpeakers": "in progress · speakers{wait}"
+    "runningSpeakers": "in progress · speakers{wait}",
+    "runningSpeakersLong": "in progress · speakers{wait} · taking longer than usual, keep the window open"
   },
   "legacy": {
     "activeBatch": "Active batch",

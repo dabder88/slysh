@@ -49,6 +49,18 @@ def main() -> int:
         if needle not in html:
             return _fail(f"web/index.html missing {needle}")
 
+    legacy_js = PAYLOAD / "web" / "js" / "legacy.js"
+    if not legacy_js.is_file():
+        return _fail(f"missing {legacy_js}")
+    scripts_dir = Path(__file__).resolve().parent
+    if str(scripts_dir) not in sys.path:
+        sys.path.insert(0, str(scripts_dir))
+    from smoke_web_legacy_exports import check_legacy_exports
+
+    dupes = check_legacy_exports(legacy_js)
+    if dupes:
+        return _fail(f"legacy.js duplicate exports: {dupes}")
+
     bat_bytes = BAT.read_bytes()
     if b"\r\n" not in bat_bytes and b"\n" in bat_bytes:
         return _fail("Slysh.bat must use CRLF line endings (LF-only breaks cmd.exe)")

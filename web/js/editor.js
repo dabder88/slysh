@@ -12,6 +12,11 @@ import {
   syncExportActions,
   openBatchExportModal,
 } from "./legacy.js";
+import {
+  orderedSpeakerKeys,
+  parseSpeakerOrdinal,
+  speakerDisplayName,
+} from "./library-utils.js";
 
 let editorBound = false;
 let currentJobId = null;
@@ -56,20 +61,6 @@ function formatPlayerTime(seconds) {
 
 function segmentSpeakerKey(seg) {
   return seg.speaker_key ?? seg.speaker ?? "";
-}
-
-function segmentSpeakerDisplay(seg) {
-  return seg.speaker || "";
-}
-
-function speakerLabel(speaker, index) {
-  if (!speaker) {
-    return t("editor.k3146264");
-  }
-  if (/^SPEAKER_/i.test(speaker)) {
-    return t("editor.speakerN", { n: index + 1 });
-  }
-  return speaker;
 }
 
 function setPlayerCollapsed(collapsed, persist = true) {
@@ -443,21 +434,13 @@ function scrollToTranscriptMs(startMs, job = currentJob) {
   return true;
 }
 
-function collectSpeakers(segments) {
-  const speakers = [];
-  segments.forEach((seg) => {
-    const key = segmentSpeakerKey(seg);
-    if (key && !speakers.includes(key)) {
-      speakers.push(key);
-    }
-  });
-  return speakers;
-}
-
 function createSegmentBlock(seg, index, job, speakers, youtube) {
   const text = (seg.text || "").trim();
-  const speakerIndex = speakers.indexOf(segmentSpeakerKey(seg));
-  const tone = SPEAKER_TONES[speakerIndex >= 0 ? speakerIndex % SPEAKER_TONES.length : 0];
+  const key = segmentSpeakerKey(seg);
+  const names = job?.speaker_names || {};
+  const ordinal = parseSpeakerOrdinal(key);
+  const toneIndex = ordinal != null ? ordinal : speakers.indexOf(key);
+  const tone = SPEAKER_TONES[toneIndex >= 0 ? toneIndex % SPEAKER_TONES.length : 0];
 
   const block = document.createElement("article");
   block.className = "editor-segment";
@@ -469,7 +452,7 @@ function createSegmentBlock(seg, index, job, speakers, youtube) {
   meta.className = "editor-segment-meta";
   const speaker = document.createElement("span");
   speaker.className = `editor-segment-speaker editor-segment-speaker--${tone}`;
-  speaker.textContent = speakerLabel(segmentSpeakerDisplay(seg), speakerIndex);
+  speaker.textContent = speakerDisplayName(key, names[key]);
   const time = document.createElement("span");
   time.className = youtube
     ? "hint editor-segment-time editor-segment-time--jump"
@@ -549,7 +532,7 @@ function renderSegments(job) {
     renderedSegmentCount > 0 &&
     container.querySelector(".editor-segment")
   ) {
-    const speakers = collectSpeakers(segments);
+    const speakers = orderedSpeakerKeys(segments);
     const youtube = isYoutubeJob(job);
     for (let index = renderedSegmentCount; index < segments.length; index += 1) {
       const seg = segments[index];
@@ -588,7 +571,7 @@ function renderSegments(job) {
     return;
   }
 
-  const speakers = collectSpeakers(segments);
+  const speakers = orderedSpeakerKeys(segments);
   const youtube = isYoutubeJob(job);
 
   segments.forEach((seg, index) => {

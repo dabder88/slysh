@@ -359,8 +359,20 @@ def start_batch(
                         )
                     else:
                         try:
-                            module = importlib.import_module("slysh.speakers_msdd")
-                            assign_speakers(db, job_id, module.MsddSpeakersBackend())
+                            engine_url = None
+                            if ensure_engine is not None:
+                                engine_url = ensure_engine(app)
+                            else:
+                                engine_url = getattr(app.state, "engine_url", None)
+                            if not engine_url:
+                                raise RuntimeError("Движок не запущен.")
+                            from slysh.speakers_engine import EngineSpeakersBackend
+
+                            assign_speakers(
+                                db,
+                                job_id,
+                                EngineSpeakersBackend(engine_url),
+                            )
                         except Exception as exc:
                             logging.exception("batch speakers failed for job %s", job_id)
                             db.set_error(job_id, str(exc))

@@ -30,6 +30,11 @@ class TranscribeChunkBody(BaseModel):
     samples: list[float]
 
 
+class LabelSpeakersBody(BaseModel):
+    path: str
+    segments: list[dict]
+
+
 def _segments_payload(segments: list[Segment]) -> dict:
     return {
         "segments": [
@@ -162,6 +167,45 @@ def create_app(backend, decode) -> FastAPI:
             message = str(exc).strip() or "Ошибка распознавания"
             return JSONResponse(status_code=400, content={"error": message})
         return _segments_payload(segments)
+
+    @app.post("/label_speakers")
+    def label_speakers(body: LabelSpeakersBody):
+        from slysh.models import Segment
+        from slysh.speakers import SpeakerCancelledError
+        from slysh.speakers_msdd import MsddSpeakersBackend
+
+        is_cancelled = operation_cancel.start()
+        segments = [
+            Segment(
+                int(row["start_ms"]),
+                int(row["end_ms"]),
+                str(row.get("text") or ""),
+                speaker=row.get("speaker"),
+            )
+            for row in body.segments
+            if isinstance(row, dict) and "start_ms" in row and "end_ms" in row
+        ]
+        logging.info(
+            "label_speakers start path=%s segments=%d",
+            body.path,
+            len(segments),
+        )
+        set_progress(0.05, "speakers")
+        try:
+            labeled = MsddSpeakersBackend().label(
+                body.path,
+                segments,
+                cancelled=is_cancelled,
+            )
+        except SpeakerCancelledError:
+            return JSONResponse(status_code=499, content={"error": "cancelled"})
+        except Exception as exc:
+            logging.exception("label_speakers failed for %s", body.path)
+            message = str(exc).strip() or "диаризация не удалась"
+            return JSONResponse(status_code=400, content={"error": message})
+        set_progress(1.0, "done")
+        logging.info("label_speakers done path=%s segments=%d", body.path, len(labeled))
+        return _segments_payload(labeled)
 
     @app.post("/cancel")
     def cancel() -> dict:

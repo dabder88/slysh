@@ -38,30 +38,14 @@ function scheduleEngineSetupModal(status) {
   });
 }
 
-async function bootstrap() {
-  const bootFallback = window.setTimeout(hideBootSplash, 15000);
+let appShellWired = false;
 
-  try {
-    await establishUiSession();
-  } catch (err) {
-    console.error(err);
+function wireAppShell() {
+  if (appShellWired) {
+    return;
   }
+  appShellWired = true;
 
-  initSecretFields();
-  await initI18n();
-  initShell();
-  let bootSetupStatus = null;
-  try {
-    if (typeof window.refreshEngineSetupUi === "function") {
-      bootSetupStatus = await window.refreshEngineSetupUi();
-    }
-  } catch (err) {
-    console.error(err);
-  } finally {
-    window.clearTimeout(bootFallback);
-    hideBootSplash();
-    scheduleEngineSetupModal(bootSetupStatus);
-  }
   initRouter();
 
   let lastRoute = null;
@@ -113,8 +97,47 @@ async function bootstrap() {
   notifyCurrentRoute();
 }
 
+async function bootstrap() {
+  const bootFallback = window.setTimeout(hideBootSplash, 15000);
+
+  try {
+    try {
+      await establishUiSession();
+    } catch (err) {
+      console.error(err);
+    }
+
+    initSecretFields();
+    try {
+      await initI18n();
+    } catch (err) {
+      console.error(err);
+    }
+    try {
+      initShell();
+    } catch (err) {
+      console.error(err);
+    }
+  } finally {
+    wireAppShell();
+    window.clearTimeout(bootFallback);
+    hideBootSplash();
+  }
+
+  let bootSetupStatus = null;
+  try {
+    if (typeof window.refreshEngineSetupUi === "function") {
+      bootSetupStatus = await window.refreshEngineSetupUi();
+    }
+  } catch (err) {
+    console.error(err);
+  }
+  scheduleEngineSetupModal(bootSetupStatus);
+}
+
 bootstrap().catch((err) => {
   console.error(err);
+  wireAppShell();
   hideBootSplash();
   const banner = document.getElementById("boot-error");
   if (banner) {

@@ -9,6 +9,9 @@ import {
   jobProgressPct,
   jobProgressPctLabel,
   isProgressIndeterminate,
+  orderedSpeakerKeys,
+  speakerDisplayName,
+  speakerKeysForRename,
 } from "./library-utils.js";
 import { api, showToast, jobDisplayName, isYoutubeJob } from "./api.js";
 import { readTranscribeRange } from "./media-time.js";
@@ -1132,16 +1135,7 @@ async function resolveExportOpenPaths() {
 }
 
 function uniqueSpeakers(segments) {
-  const keys = [];
-  const seen = new Set();
-  for (const seg of segments || []) {
-    const key = seg.speaker_key ?? seg.speaker;
-    if (key && !seen.has(key)) {
-      seen.add(key);
-      keys.push(key);
-    }
-  }
-  return keys;
+  return orderedSpeakerKeys(segments);
 }
 
 export async function startSpeakers(jobId) {
@@ -1174,7 +1168,9 @@ function syncSpeakersUi(job) {
     speakersBtn.hidden = !completed || youtube;
     speakersBtn.disabled = Boolean(job && job.speakers_running);
   }
-  const keys = speakerKeys.length ? speakerKeys : uniqueSpeakers(job.segments || []);
+  const keys = speakerKeys.length
+    ? speakerKeys
+    : speakerKeysForRename(job.segments || []);
   const names = job?.speaker_names || {};
   renderSpeakerRename(completed && !youtube ? keys : [], names);
 }
@@ -1200,7 +1196,7 @@ function renderSpeakerRename(keys, names = {}) {
   speakerRenameEl.hidden = false;
   for (const key of keys) {
     const label = document.createElement("label");
-    label.textContent = key;
+    label.textContent = speakerDisplayName(key, names[key]);
     const input = document.createElement("input");
     input.dataset.speakerKey = key;
     input.value = names[key] || "";

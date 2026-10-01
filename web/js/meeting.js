@@ -1,6 +1,7 @@
 ﻿import { api, showToast } from "./api.js";
 import { reportError } from "./errors.js";
 import { openJobExportModal, openLocalPath, refreshLibrary, startSpeakers, uniqueSpeakers, waitForSpeakers } from "./legacy.js";
+import { speakerDisplayName, speakerKeysForRename } from "./library-utils.js";
 import { formatMsClock } from "./media-time.js";
 import { t } from "./i18n.js";
 
@@ -192,7 +193,7 @@ function renderMeetingSpeakerRename(keys, names = {}) {
     row.className = "meeting-speaker-row";
     const badge = document.createElement("span");
     badge.className = "meeting-speaker-key";
-    badge.textContent = key;
+    badge.textContent = speakerDisplayName(key, names[key]);
     const input = document.createElement("input");
     input.type = "text";
     input.className = "meeting-speaker-input";
@@ -260,7 +261,7 @@ function syncMeetingSpeakersUi(job, { sessionActive, segments } = {}) {
     showToast(job.speakers_error);
   }
   if (!sessionActive && hasSpeakers) {
-    const keys = meetingSpeakerKeys.length ? meetingSpeakerKeys : uniqueSpeakers(items);
+    const keys = meetingSpeakerKeys.length ? meetingSpeakerKeys : speakerKeysForRename(items);
     renderMeetingSpeakerRename(keys, job?.speaker_names || {});
   } else if (!sessionActive) {
     renderMeetingSpeakerRename([]);
@@ -291,7 +292,7 @@ async function saveMeetingSpeakerNames() {
     body: JSON.stringify(body),
   });
   const job = await api(`/api/jobs/${meetingJobId}`);
-  meetingSpeakerKeys = uniqueSpeakers(job.segments || []);
+  meetingSpeakerKeys = speakerKeysForRename(job.segments || []);
   renderMeetingTranscript(job.segments || [], meetingJobId);
   syncMeetingSpeakersUi(job, { sessionActive: false, segments: job.segments || [] });
 }
@@ -311,7 +312,7 @@ async function runMeetingSpeakers() {
         syncMeetingSpeakersUi(updated, { sessionActive: false, segments: updated.segments || [] });
       },
     });
-    meetingSpeakerKeys = uniqueSpeakers(job.segments || []);
+    meetingSpeakerKeys = speakerKeysForRename(job.segments || []);
     renderMeetingTranscript(job.segments || [], meetingJobId);
     syncMeetingSpeakersUi(job, { sessionActive: false, segments: job.segments || [] });
   } catch (err) {

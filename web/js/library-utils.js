@@ -179,9 +179,21 @@ export function formatBatchCountsSummary(batch, separator = " · ") {
 export function estimateSpeakerWorkSeconds(job) {
   const dur = Number(job?.duration_s);
   if (Number.isFinite(dur) && dur > 0) {
-    return Math.max(20, Math.min(600, dur * 0.35));
+    // NeMo MSDD often runs longer than realtime on CPU; avoid capping at 10 min for long meetings.
+    return Math.max(90, Math.min(7200, dur * 1.2));
   }
-  return 120;
+  return 180;
+}
+
+export function speakersProgressOverEstimate(job) {
+  if (!job?.speakers_running) {
+    return false;
+  }
+  const elapsed = Number(job.speakers_elapsed_s);
+  if (!Number.isFinite(elapsed) || elapsed < 0) {
+    return false;
+  }
+  return elapsed > estimateSpeakerWorkSeconds(job);
 }
 
 export function speakerProgressPct(job) {
@@ -192,12 +204,21 @@ export function speakerProgressPct(job) {
   if (!Number.isFinite(elapsed) || elapsed < 0) {
     return 0;
   }
+  if (speakersProgressOverEstimate(job)) {
+    return null;
+  }
   const estimate = estimateSpeakerWorkSeconds(job);
-  return Math.min(95, Math.round((elapsed / estimate) * 100));
+  return Math.min(90, Math.round((elapsed / estimate) * 100));
 }
 
 export function jobProgressPct(job) {
   const speakerPct = speakerProgressPct(job);
+  if (job?.speakers_running) {
+    if (speakerPct != null) {
+      return speakerPct;
+    }
+    return 90;
+  }
   if (speakerPct != null) {
     return speakerPct;
   }
@@ -205,10 +226,13 @@ export function jobProgressPct(job) {
 }
 
 export function jobProgressPctLabel(job) {
-  const pct = jobProgressPct(job);
-  if (isProgressIndeterminate(job) && pct <= 0) {
-    return "…";
+  if (isProgressIndeterminate(job)) {
+    const pct = jobProgressPct(job);
+    if (job?.speakers_running || pct <= 0) {
+      return "…";
+    }
   }
+  const pct = jobProgressPct(job);
   return `${pct}%`;
 }
 
@@ -217,6 +241,9 @@ export function isProgressIndeterminate(job) {
     return false;
   }
   if (job.status === "queued" || job.engine_starting) {
+    return true;
+  }
+  if (job.speakers_running && speakersProgressOverEstimate(job)) {
     return true;
   }
   return job.status === "running" && jobProgressPct(job) <= 0;
@@ -275,4 +302,75 @@ export function isJobTranscribing(job) {
     job &&
       (job.status === "queued" || job.status === "running" || job.speakers_running || job.engine_starting)
   );
+}
+
+export const RENAME_MIN_SPEAKER_DURATION_MS = 5000;
+
+export function parseSpeakerOrdinal(key) {
+  const match = /^SPEAKER_(\d+)$/i.exec(String(key || "").trim());
+  return match ? parseInt(match[1], 10) : null;
+}
+
+export function segmentSpeakerKeyFromSeg(seg) {
+  return seg?.speaker_key ?? seg?.speaker ?? "";
+}
+
+export function speakerDurationByKey(segments) {
+  const map = new Map();
+  for (const seg of segments || []) {
+    const key = segmentSpeakerKeyFromSeg(seg);
+    if (!key) {
+      continue;
+    }
+    const dur = Math.max(0, Number(seg.end_ms) - Number(seg.start_ms));
+    map.set(key, (map.get(key) || 0) + dur);
+  }
+  return map;
+}
+
+function compareSpeakerKeys(a, b) {
+  const na = parseSpeakerOrdinal(a);
+  const nb = parseSpeakerOrdinal(b);
+  if (na != null && nb != null) {
+    return na - nb;
+  }
+  if (na != null) {
+    return -1;
+  }
+  if (nb != null) {
+    return 1;
+  }
+  return String(a).localeCompare(String(b), undefined, { numeric: true });
+}
+
+export function orderedSpeakerKeys(segments, options = {}) {
+  const { renameMinDurationMs = 0 } = options;
+  const durations = speakerDurationByKey(segments);
+  let keys = [...durations.keys()];
+  if (renameMinDurationMs > 0) {
+    keys = keys.filter((key) => (durations.get(key) || 0) >= renameMinDurationMs);
+  }
+  keys.sort(compareSpeakerKeys);
+  return keys;
+}
+
+export function speakerKeysForRename(segments) {
+  return orderedSpeakerKeys(segments, {
+    renameMinDurationMs: RENAME_MIN_SPEAKER_DURATION_MS,
+  });
+}
+
+export function speakerDisplayName(key, customName) {
+  const name = String(customName || "").trim();
+  if (name) {
+    return name;
+  }
+  if (!key) {
+    return t("editor.k3146264");
+  }
+  const ordinal = parseSpeakerOrdinal(key);
+  if (ordinal != null) {
+    return t("editor.speakerN", { n: ordinal + 1 });
+  }
+  return String(key);
 }

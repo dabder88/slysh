@@ -142,9 +142,14 @@ function applyModelDownloadProgress(md, ui) {
   }
   if (ui.statusEl) {
     if (active) {
-      const detail = modelDownloadDetailLine(prog, formatModelDownloadActiveLine(prog));
-      ui.statusEl.hidden = !detail;
-      ui.statusEl.textContent = detail;
+      if (ui.summaryEl) {
+        ui.statusEl.hidden = true;
+        ui.statusEl.textContent = "";
+      } else {
+        const detail = modelDownloadDetailLine(prog, formatModelDownloadActiveLine(prog));
+        ui.statusEl.hidden = !detail;
+        ui.statusEl.textContent = detail;
+      }
     }
   }
   if (ui.stalledEl) {
@@ -1963,15 +1968,15 @@ function initComputeSettings() {
     const text = parts.join(" ");
     if (computeHintEl) {
       computeHintEl.textContent = text;
-      computeHintEl.classList.toggle("is-warn", Boolean(data.warning));
+      computeHintEl.classList.remove("is-warn");
     }
     if (dashboardHintEl) {
       dashboardHintEl.textContent = text;
-      dashboardHintEl.classList.toggle("is-warn", Boolean(data.warning));
+      dashboardHintEl.classList.remove("is-warn");
     }
     if (settingsHintEl) {
       settingsHintEl.textContent = text;
-      settingsHintEl.classList.toggle("is-warn", Boolean(data.warning));
+      settingsHintEl.classList.remove("is-warn");
     }
     const liveEl = document.getElementById("settings-bento-compute-live");
     if (liveEl) {
@@ -2454,6 +2459,16 @@ function initEngineSetup() {
   settingsBtn?.addEventListener("click", () => openConfirmModal(false));
   laterBtn?.addEventListener("click", () => dismiss());
 
+  modal?.addEventListener("click", (event) => {
+    if (event.target !== modal || modal.hidden) {
+      return;
+    }
+    if (wasInstalling) {
+      return;
+    }
+    dismiss().catch((err) => reportError(t("settings.engineSetup"), err));
+  });
+
   confirmStartBtn?.addEventListener("click", () => {
     closeConfirmModal();
     startInstall(confirmFromFirstRun);
@@ -2505,7 +2520,11 @@ function initModelSetup() {
   const downloadBtn = document.getElementById("model-setup-download");
   const laterBtn = document.getElementById("model-setup-later");
   const statusEl = document.getElementById("model-setup-status");
+  const progressWrap = document.getElementById("model-setup-download-progress-wrap");
   const progressEl = document.getElementById("model-setup-progress");
+  const progressFill = document.getElementById("model-setup-download-progress-fill");
+  const progressPct = document.getElementById("model-setup-download-progress-pct");
+  const progressLabel = document.getElementById("model-setup-download-progress-label");
   const progressSummary = document.getElementById("model-setup-progress-summary");
   const progressStalled = document.getElementById("model-setup-progress-stalled");
   const downloadWaitHint = document.getElementById("model-setup-download-wait-hint");
@@ -2567,14 +2586,23 @@ function initModelSetup() {
     const md = status?.model_download || {};
     const active = Boolean(md.active);
     syncGigaamVpnHint(status);
+    if (progressWrap) {
+      progressWrap.hidden = !active;
+    }
     applyModelDownloadProgress(md, {
       progressEl,
+      progressFillEl: progressFill,
+      progressPctEl: progressPct,
+      progressLabelEl: progressLabel,
       summaryEl: progressSummary,
       statusEl,
       stalledEl: progressStalled,
       waitHintEl: downloadWaitHint,
     });
     if (!active) {
+      if (progressWrap) {
+        progressWrap.hidden = true;
+      }
       if (progressSummary) {
         progressSummary.hidden = true;
         progressSummary.textContent = "";
