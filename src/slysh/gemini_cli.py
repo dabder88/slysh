@@ -72,6 +72,8 @@ def transcribe_gemini_file(
         raise RemoteAsrError(
             "Gemini CLI не найден. Установите @google/gemini-cli и выполните gemini."
         )
+    if cancelled and cancelled():
+        return []
     path = Path(audio_path).resolve()
     prompt = f"{GEMINI_PROMPT} @{path}"
     cmd = [
