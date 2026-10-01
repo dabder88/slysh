@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Callable
 from slysh.batch_rules import is_youtube_batch_rules, normalize_rules
 from slysh.compute import is_cloud_only
 from slysh.export import (
+    batch_export_stem_candidates,
     suggested_export_path,
     unique_export_path,
     write_job_export,
@@ -101,13 +102,14 @@ def _export_batch_job(
             write_job_export(out, segments, fmt, youtube_meta=meta)
         else:
             if target_rules.get("export_dir_mode") == "fixed" and target_rules.get("export_dir"):
-                stem = Path(job["source_path"]).stem or "transcript"
+                stems = batch_export_stem_candidates(str(job["source_path"]))
                 used = used_names if used_names is not None else set()
                 out = unique_export_path(
                     Path(str(target_rules["export_dir"])),
-                    stem,
+                    stems[0],
                     fmt,
                     used,
+                    alt_stems=stems[1:],
                 )
             else:
                 out = suggested_export_path(job["source_path"], fmt)

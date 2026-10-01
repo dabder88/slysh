@@ -54,6 +54,14 @@ function formatPlayerTime(seconds) {
   return `${minutes}:${String(secs).padStart(2, "0")}`;
 }
 
+function segmentSpeakerKey(seg) {
+  return seg.speaker_key ?? seg.speaker ?? "";
+}
+
+function segmentSpeakerDisplay(seg) {
+  return seg.speaker || "";
+}
+
 function speakerLabel(speaker, index) {
   if (!speaker) {
     return t("editor.k3146264");
@@ -438,8 +446,8 @@ function scrollToTranscriptMs(startMs, job = currentJob) {
 function collectSpeakers(segments) {
   const speakers = [];
   segments.forEach((seg) => {
-    const key = seg.speaker || "";
-    if (!speakers.includes(key)) {
+    const key = segmentSpeakerKey(seg);
+    if (key && !speakers.includes(key)) {
       speakers.push(key);
     }
   });
@@ -448,7 +456,7 @@ function collectSpeakers(segments) {
 
 function createSegmentBlock(seg, index, job, speakers, youtube) {
   const text = (seg.text || "").trim();
-  const speakerIndex = speakers.indexOf(seg.speaker || "");
+  const speakerIndex = speakers.indexOf(segmentSpeakerKey(seg));
   const tone = SPEAKER_TONES[speakerIndex >= 0 ? speakerIndex % SPEAKER_TONES.length : 0];
 
   const block = document.createElement("article");
@@ -461,7 +469,7 @@ function createSegmentBlock(seg, index, job, speakers, youtube) {
   meta.className = "editor-segment-meta";
   const speaker = document.createElement("span");
   speaker.className = `editor-segment-speaker editor-segment-speaker--${tone}`;
-  speaker.textContent = speakerLabel(seg.speaker, speakerIndex);
+  speaker.textContent = speakerLabel(segmentSpeakerDisplay(seg), speakerIndex);
   const time = document.createElement("span");
   time.className = youtube
     ? "hint editor-segment-time editor-segment-time--jump"

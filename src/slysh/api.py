@@ -1957,6 +1957,7 @@ def create_ui_app(
                 db.set_job_source_title(job_id, youtube_title)
                 job["source_title"] = youtube_title
         names = db.list_speaker_names(job_id)
+        job["speaker_names"] = names
         job["segments"] = _segments_payload(segments, speaker_names=names)
         job["transcript"] = format_transcript(_display_segments(db, job_id, segments))
         return job
@@ -2196,7 +2197,7 @@ def create_ui_app(
         _require_job(db, job_id)
         for speaker_key, display_name in body.items():
             db.upsert_speaker(job_id, speaker_key, str(display_name).strip())
-        return {"ok": True}
+        return {"ok": True, "speaker_names": db.list_speaker_names(job_id)}
 
     @app.get("/api/app/info")
     def get_app_info() -> dict:

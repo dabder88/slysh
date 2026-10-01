@@ -586,6 +586,7 @@ class Database:
 
     @_locked
     def apply_speaker_names(self, job_id: int) -> None:
+        """Deprecated: overwrites segment keys with display names. Do not call."""
         self._conn.execute(
             """
             UPDATE segments

@@ -26,16 +26,56 @@ def suggested_export_path(source_path: str, fmt: str) -> Path:
     return source.with_name(f"{stem}.{fmt}")
 
 
-def unique_export_path(directory: Path, stem: str, fmt: str, used: set[str]) -> Path:
+def _export_slot_key(directory: Path, filename: str) -> str:
+    dir_key = str(Path(directory).resolve()).casefold()
+    return f"{dir_key}\x1f{filename.casefold()}"
+
+
+def batch_export_stem_candidates(source_path: str) -> tuple[str, ...]:
+    """Prefer bare stem; add parent folder suffix before numeric _2, _3."""
+    source = Path(source_path)
+    base = (source.stem or "transcript").strip() or "transcript"
+    parent = (source.parent.name or "").strip()
+    if parent and parent not in {".", ".."}:
+        return (base, f"{base}__{parent}")
+    return (base,)
+
+
+def unique_export_path(
+    directory: Path,
+    stem: str,
+    fmt: str,
+    used: set[str],
+    *,
+    alt_stems: tuple[str, ...] = (),
+) -> Path:
     fmt = normalize_fmt(fmt)
-    base = (stem or "transcript").strip() or "transcript"
-    index = 1
+    directory = Path(directory)
+    candidates: list[str] = []
+    seen: set[str] = set()
+    for raw in (stem,) + tuple(alt_stems):
+        base = (raw or "transcript").strip() or "transcript"
+        key = base.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        candidates.append(base)
+    if not candidates:
+        candidates = ["transcript"]
+    for base in candidates:
+        name = f"{base}.{fmt}"
+        slot = _export_slot_key(directory, name)
+        if slot not in used:
+            used.add(slot)
+            return directory / name
+    primary = candidates[0]
+    index = 2
     while True:
-        name = f"{base}.{fmt}" if index == 1 else f"{base}_{index}.{fmt}"
-        key = name.casefold()
-        if key not in used:
-            used.add(key)
-            return Path(directory) / name
+        name = f"{primary}_{index}.{fmt}"
+        slot = _export_slot_key(directory, name)
+        if slot not in used:
+            used.add(slot)
+            return directory / name
         index += 1
 
 

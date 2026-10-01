@@ -164,7 +164,7 @@ function syncMeetingExportActions(path) {
   }
 }
 
-function renderMeetingSpeakerRename(keys) {
+function renderMeetingSpeakerRename(keys, names = {}) {
   const panel = document.getElementById("meeting-speaker-rename");
   if (!panel) {
     return;
@@ -197,6 +197,7 @@ function renderMeetingSpeakerRename(keys) {
     input.type = "text";
     input.className = "meeting-speaker-input";
     input.dataset.speakerKey = key;
+    input.value = names[key] || "";
     input.placeholder = t("meeting.k3979619");
     input.autocomplete = "off";
     input.addEventListener("change", () =>
@@ -260,7 +261,7 @@ function syncMeetingSpeakersUi(job, { sessionActive, segments } = {}) {
   }
   if (!sessionActive && hasSpeakers) {
     const keys = meetingSpeakerKeys.length ? meetingSpeakerKeys : uniqueSpeakers(items);
-    renderMeetingSpeakerRename(keys);
+    renderMeetingSpeakerRename(keys, job?.speaker_names || {});
   } else if (!sessionActive) {
     renderMeetingSpeakerRename([]);
   }

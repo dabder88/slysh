@@ -1131,13 +1131,14 @@ async function resolveExportOpenPaths() {
   return [];
 }
 
-function uniqueSpeakers(segments) {
+export function uniqueSpeakers(segments) {
   const keys = [];
   const seen = new Set();
   for (const seg of segments || []) {
-    if (seg.speaker && !seen.has(seg.speaker)) {
-      seen.add(seg.speaker);
-      keys.push(seg.speaker);
+    const key = seg.speaker_key ?? seg.speaker;
+    if (key && !seen.has(key)) {
+      seen.add(key);
+      keys.push(key);
     }
   }
   return keys;
@@ -1174,10 +1175,11 @@ function syncSpeakersUi(job) {
     speakersBtn.disabled = Boolean(job && job.speakers_running);
   }
   const keys = speakerKeys.length ? speakerKeys : uniqueSpeakers(job.segments || []);
-  renderSpeakerRename(completed && !youtube ? keys : []);
+  const names = job?.speaker_names || {};
+  renderSpeakerRename(completed && !youtube ? keys : [], names);
 }
 
-function renderSpeakerRename(keys) {
+function renderSpeakerRename(keys, names = {}) {
   if (!speakerRenameEl) {
     return;
   }
@@ -1201,6 +1203,7 @@ function renderSpeakerRename(keys) {
     label.textContent = key;
     const input = document.createElement("input");
     input.dataset.speakerKey = key;
+    input.value = names[key] || "";
     input.placeholder = t("common.name");
     input.addEventListener("change", () => saveSpeakerNames().catch((err) => showToast(err.message)));
     label.appendChild(input);
