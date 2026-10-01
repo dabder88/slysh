@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from slysh.compute import _read_settings, _write_settings
+from slysh.compute import _read_settings, mutate_settings
 from slysh.paths import app_dir, install_root
 from slysh.release_version import github_repo_slug, installed_app_layout, release_version
 from slysh.subprocess_win import subprocess_no_console_kwargs
@@ -146,13 +146,16 @@ def _parse_expected_sha256(body: str) -> str | None:
 
 
 def _save_last_check() -> None:
-    data = _read_settings()
-    updates = data.get("updates")
-    if not isinstance(updates, dict):
-        updates = {}
-    updates["last_check_at"] = datetime.now(timezone.utc).isoformat()
-    data["updates"] = updates
-    _write_settings(data)
+    stamp = datetime.now(timezone.utc).isoformat()
+
+    def patch(data: dict) -> None:
+        updates = data.get("updates")
+        if not isinstance(updates, dict):
+            updates = {}
+        updates["last_check_at"] = stamp
+        data["updates"] = updates
+
+    mutate_settings(patch)
 
 
 def check_for_updates() -> dict[str, Any]:
@@ -384,13 +387,14 @@ def save_lock_fingerprint() -> None:
     fp = uv_lock_fingerprint()
     if not fp:
         return
-    data = _read_settings()
-    runtime = data.get("runtime")
-    if not isinstance(runtime, dict):
-        runtime = {}
-    runtime["lock_fingerprint"] = fp
-    data["runtime"] = runtime
-    _write_settings(data)
+    def patch(data: dict) -> None:
+        runtime = data.get("runtime")
+        if not isinstance(runtime, dict):
+            runtime = {}
+        runtime["lock_fingerprint"] = fp
+        data["runtime"] = runtime
+
+    mutate_settings(patch)
 
 
 def engine_resync_recommended() -> bool:

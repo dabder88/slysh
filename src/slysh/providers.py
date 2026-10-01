@@ -7,7 +7,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Any, Callable
 
-from slysh.compute import _read_settings, _write_settings
+from slysh.compute import _read_settings, mutate_settings
 from slysh.secrets_dpapi import clear_nested, get_nested, set_nested
 
 OPENROUTER_DEFAULT_MODEL = "openai/whisper-1"
@@ -172,9 +172,10 @@ def _providers_block() -> dict:
 
 
 def _save_providers(block: dict) -> None:
-    data = _read_settings()
-    data["providers"] = block
-    _write_settings(data)
+    def patch(data: dict) -> None:
+        data["providers"] = block
+
+    mutate_settings(patch)
 
 
 def _secret_key_path(*parts: str) -> tuple[str, ...]:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 
-from slysh.compute import _read_settings, _write_settings
+from slysh.compute import _read_settings, mutate_settings
 from slysh.paths import install_ui_locale_seed_path
 
 UI_LOCALES = frozenset({"ru", "en"})
@@ -29,8 +29,11 @@ def resolve_ui_locale(hint: str | None = None) -> str:
     if stored in UI_LOCALES:
         return stored
     locale = normalize_locale_hint(hint)
-    data["ui_locale"] = locale
-    _write_settings(data)
+
+    def patch(data: dict) -> None:
+        data["ui_locale"] = locale
+
+    mutate_settings(patch)
     return locale
 
 
@@ -38,9 +41,10 @@ def save_ui_locale(locale: str) -> str:
     value = str(locale).strip().lower()
     if value not in UI_LOCALES:
         raise ValueError("Нужно ru или en")
-    data = _read_settings()
-    data["ui_locale"] = value
-    _write_settings(data)
+    def patch(data: dict) -> None:
+        data["ui_locale"] = value
+
+    mutate_settings(patch)
     return value
 
 

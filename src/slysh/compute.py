@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-import json
 import os
 import subprocess
 import sys
 import threading
-from collections.abc import MutableMapping
+from collections.abc import Callable, MutableMapping
 from pathlib import Path
+from typing import Any
 
 from slysh.paths import app_dir
 
@@ -63,20 +63,21 @@ def settings_path() -> Path:
 
 
 def _read_settings() -> dict:
-    path = settings_path()
-    if not path.is_file():
-        return {}
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return {}
-    return data if isinstance(data, dict) else {}
+    from slysh.settings_store import load_json_resilient
+
+    return load_json_resilient(settings_path())
 
 
 def _write_settings(data: dict) -> None:
     from slysh.settings_store import save_json
 
     save_json(settings_path(), data)
+
+
+def mutate_settings(mutator: Callable[[dict[str, Any]], None]) -> dict[str, Any]:
+    from slysh.settings_store import mutate_json
+
+    return mutate_json(settings_path(), mutator)
 
 
 def load_preference() -> str:
@@ -102,9 +103,10 @@ def save_engine_mode(mode: str) -> str:
     value = str(mode).strip().lower()
     if value not in ENGINE_MODES:
         raise ValueError("Нужно auto, cloud_only или local")
-    data = _read_settings()
-    data["engine_mode"] = value
-    _write_settings(data)
+    def patch(data: dict[str, Any]) -> None:
+        data["engine_mode"] = value
+
+    mutate_settings(patch)
     return value
 
 
@@ -116,9 +118,10 @@ def save_preference(preference: str) -> str:
     pref = str(preference).strip().lower()
     if pref not in PREFERENCES:
         raise ValueError("Нужно auto, gpu или cpu")
-    data = _read_settings()
-    data["compute"] = pref
-    _write_settings(data)
+    def patch(data: dict[str, Any]) -> None:
+        data["compute"] = pref
+
+    mutate_settings(patch)
     return pref
 
 
@@ -154,13 +157,14 @@ def save_asr_id(model_id: str) -> str:
     value = str(model_id).strip()
     if not value:
         raise ValueError("Нужно выбрать модель")
-    data = _read_settings()
-    data["asr"] = value
-    if _is_remote_asr(value):
-        data["asr_remote"] = value
-    else:
-        data["asr_local"] = value
-    _write_settings(data)
+    def patch(data: dict[str, Any]) -> None:
+        data["asr"] = value
+        if _is_remote_asr(value):
+            data["asr_remote"] = value
+        else:
+            data["asr_local"] = value
+
+    mutate_settings(patch)
     return value
 
 

@@ -6,7 +6,7 @@ from typing import Any
 from urllib.parse import quote
 from urllib.request import ProxyHandler, build_opener, urlopen
 
-from slysh.compute import _read_settings, _write_settings
+from slysh.compute import _read_settings, mutate_settings
 
 PROXY_TARGET_IDS = frozenset(
     {
@@ -106,8 +106,7 @@ def save_proxy_config(
                 merged[tid] = bool(value)
         current["targets"] = merged
     _validate_proxy_config(current)
-    data = _read_settings()
-    data["proxy"] = {
+    proxy_block = {
         "enabled": current["enabled"],
         "host": current["host"],
         "port": current["port"],
@@ -115,7 +114,11 @@ def save_proxy_config(
         "password": current["password"],
         "targets": current["targets"],
     }
-    _write_settings(data)
+
+    def patch(data: dict) -> None:
+        data["proxy"] = proxy_block
+
+    mutate_settings(patch)
     return current
 
 
