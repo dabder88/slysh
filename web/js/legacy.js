@@ -1131,7 +1131,7 @@ async function resolveExportOpenPaths() {
   return [];
 }
 
-export function uniqueSpeakers(segments) {
+function uniqueSpeakers(segments) {
   const keys = [];
   const seen = new Set();
   for (const seg of segments || []) {
