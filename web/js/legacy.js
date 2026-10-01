@@ -892,6 +892,9 @@ function stopPoll() {
 }
 
 function isEditingTranscript() {
+  if (getRoute() === "editor" && window.__editorIsDraftDirty?.()) {
+    return true;
+  }
   return document.activeElement === transcriptEl;
 }
 

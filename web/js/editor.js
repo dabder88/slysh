@@ -850,7 +850,7 @@ function renderEditor(job) {
 
   syncYoutubeSource(job);
 
-  if (editorMode === "view") {
+  if (editorMode === "view" && !editorDraftDirty) {
     renderSegments(job);
   }
   renderBatchPanel(job);
@@ -873,6 +873,10 @@ export function editorCurrentJobId() {
   return currentJobId;
 }
 
+export function editorIsDraftDirty() {
+  return editorDraftDirty;
+}
+
 export function markEditorDraftSaved() {
   editorDraftDirty = false;
   if (currentJobId != null && editorDrafts.has(currentJobId)) {
@@ -884,6 +888,7 @@ export function markEditorDraftSaved() {
 if (typeof window !== "undefined") {
   window.__editorCurrentJobId = editorCurrentJobId;
   window.__editorMarkDraftSaved = markEditorDraftSaved;
+  window.__editorIsDraftDirty = editorIsDraftDirty;
 }
 
 function stashEditorDraft(jobId) {
@@ -1201,6 +1206,9 @@ export function initEditor() {
   });
 
   document.getElementById("editor-mode-view")?.addEventListener("click", () => {
+    if (editorMode === "edit" && editorDraftDirty && currentJobId != null) {
+      stashEditorDraft(currentJobId);
+    }
     setEditorMode("view");
     if (currentJob) {
       renderSegments(currentJob);
@@ -1212,6 +1220,16 @@ export function initEditor() {
       return;
     }
     setEditorMode("edit");
+    if (currentJob) {
+      restoreEditorDraft(currentJob);
+    }
+  });
+  window.addEventListener("beforeunload", (event) => {
+    if (getRoute() !== "editor" || !editorDraftDirty) {
+      return;
+    }
+    event.preventDefault();
+    event.returnValue = "";
   });
   const segmentsContainer = document.getElementById("editor-segments");
   segmentsContainer?.addEventListener("scroll", () => {
