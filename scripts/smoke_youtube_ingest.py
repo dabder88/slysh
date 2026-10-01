@@ -1,4 +1,4 @@
-"""Smoke: YouTube metadata in SQLite + optional live yt-dlp ingest."""
+"""Smoke: YouTube metadata in SQLite + optional live ingest (Apify or yt-dlp)."""
 from __future__ import annotations
 
 import os
@@ -11,6 +11,25 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 DEFAULT_URL = "https://www.youtube.com/watch?v=jNQXAC9IVRw"
+
+
+def _live_secrets_home() -> Path | None:
+    explicit = os.environ.get("SLYSH_SMOKE_YOUTUBE_HOME", "").strip()
+    if explicit:
+        return Path(explicit)
+    if os.environ.get("SLYSH_SMOKE_YOUTUBE_USE_HOME", "1") != "1":
+        return None
+    base = Path(os.environ.get("LOCALAPPDATA", "")) / "Slysh"
+    return base if base.is_dir() else None
+
+
+def _live_ingest_method() -> str:
+    method = os.environ.get("SLYSH_SMOKE_YOUTUBE_METHOD", "").strip().lower()
+    if method in {"apify", "ytdlp"}:
+        return method
+    from slysh.providers import apify_api_key
+
+    return "apify" if apify_api_key() else "ytdlp"
 
 
 def _smoke_sqlite_ingest() -> int:
@@ -73,7 +92,7 @@ def _smoke_sqlite_ingest() -> int:
     return 0
 
 
-def _smoke_live_ytdlp() -> int:
+def _smoke_live_ingest() -> int:
     if os.environ.get("SLYSH_SKIP_YOUTUBE_SMOKE") == "1":
         print("smoke_youtube_ingest: live SKIP (SLYSH_SKIP_YOUTUBE_SMOKE=1)")
         return 0
@@ -87,22 +106,29 @@ def _smoke_live_ytdlp() -> int:
     )
     from slysh.youtube_ytdlp import find_ytdlp
 
-    if not find_ytdlp():
+    work_home = Path(tempfile.mkdtemp(prefix="slysh-yt-live-"))
+    secrets_home = _live_secrets_home()
+    if secrets_home is not None:
+        os.environ["GIGAAM_DESKTOP_HOME"] = str(secrets_home)
+        print(f"smoke_youtube_ingest: live using secrets from {secrets_home}")
+    else:
+        os.environ["GIGAAM_DESKTOP_HOME"] = str(work_home)
+
+    method = _live_ingest_method()
+    if method == "ytdlp" and not find_ytdlp():
         print("smoke_youtube_ingest: live SKIP (yt-dlp not found)")
         return 0
 
-    home = Path(tempfile.mkdtemp(prefix="slysh-yt-live-"))
-    os.environ["GIGAAM_DESKTOP_HOME"] = str(home)
     import slysh.youtube_ingest as youtube_ingest_mod
 
     youtube_ingest_mod._meta_db = None
 
-    db = Database(home / "app.db")
+    db = Database(work_home / "app.db")
     url = os.environ.get("SLYSH_SMOKE_YOUTUBE_URL", DEFAULT_URL).strip()
     url, video_id = normalize_youtube_url(url)
     job_id = db.create_job(JobKind.YOUTUBE, url)
-    print(f"smoke_youtube_ingest: live job {job_id} {video_id} …")
-    run_youtube_job(db, job_id, url, "ytdlp", "ru")
+    print(f"smoke_youtube_ingest: live job {job_id} {video_id} method={method} …")
+    run_youtube_job(db, job_id, url, method, "ru")
     job = db.get_job(job_id) or {}
     if job.get("status") != JobStatus.COMPLETED.value:
         err = (job.get("error_text") or job.get("status") or "").strip()
@@ -116,9 +142,12 @@ def _smoke_live_ytdlp() -> int:
         print(f"smoke_youtube_ingest: live FAIL empty result", file=sys.stderr)
         return 1
     preview = (segments[0].text or "")[:60]
+    meta = db.get_job_youtube_meta(job_id) or {}
     print(
         f"smoke_youtube_ingest: live OK title={title!r} segments={len(segments)} "
-        f"channel={video.get('channel')!r} preview={preview!r}"
+        f"channel={video.get('channel')!r} video_id={video.get('video_id')!r} "
+        f"method={meta.get('method')!r} upload_date={video.get('upload_date')!r} "
+        f"preview={preview!r}"
     )
     return 0
 
@@ -128,7 +157,7 @@ def main() -> int:
     if code != 0:
         return code
     if os.environ.get("SLYSH_SMOKE_YOUTUBE_LIVE", "1") == "1":
-        return _smoke_live_ytdlp()
+        return _smoke_live_ingest()
     print("smoke_youtube_ingest: live SKIP (SLYSH_SMOKE_YOUTUBE_LIVE=0)")
     return 0
 
