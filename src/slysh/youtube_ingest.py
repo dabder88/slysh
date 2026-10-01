@@ -386,10 +386,15 @@ def run_youtube_job(
     *,
     cancel_event: threading.Event | None = None,
 ) -> None:
+    from slysh.asr_coordinator import job_run_active, job_run_id
     from slysh.models import JobStatus
+
+    run_id = job_run_id(db, job_id)
 
     def cancelled() -> bool:
         if cancel_event is not None and cancel_event.is_set():
+            return True
+        if not job_run_active(db, job_id, run_id):
             return True
         current = db.get_job(job_id) or {}
         return current.get("status") == JobStatus.CANCELLED.value
@@ -443,6 +448,9 @@ def run_youtube_job(
         current = db.get_job(job_id) or {}
         if current.get("status") != JobStatus.CANCELLED.value:
             db.set_status(job_id, JobStatus.CANCELLED)
+        return
+
+    if not job_run_active(db, job_id, run_id):
         return
 
     report(0.82)

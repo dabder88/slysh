@@ -63,7 +63,13 @@ def _smoke_sqlite_ingest() -> int:
     if not row or not row.get("video"):
         print("smoke_youtube_ingest: FAIL missing job_youtube_meta row", file=sys.stderr)
         return 1
-    print("smoke_youtube_ingest: OK sqlite ingest + metadata")
+    meta = db.get_job_youtube_meta(job_id) or {}
+    print(
+        "smoke_youtube_ingest: OK sqlite ingest + metadata "
+        f"title={video.get('title')!r} channel={video.get('channel')!r} "
+        f"video_id={video.get('video_id')!r} method={meta.get('method')!r} "
+        f"segments={len(db.list_segments(job_id))}"
+    )
     return 0
 
 
