@@ -6,7 +6,7 @@ import threading
 
 import numpy as np
 
-from slysh.audio_ingest import AudioIngestQueue
+from slysh.audio_ingest import AudioIngestQueue, notify_capture_overflow
 from slysh.chunking import SAMPLE_RATE
 from slysh.sounddevice_lazy import sd
 from slysh.live_buffer import LiveSession
@@ -469,14 +469,21 @@ class MeetingCapture:
     def resume(self) -> None:
         self._paused = False
 
+    def _overflow_cb(self) -> None:
+        notify_capture_overflow(self.rms_holder)
+
     def start(self) -> None:
         if self._sys_ingest is None:
             self._sys_ingest = AudioIngestQueue(
-                self._ingest_block, name="meeting-sys-ingest"
+                self._ingest_block,
+                name="meeting-sys-ingest",
+                on_overflow=self._overflow_cb,
             )
         if self._mic_ingest is None:
             self._mic_ingest = AudioIngestQueue(
-                self._ingest_mic_block, name="meeting-mic-ingest"
+                self._ingest_mic_block,
+                name="meeting-mic-ingest",
+                on_overflow=self._overflow_cb,
             )
         if not loopback_supported():
             raise MeetingCaptureError(NOT_WINDOWS_HINT)
@@ -581,7 +588,9 @@ class MeetingCapture:
             return
         if self._sys_ingest is None:
             self._sys_ingest = AudioIngestQueue(
-                self._ingest_block, name="meeting-sys-ingest"
+                self._ingest_block,
+                name="meeting-sys-ingest",
+                on_overflow=self._overflow_cb,
             )
         pcm = resample_to_16k(frames, self._sys_rate)
         self._sys_ingest.push(pcm)

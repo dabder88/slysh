@@ -10,9 +10,22 @@ import numpy as np
 
 log = logging.getLogger(__name__)
 
+AUDIO_INGEST_OVERFLOW_MESSAGE = (
+    "Переполнена очередь аудио; запись остановлена, сохранена доступная часть."
+)
+
 
 class AudioIngestOverflowError(RuntimeError):
     pass
+
+
+def notify_capture_overflow(holder: dict) -> None:
+    """Signal live/meeting capture state: stop worker and surface error in status."""
+    if not holder.get("error"):
+        holder["error"] = AUDIO_INGEST_OVERFLOW_MESSAGE
+    stop = holder.get("stop_event")
+    if stop is not None:
+        stop.set()
 
 
 class AudioIngestQueue:
@@ -22,10 +35,13 @@ class AudioIngestQueue:
         *,
         max_blocks: int = 64,
         name: str = "audio-ingest",
+        on_overflow: Callable[[], None] | None = None,
     ) -> None:
         self._handler = handler
+        self._on_overflow = on_overflow
         self._queue: queue.Queue[np.ndarray | None] = queue.Queue(maxsize=max_blocks)
         self._overflow = False
+        self._overflow_lock = threading.Lock()
         self._thread = threading.Thread(target=self._run, name=name, daemon=True)
         self._thread.start()
 
@@ -42,8 +58,19 @@ class AudioIngestQueue:
         try:
             self._queue.put_nowait(block.copy())
         except queue.Full:
+            self._mark_overflow()
+
+    def _mark_overflow(self) -> None:
+        with self._overflow_lock:
+            if self._overflow:
+                return
             self._overflow = True
-            log.error("audio ingest queue full (%s)", self._thread.name)
+        log.error("audio ingest queue full (%s)", self._thread.name)
+        if self._on_overflow is not None:
+            try:
+                self._on_overflow()
+            except Exception:
+                log.exception("audio ingest on_overflow failed")
 
     def close(self, *, timeout: float = 5.0) -> None:
         try:

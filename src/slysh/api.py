@@ -1395,7 +1395,7 @@ def _close_live_ingest(state: dict) -> None:
 def _ensure_live_ingest(state: dict) -> None:
     if state.get("ingest") is not None:
         return
-    from slysh.audio_ingest import AudioIngestQueue
+    from slysh.audio_ingest import AudioIngestQueue, notify_capture_overflow
 
     def on_pcm(pcm: np.ndarray) -> None:
         session = state.get("session")
@@ -1405,7 +1405,11 @@ def _ensure_live_ingest(state: dict) -> None:
         if len(pcm):
             state["rms"] = float(np.sqrt(np.mean(np.square(pcm))))
 
-    state["ingest"] = AudioIngestQueue(on_pcm, name="live-ingest")
+    state["ingest"] = AudioIngestQueue(
+        on_pcm,
+        name="live-ingest",
+        on_overflow=lambda: notify_capture_overflow(state),
+    )
 
 
 def _live_session_active(state: dict) -> bool:
@@ -1680,13 +1684,40 @@ def _drain_live_session(
         _handle_live_chunk(app, db, tail)
 
 
+def _capture_ingest_overflowed(state: dict) -> bool:
+    from slysh.audio_ingest import AudioIngestQueue
+
+    ingest = state.get("ingest")
+    if isinstance(ingest, AudioIngestQueue) and ingest.overflowed:
+        return True
+    capture = state.get("capture")
+    if capture is None:
+        return False
+    for attr in ("_sys_ingest", "_mic_ingest"):
+        q = getattr(capture, attr, None)
+        if isinstance(q, AudioIngestQueue) and q.overflowed:
+            return True
+    return False
+
+
 def _live_worker(app: FastAPI, db: Database) -> None:
+    from slysh.audio_ingest import AUDIO_INGEST_OVERFLOW_MESSAGE, notify_capture_overflow
+
     state = _active_capture_state(app)
     stop_event: threading.Event = state["stop_event"]
     while True:
         session = state.get("session")
         if session is None:
             break
+        if _capture_ingest_overflowed(state):
+            notify_capture_overflow(state)
+            job_id = state.get("job_id")
+            if job_id is not None:
+                db.set_error(
+                    int(job_id),
+                    str(state.get("error") or AUDIO_INGEST_OVERFLOW_MESSAGE),
+                )
+            stop_event.set()
         for chunk in session.take_ready_chunks():
             _handle_live_chunk(app, db, chunk)
         if stop_event.is_set():
