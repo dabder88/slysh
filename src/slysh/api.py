@@ -59,7 +59,7 @@ from slysh.loopback_security import install_loopback_guards, production_openapi_
 from slysh.media_access import resolve_job_media_path
 from slysh.decode import decode_pcm_16k_mono
 from slysh.db import Database, SegmentsRevisionConflictError
-from slysh.engine_client import cancel as engine_cancel
+from slysh.engine_client import EngineError, cancel as engine_cancel
 from slysh.engine_client import health as engine_health
 from slysh.engine_client import transcribe_chunk
 from slysh.transcribe import transcribe_pcm_chunks
@@ -1551,14 +1551,32 @@ def _active_capture_state(app: FastAPI) -> dict:
     return app.state.live
 
 
+def _capture_finalize_busy(app: FastAPI) -> bool:
+    threads: dict = getattr(app.state, "capture_finalize_threads", None) or {}
+    return any(t is not None and t.is_alive() for t in threads.values())
+
+
+def _capture_finalize_uses_local_engine(app: FastAPI) -> bool:
+    if is_cloud_only():
+        return False
+    selected = _selected_model()
+    if selected is None:
+        return True
+    if selected.backend == "cli":
+        return False
+    return selected.backend not in REMOTE_BACKENDS
+
+
 def _live_is_busy(app: FastAPI) -> bool:
     live = app.state.live
-    return bool(live.get("listening") or live.get("session"))
+    return bool(live.get("listening") or live.get("session") or _capture_finalize_busy(app))
 
 
 def _meeting_is_busy(app: FastAPI) -> bool:
     meeting = getattr(app.state, "meeting", None) or {}
-    return bool(meeting.get("listening") or meeting.get("session"))
+    return bool(
+        meeting.get("listening") or meeting.get("session") or _capture_finalize_busy(app)
+    )
 
 
 _MIC_NAME_SKIP = ("disabled", "unavailable", "disconnected", "not plugged", "not present")
@@ -1647,11 +1665,15 @@ def _handle_live_chunk(
     job_id = state.get("job_id")
     if job_id is None:
         return
+    jid = int(job_id)
+    run_id = job_run_id(db, jid)
+    if not job_run_active(db, jid, run_id):
+        return
     selected = _selected_model()
     if selected is not None and selected.backend == "cli":
         hint = MEETING_CLI_HINT if state.get("kind") == "meeting" else LIVE_CLI_HINT
         state["error"] = hint
-        db.set_error(job_id, hint)
+        db.set_error(jid, hint)
         return
     if selected is not None and selected.backend in {"openrouter", "custom", "http"}:
         fd, tmp = tempfile.mkstemp(prefix="gigaam_live_", suffix=".wav")
@@ -1668,11 +1690,11 @@ def _handle_live_chunk(
                 duration_ms=duration_ms,
             )
             _append_live_segments(
-                app, db, job_id, offset_segments(segs, chunk_start_seconds=offset)
+                app, db, jid, offset_segments(segs, chunk_start_seconds=offset)
             )
         except Exception as exc:
             state["error"] = str(exc)
-            db.set_error(job_id, str(exc))
+            db.set_error(jid, str(exc))
         finally:
             try:
                 os.remove(tmp)
@@ -1683,15 +1705,20 @@ def _handle_live_chunk(
     if not url:
         hint = str(state.get("error") or "").strip() or "Движок расшифровки недоступен."
         state["error"] = hint
-        db.set_error(job_id, hint)
+        db.set_error(jid, hint)
         return
     try:
         payload = transcribe_chunk(url, np.asarray(pcm, dtype=np.float32).tolist())
         segs = offset_segments(_segments_from_engine(payload), offset)
-        _append_live_segments(app, db, job_id, segs)
+        _append_live_segments(app, db, jid, segs)
+    except EngineError as exc:
+        if "cancel" in str(exc).lower():
+            return
+        state["error"] = str(exc)
+        db.set_error(jid, str(exc))
     except Exception as exc:
         state["error"] = str(exc)
-        db.set_error(job_id, str(exc))
+        db.set_error(jid, str(exc))
 
 
 def _collect_pcm_for_asr(session: LiveSession, *, finalize: bool) -> list[np.ndarray]:
@@ -1735,15 +1762,33 @@ def _run_capture_finalize(
     pcm_chunks: list[np.ndarray],
 ) -> None:
     threads: dict = getattr(app.state, "capture_finalize_threads", None) or {}
+    coord: AsrCoordinator = app.state.asr_coordinator
+    uses_local = _capture_finalize_uses_local_engine(app)
+    if uses_local and not coord.begin_local_wait(job_id, timeout_s=300.0):
+        db.set_error(job_id, "Не удалось дождаться локального движка для завершения записи.")
+        db.set_status(job_id, JobStatus.FAILED)
+        threads.pop(job_id, None)
+        return
+    run_id = job_run_id(db, job_id)
     try:
         for pcm in pcm_chunks:
+            if not job_run_active(db, job_id, run_id):
+                break
             _handle_live_chunk(app, db, pcm, capture_state=asr_state)
-        _finalize_capture_job(db, asr_state, job_id)
+        if job_run_active(db, job_id, run_id):
+            _finalize_capture_job(db, asr_state, job_id)
+        elif (db.get_job(job_id) or {}).get("status") == JobStatus.CANCELLED.value:
+            pass
+        else:
+            db.set_status(job_id, JobStatus.CANCELLED)
     except Exception:
         logging.exception("capture finalize failed for job %s", job_id)
         db.set_error(job_id, "Не удалось завершить расшифровку записи.")
         db.set_status(job_id, JobStatus.FAILED)
     finally:
+        if uses_local:
+            coord.end_local(job_id)
+            _pump_asr_queues(app, db)
         threads.pop(job_id, None)
 
 
