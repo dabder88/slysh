@@ -64,18 +64,21 @@ function syncLiveTranscriptFromSegments(segments, { force = false } = {}) {
   }
 }
 
-function syncLiveTranscriptWait({ sessionActive, segments, jobStatus }) {
+function syncLiveTranscriptWait({ sessionActive, segments, jobStatus, captureFinalizing }) {
   const wait = document.getElementById("live-transcript-wait");
   if (!wait) {
     return;
   }
   const hasText = hasLiveTranscriptText(segments);
+  const finalizing = Boolean(captureFinalizing);
   if (hasText) {
     liveAwaitingTranscript = false;
-  } else if (jobStatus === "completed" || jobStatus === "failed") {
+  } else if ((jobStatus === "completed" || jobStatus === "failed") && !finalizing) {
     liveAwaitingTranscript = false;
+  } else if (finalizing) {
+    liveAwaitingTranscript = true;
   }
-  const show = !hasText && (Boolean(sessionActive) || liveAwaitingTranscript);
+  const show = !hasText && (Boolean(sessionActive) || liveAwaitingTranscript || finalizing);
   wait.hidden = !show;
 }
 
@@ -291,15 +294,17 @@ async function pollLive() {
   const jobId = status.job_id || liveJobId;
   let jobStatus = "";
   let segments = [];
+  let captureFinalizing = Boolean(status.capture_finalizing);
   if (jobId) {
     liveJobId = jobId;
     const job = await api(`/api/jobs/${jobId}`);
     jobStatus = job.status || "";
+    captureFinalizing = captureFinalizing || Boolean(job.capture_finalizing);
     segments = Array.isArray(status.segments) ? status.segments : job.segments || [];
     syncLiveTranscriptFromSegments(segments);
     syncLivePostActions({ listening, sessionActive, segments, jobStatus });
     syncLiveClearBar({ sessionActive, segments });
-    syncLiveTranscriptWait({ sessionActive, segments, jobStatus });
+    syncLiveTranscriptWait({ sessionActive, segments, jobStatus, captureFinalizing });
   } else {
     liveJobId = null;
     if (!liveEditDirty) {
@@ -307,9 +312,9 @@ async function pollLive() {
     }
     syncLivePostActions({ listening, sessionActive, segments: [], jobStatus: "" });
     syncLiveClearBar({ sessionActive, segments: [] });
-    syncLiveTranscriptWait({ sessionActive, segments: [], jobStatus: "" });
+    syncLiveTranscriptWait({ sessionActive, segments: [], jobStatus: "", captureFinalizing: false });
   }
-  if (!sessionActive && livePollTimer && !liveAwaitingTranscript) {
+  if (!sessionActive && livePollTimer && !liveAwaitingTranscript && !captureFinalizing) {
     clearInterval(livePollTimer);
     livePollTimer = null;
   }

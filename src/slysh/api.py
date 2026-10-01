@@ -620,6 +620,12 @@ def _ensure_engine_url(app: FastAPI) -> str:
     return url
 
 
+def _capture_finalize_active(app: FastAPI, job_id: int) -> bool:
+    threads: dict = getattr(app.state, "capture_finalize_threads", None) or {}
+    thread = threads.get(int(job_id))
+    return thread is not None and thread.is_alive()
+
+
 def _decorate_job(
     app: FastAPI,
     job: dict,
@@ -628,6 +634,7 @@ def _decorate_job(
     enrich_youtube: bool = False,
 ) -> dict:
     payload = dict(job)
+    payload["capture_finalizing"] = _capture_finalize_active(app, int(job["id"]))
     running = getattr(app.state, "speaker_jobs", {})
     errors = getattr(app.state, "speaker_errors", {})
     started = getattr(app.state, "speaker_started", {})
@@ -1458,6 +1465,7 @@ def _live_status_payload(app: FastAPI, db: Database, state: dict) -> dict:
     job_id = state.get("job_id")
     if job_id is not None:
         jid = int(job_id)
+        payload["capture_finalizing"] = _capture_finalize_active(app, jid)
         segs = db.list_segments(jid)
         payload["segments"] = _segments_payload(
             segs, speaker_names=db.list_speaker_names(jid)
@@ -1526,6 +1534,7 @@ def _meeting_status_payload(app: FastAPI, db: Database, state: dict) -> dict:
     job_id = state.get("job_id")
     if job_id is not None:
         jid = int(job_id)
+        payload["capture_finalizing"] = _capture_finalize_active(app, jid)
         segs = db.list_segments(jid)
         payload["segments"] = _segments_payload(
             segs, speaker_names=db.list_speaker_names(jid)
@@ -2220,6 +2229,11 @@ def create_ui_app(
     @app.post("/api/jobs/{job_id}/retranscribe")
     def retranscribe(job_id: int, body: JobTranscribeBody = JobTranscribeBody()) -> dict:
         job = _require_job(db, job_id)
+        if _capture_finalize_active(app, job_id):
+            raise HTTPException(
+                status_code=409,
+                detail="Дождитесь завершения обработки записи.",
+            )
         if _is_youtube_job(job):
             method, language = load_job_ingest_meta(job_id, db=db)
             db.begin_transcription(job_id)

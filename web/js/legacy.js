@@ -986,6 +986,7 @@ function syncTranscribeUi(job) {
     job &&
       (job.status === "queued" ||
         job.status === "running" ||
+        job.capture_finalizing ||
         job.speakers_running ||
         job.engine_starting)
   );
@@ -1014,7 +1015,9 @@ function syncTranscribeUi(job) {
     }
   }
   if (retranscribeBtn) {
-    retranscribeBtn.hidden = !completed || youtube;
+    const failed = job?.status === "failed";
+    const canRetranscribe = (completed || failed) && !youtube && !job?.capture_finalizing;
+    retranscribeBtn.hidden = !canRetranscribe;
   }
   if (topTranscribe) {
     topTranscribe.hidden = !inEditor;
