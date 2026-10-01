@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import sqlite3
 import threading
@@ -137,6 +138,118 @@ class Database:
             )
             """
         )
+        self._conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS job_youtube_meta (
+              job_id INTEGER PRIMARY KEY,
+              method TEXT NOT NULL DEFAULT 'ytdlp',
+              language TEXT NOT NULL DEFAULT 'ru',
+              video_json TEXT NOT NULL DEFAULT '{}',
+              FOREIGN KEY(job_id) REFERENCES jobs(id) ON DELETE CASCADE
+            )
+            """
+        )
+        self._migrate_youtube_meta_from_file()
+
+    def _migrate_youtube_meta_from_file(self) -> None:
+        from slysh.paths import youtube_dir
+
+        path = youtube_dir() / "job-meta.json"
+        if not path.is_file():
+            return
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            logging.warning("skip youtube meta file migration: unreadable %s", path)
+            return
+        if not isinstance(raw, dict):
+            return
+        for key, entry in raw.items():
+            if not isinstance(entry, dict):
+                continue
+            try:
+                job_id = int(key)
+            except (TypeError, ValueError):
+                continue
+            if self.get_job(job_id) is None:
+                continue
+            method = str(entry.get("method") or "ytdlp").strip().lower()
+            if method not in {"apify", "ytdlp"}:
+                method = "ytdlp"
+            language = str(entry.get("language") or "ru").strip() or "ru"
+            video = entry.get("video")
+            video_dict = dict(video) if isinstance(video, dict) else {}
+            self.upsert_job_youtube_meta(job_id, method, language, video_dict)
+        backup = path.with_name("job-meta.json.bak-migrated")
+        try:
+            if backup.is_file():
+                backup.unlink()
+            path.rename(backup)
+        except OSError:
+            logging.warning("could not archive migrated youtube meta file %s", path)
+
+    @_locked
+    def get_job_youtube_meta(self, job_id: int) -> dict | None:
+        row = self._conn.execute(
+            """
+            SELECT method, language, video_json
+            FROM job_youtube_meta
+            WHERE job_id = ?
+            """,
+            (job_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        try:
+            video = json.loads(row["video_json"] or "{}")
+        except json.JSONDecodeError:
+            video = {}
+        if not isinstance(video, dict):
+            video = {}
+        return {
+            "method": str(row["method"] or "ytdlp"),
+            "language": str(row["language"] or "ru"),
+            "video": video,
+        }
+
+    @_locked
+    def upsert_job_youtube_meta(
+        self,
+        job_id: int,
+        method: str,
+        language: str,
+        video: dict | None = None,
+    ) -> None:
+        existing = self.get_job_youtube_meta(job_id) or {}
+        method_value = str(method or existing.get("method") or "ytdlp").strip().lower()
+        if method_value not in {"apify", "ytdlp"}:
+            method_value = "ytdlp"
+        language_value = str(language or existing.get("language") or "ru").strip() or "ru"
+        if video is None:
+            video_payload = dict(existing.get("video") or {})
+        else:
+            video_payload = dict(video)
+        payload = json.dumps(video_payload, ensure_ascii=False)
+        self._conn.execute(
+            """
+            INSERT INTO job_youtube_meta (job_id, method, language, video_json)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(job_id) DO UPDATE SET
+              method = excluded.method,
+              language = excluded.language,
+              video_json = excluded.video_json
+            """,
+            (job_id, method_value, language_value, payload),
+        )
+        self._conn.commit()
+
+    @_locked
+    def delete_job_youtube_meta(self, job_id: int) -> None:
+        self._conn.execute(
+            "DELETE FROM job_youtube_meta WHERE job_id = ?",
+            (job_id,),
+        )
+        self._conn.commit()
 
     @_locked
     def create_batch(self, name: str, rules: dict | None = None) -> int:

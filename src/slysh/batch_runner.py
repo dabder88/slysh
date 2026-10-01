@@ -96,8 +96,8 @@ def _export_batch_job(
     for target_rules in targets:
         if is_youtube_batch_rules(target_rules) or str(job.get("kind") or "") == JobKind.YOUTUBE.value:
             out = youtube_job_export_path(job, fmt, target_rules)
-            video = load_job_youtube_video(job_id) or {}
-            _, language = load_job_ingest_meta(job_id)
+            video = load_job_youtube_video(job_id, db=db) or {}
+            _, language = load_job_ingest_meta(job_id, db=db)
             meta = youtube_export_meta_from_job(job, video, language)
             write_job_export(out, segments, fmt, youtube_meta=meta)
         else:
@@ -136,7 +136,7 @@ def _run_youtube_batch_job(
     url = str(job.get("source_path") or "")
     method = str(rules.get("youtube_method") or "apify")
     language = str(rules.get("youtube_language") or "ru")
-    save_job_ingest_meta(job_id, method, language)  # type: ignore[arg-type]
+    save_job_ingest_meta(job_id, method, language, db=db)  # type: ignore[arg-type]
 
     cancel_event = threading.Event()
     app.state.youtube_cancels[job_id] = cancel_event

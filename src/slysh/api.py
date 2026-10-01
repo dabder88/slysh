@@ -697,8 +697,8 @@ def _write_job_export_file(db: Database, job: dict, out: Path, fmt: str) -> None
     job_id = int(job["id"])
     segments = _display_segments(db, job_id, db.list_segments(job_id))
     if _is_youtube_job(job):
-        video = load_job_youtube_video(job_id) or {}
-        _, language = load_job_ingest_meta(job_id)
+        video = load_job_youtube_video(job_id, db=db) or {}
+        _, language = load_job_ingest_meta(job_id, db=db)
         meta = youtube_export_meta_from_job(job, video, language)
         write_job_export(out, segments, fmt, youtube_meta=meta)
     else:
@@ -1328,12 +1328,12 @@ def _start_youtube_job(
     method: str | None = None,
     language: str | None = None,
 ) -> None:
-    resolved_method, resolved_language = load_job_ingest_meta(job_id)
+    resolved_method, resolved_language = load_job_ingest_meta(job_id, db=db)
     if method:
         resolved_method = method
     if language:
         resolved_language = language
-    save_job_ingest_meta(job_id, resolved_method, resolved_language)
+    save_job_ingest_meta(job_id, resolved_method, resolved_language, db=db)
 
     def boot() -> None:
         _run_youtube_job(
@@ -2083,7 +2083,7 @@ def create_ui_app(
     def retranscribe(job_id: int, body: JobTranscribeBody = JobTranscribeBody()) -> dict:
         job = _require_job(db, job_id)
         if _is_youtube_job(job):
-            method, language = load_job_ingest_meta(job_id)
+            method, language = load_job_ingest_meta(job_id, db=db)
             db.begin_transcription(job_id)
             _start_youtube_job(app, db, job_id, job["source_path"], method, language)
             return _decorate_job(app, _job_payload(_require_job(db, job_id)))
@@ -2105,7 +2105,7 @@ def create_ui_app(
         if job["status"] in (JobStatus.RUNNING.value, JobStatus.QUEUED.value):
             return _decorate_job(app, _job_payload(job))
         if _is_youtube_job(job):
-            method, language = load_job_ingest_meta(job_id)
+            method, language = load_job_ingest_meta(job_id, db=db)
             db.begin_transcription(job_id)
             _start_youtube_job(app, db, job_id, job["source_path"], method, language)
             return _decorate_job(app, _job_payload(_require_job(db, job_id)))
@@ -2127,7 +2127,7 @@ def create_ui_app(
         if job_id in getattr(app.state, "speaker_jobs", {}):
             app.state.speaker_jobs.pop(job_id, None)
         app.state.speaker_errors.pop(job_id, None)
-        delete_job_ingest_meta(job_id)
+        delete_job_ingest_meta(job_id, db=db)
         if not db.delete_job(job_id):
             raise HTTPException(status_code=404, detail="job not found")
         return {"ok": True}
@@ -3027,7 +3027,7 @@ def create_ui_app(
         except YoutubeIngestError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         job_id = db.create_job(JobKind.YOUTUBE, url)
-        save_job_ingest_meta(job_id, method, language)
+        save_job_ingest_meta(job_id, method, language, db=db)
         db.begin_transcription(job_id)
         _start_youtube_job(app, db, job_id, url, method, language)
         return _decorate_job(app, _job_payload(_require_job(db, job_id)))

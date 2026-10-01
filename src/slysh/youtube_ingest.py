@@ -31,7 +31,8 @@ from slysh.youtube_ytdlp import (
 YoutubeMethod = Literal["apify", "ytdlp"]
 
 _VIDEO_ID_RE = re.compile(r"^[A-Za-z0-9_-]{11}$")
-_JOB_META_NAME = "job-meta.json"
+_meta_db: object | None = None
+_meta_db_lock = threading.Lock()
 
 
 class YoutubeIngestError(Exception):
@@ -75,12 +76,26 @@ def youtube_video_meta(result: YoutubeTranscriptResult) -> dict:
     }
 
 
-def load_job_youtube_video(job_id: int) -> dict | None:
-    store = _read_job_meta_store()
-    raw = store.get(str(job_id))
-    if not isinstance(raw, dict):
+def _meta_database():
+    global _meta_db
+    with _meta_db_lock:
+        if _meta_db is None:
+            from slysh.db import Database
+            from slysh.paths import db_path
+
+            _meta_db = Database(db_path())
+        return _meta_db
+
+
+def _resolve_meta_db(db=None):
+    return db if db is not None else _meta_database()
+
+
+def load_job_youtube_video(job_id: int, *, db=None) -> dict | None:
+    row = _resolve_meta_db(db).get_job_youtube_meta(job_id)
+    if not row:
         return None
-    video = raw.get("video")
+    video = row.get("video")
     return dict(video) if isinstance(video, dict) else None
 
 
@@ -142,66 +157,37 @@ def attach_youtube_video(
     job["youtube"] = video
 
 
-def _job_meta_path() -> Path:
-    return youtube_dir() / _JOB_META_NAME
-
-
-def _read_job_meta_store() -> dict:
-    path = _job_meta_path()
-    if not path.is_file():
-        return {}
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return {}
-    return data if isinstance(data, dict) else {}
-
-
-def _write_job_meta_store(store: dict) -> None:
-    _job_meta_path().write_text(
-        json.dumps(store, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
-
-
 def save_job_ingest_meta(
     job_id: int,
     method: YoutubeMethod,
     language: str,
     video: dict | None = None,
+    *,
+    db=None,
 ) -> None:
-    store = _read_job_meta_store()
-    entry = store.get(str(job_id))
-    if not isinstance(entry, dict):
-        entry = {}
-    entry["method"] = method
-    entry["language"] = language or "ru"
-    if video is not None:
-        entry["video"] = video
-    store[str(job_id)] = entry
-    _write_job_meta_store(store)
+    database = _resolve_meta_db(db)
+    existing = database.get_job_youtube_meta(job_id) or {}
+    if video is None:
+        video_payload = dict(existing.get("video") or {})
+    else:
+        video_payload = dict(video)
+    database.upsert_job_youtube_meta(job_id, method, language or "ru", video_payload)
 
 
-def load_job_ingest_meta(job_id: int) -> tuple[YoutubeMethod, str]:
-    store = _read_job_meta_store()
-    raw = store.get(str(job_id))
-    if not isinstance(raw, dict):
+def load_job_ingest_meta(job_id: int, *, db=None) -> tuple[YoutubeMethod, str]:
+    row = _resolve_meta_db(db).get_job_youtube_meta(job_id)
+    if not row:
         method: YoutubeMethod = "apify" if apify_api_key() else "ytdlp"
         return method, "ru"
-    method_value = str(raw.get("method") or "apify").strip().lower()
+    method_value = str(row.get("method") or "apify").strip().lower()
     if method_value not in {"apify", "ytdlp"}:
         method_value = "apify"
-    language = str(raw.get("language") or "ru").strip() or "ru"
+    language = str(row.get("language") or "ru").strip() or "ru"
     return method_value, language
 
 
-def delete_job_ingest_meta(job_id: int) -> None:
-    store = _read_job_meta_store()
-    key = str(job_id)
-    if key not in store:
-        return
-    store.pop(key, None)
-    _write_job_meta_store(store)
+def delete_job_ingest_meta(job_id: int, *, db=None) -> None:
+    _resolve_meta_db(db).delete_job_youtube_meta(job_id)
 
 
 def load_youtube_audio_path(job_id: int) -> Path | None:
@@ -215,19 +201,11 @@ def load_youtube_audio_path(job_id: int) -> Path | None:
     return path if is_usable_audio_file(path) else None
 
 
-def save_youtube_audio_path(job_id: int, audio_path: Path) -> None:
-    store = _read_job_meta_store()
-    entry = store.get(str(job_id))
-    if not isinstance(entry, dict):
-        entry = {}
-    video = entry.get("video")
-    if not isinstance(video, dict):
-        video = load_job_youtube_video(job_id) or {}
-    video = dict(video)
+def save_youtube_audio_path(job_id: int, audio_path: Path, *, db=None) -> None:
+    method, language = load_job_ingest_meta(job_id, db=db)
+    video = dict(load_job_youtube_video(job_id, db=db) or {})
     video["audio_path"] = str(audio_path)
-    entry["video"] = video
-    store[str(job_id)] = entry
-    _write_job_meta_store(store)
+    save_job_ingest_meta(job_id, method, language, video, db=db)
 
 
 def ensure_youtube_audio(
@@ -474,6 +452,7 @@ def run_youtube_job(
         method,
         language,
         youtube_video_meta(result),
+        db=db,
     )
     report(0.95)
     report(1.0)
