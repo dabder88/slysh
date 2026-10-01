@@ -371,6 +371,7 @@ LIVE_NOT_ACTIVE_HINT = "Диктофон не запущен."
 LIVE_ALREADY_PAUSED_HINT = "Диктофон уже на паузе."
 LIVE_NOT_PAUSED_HINT = "Диктофон не на паузе."
 LIVE_ALREADY_HINT = "Диктофон уже записывает."
+CAPTURE_FINALIZING_HINT = "Дождитесь завершения расшифровки записи."
 
 
 def _parse_last_export_paths(job: dict) -> list[str]:
@@ -1567,6 +1568,11 @@ def _capture_finalize_uses_local_engine(app: FastAPI) -> bool:
     return selected.backend not in REMOTE_BACKENDS
 
 
+def _capture_finalize_uses_remote_engine(app: FastAPI) -> bool:
+    selected = _selected_model()
+    return selected is not None and selected.backend in REMOTE_BACKENDS
+
+
 def _live_is_busy(app: FastAPI) -> bool:
     live = app.state.live
     return bool(live.get("listening") or live.get("session") or _capture_finalize_busy(app))
@@ -1764,11 +1770,19 @@ def _run_capture_finalize(
     threads: dict = getattr(app.state, "capture_finalize_threads", None) or {}
     coord: AsrCoordinator = app.state.asr_coordinator
     uses_local = _capture_finalize_uses_local_engine(app)
-    if uses_local and not coord.begin_local_wait(job_id, timeout_s=300.0):
-        db.set_error(job_id, "Не удалось дождаться локального движка для завершения записи.")
-        db.set_status(job_id, JobStatus.FAILED)
-        threads.pop(job_id, None)
-        return
+    uses_remote = _capture_finalize_uses_remote_engine(app)
+    if uses_local:
+        if not coord.begin_local_wait(job_id, timeout_s=300.0):
+            db.set_error(job_id, "Не удалось дождаться локального движка для завершения записи.")
+            db.set_status(job_id, JobStatus.FAILED)
+            threads.pop(job_id, None)
+            return
+    elif uses_remote:
+        if not coord.begin_remote_wait(job_id, timeout_s=300.0):
+            db.set_error(job_id, "Не удалось дождаться облачного исполнителя для завершения записи.")
+            db.set_status(job_id, JobStatus.FAILED)
+            threads.pop(job_id, None)
+            return
     run_id = job_run_id(db, job_id)
     try:
         for pcm in pcm_chunks:
@@ -1788,6 +1802,9 @@ def _run_capture_finalize(
     finally:
         if uses_local:
             coord.end_local(job_id)
+        elif uses_remote:
+            coord.end_remote(job_id)
+        if uses_local or uses_remote:
             _pump_asr_queues(app, db)
         threads.pop(job_id, None)
 
@@ -2338,7 +2355,11 @@ def create_ui_app(
             queue.cancel(job_id)
         url = getattr(app.state, "engine_url", None)
         coord: AsrCoordinator = app.state.asr_coordinator
-        if url and job["status"] == JobStatus.RUNNING.value and coord.local_job_id() == job_id:
+        finalize_threads: dict = getattr(app.state, "capture_finalize_threads", None) or {}
+        fin_thread = finalize_threads.get(job_id)
+        on_local = coord.local_job_id() == job_id
+        on_finalize = fin_thread is not None and fin_thread.is_alive()
+        if url and job["status"] == JobStatus.RUNNING.value and (on_local or on_finalize):
             try:
                 engine_cancel(url)
             except Exception:
@@ -2850,10 +2871,12 @@ def create_ui_app(
     @app.post("/api/live/start")
     def live_start(body: LiveStartBody | None = None) -> dict:
         body = body or LiveStartBody()
-        if _meeting_is_busy(app):
+        if _meeting_session_active(app.state.meeting):
             raise HTTPException(status_code=400, detail=MEETING_BUSY_HINT)
         if _live_session_active(app.state.live):
             raise HTTPException(status_code=400, detail=LIVE_ALREADY_HINT)
+        if _capture_finalize_busy(app):
+            raise HTTPException(status_code=400, detail=CAPTURE_FINALIZING_HINT)
         selected = _selected_model()
         if selected is not None and selected.backend == "cli":
             raise HTTPException(status_code=400, detail=LIVE_CLI_HINT)
@@ -3022,10 +3045,12 @@ def create_ui_app(
     @app.post("/api/meeting/start")
     def meeting_start(body: MeetingStartBody | None = None) -> dict:
         body = body or MeetingStartBody()
-        if _live_is_busy(app):
+        if _live_session_active(app.state.live):
             raise HTTPException(status_code=400, detail=LIVE_BUSY_HINT)
-        if _meeting_is_busy(app):
+        if _meeting_session_active(app.state.meeting):
             raise HTTPException(status_code=400, detail=MEETING_ALREADY_HINT)
+        if _capture_finalize_busy(app):
+            raise HTTPException(status_code=400, detail=CAPTURE_FINALIZING_HINT)
         selected = _selected_model()
         if selected is not None and selected.backend == "cli":
             raise HTTPException(status_code=400, detail=MEETING_CLI_HINT)
