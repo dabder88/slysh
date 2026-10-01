@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib
 import json
 import logging
+from collections.abc import Callable
 from contextlib import asynccontextmanager
 import os
 import secrets
@@ -982,6 +983,13 @@ def _stop_engine(app: FastAPI) -> None:
 
 def shutdown_ui_runtime(app: FastAPI) -> None:
     """Stop child processes owned by the UI (engine, yt-dlp helpers, etc.)."""
+    finalize_threads: dict = getattr(app.state, "capture_finalize_threads", None) or {}
+    for job_id, thread in list(finalize_threads.items()):
+        if thread is not None and thread.is_alive():
+            thread.join(timeout=15.0)
+            if thread.is_alive():
+                logging.warning("capture finalize still running for job %s on shutdown", job_id)
+        finalize_threads.pop(job_id, None)
     procs: dict = getattr(app.state, "speaker_ytdlp_procs", None) or {}
     for job_id, proc in list(procs.items()):
         if proc is not None and proc.poll() is None:
@@ -1607,7 +1615,7 @@ def _ensure_engine_for_live(app: FastAPI) -> str | None:
     return getattr(app.state, "engine_url", None)
 
 
-_LIVE_WORKER_JOIN_TIMEOUT_S = 600.0
+_LIVE_CAPTURE_DRAIN_TIMEOUT_S = 30.0
 
 
 def _append_live_segments(app: FastAPI, db: Database, job_id: int, segments: list[Segment]) -> None:
@@ -1617,8 +1625,14 @@ def _append_live_segments(app: FastAPI, db: Database, job_id: int, segments: lis
         db.append_segments(job_id, segments)
 
 
-def _handle_live_chunk(app: FastAPI, db: Database, pcm: np.ndarray) -> None:
-    state = _active_capture_state(app)
+def _handle_live_chunk(
+    app: FastAPI,
+    db: Database,
+    pcm: np.ndarray,
+    *,
+    capture_state: dict | None = None,
+) -> None:
+    state = capture_state if capture_state is not None else _active_capture_state(app)
     offset = int(state["chunk_start_seconds"])
     state["chunk_start_seconds"] = offset + (len(pcm) // SAMPLE_RATE)
     job_id = state.get("job_id")
@@ -1671,6 +1685,17 @@ def _handle_live_chunk(app: FastAPI, db: Database, pcm: np.ndarray) -> None:
         db.set_error(job_id, str(exc))
 
 
+def _collect_pcm_for_asr(session: LiveSession, *, finalize: bool) -> list[np.ndarray]:
+    chunks: list[np.ndarray] = list(session.take_ready_chunks())
+    if finalize:
+        tail = session.flush()
+    else:
+        tail = session.take_pending_tail()
+    if tail is not None:
+        chunks.append(tail)
+    return chunks
+
+
 def _drain_live_session(
     app: FastAPI, db: Database, session: LiveSession, *, finalize: bool
 ) -> None:
@@ -1682,6 +1707,86 @@ def _drain_live_session(
         tail = session.take_pending_tail()
     if tail is not None:
         _handle_live_chunk(app, db, tail)
+
+
+def _capture_asr_snapshot(state: dict) -> dict:
+    return {
+        "chunk_start_seconds": int(state.get("chunk_start_seconds") or 0),
+        "job_id": state.get("job_id"),
+        "kind": state.get("kind") or "live",
+        "error": state.get("error"),
+    }
+
+
+def _run_capture_finalize(
+    app: FastAPI,
+    db: Database,
+    job_id: int,
+    asr_state: dict,
+    pcm_chunks: list[np.ndarray],
+) -> None:
+    threads: dict = getattr(app.state, "capture_finalize_threads", None) or {}
+    try:
+        for pcm in pcm_chunks:
+            _handle_live_chunk(app, db, pcm, capture_state=asr_state)
+        _finalize_capture_job(db, asr_state, job_id)
+    except Exception:
+        logging.exception("capture finalize failed for job %s", job_id)
+        db.set_error(job_id, "Не удалось завершить расшифровку записи.")
+        db.set_status(job_id, JobStatus.FAILED)
+    finally:
+        threads.pop(job_id, None)
+
+
+def _start_capture_finalize(
+    app: FastAPI,
+    db: Database,
+    job_id: int,
+    asr_state: dict,
+    pcm_chunks: list[np.ndarray],
+) -> threading.Thread | None:
+    if not pcm_chunks:
+        _finalize_capture_job(db, asr_state, job_id)
+        return None
+    if not hasattr(app.state, "capture_finalize_threads"):
+        app.state.capture_finalize_threads = {}
+    thread = threading.Thread(
+        target=_run_capture_finalize,
+        args=(app, db, job_id, asr_state, pcm_chunks),
+        name=f"capture-finalize-{job_id}",
+        daemon=True,
+    )
+    app.state.capture_finalize_threads[job_id] = thread
+    thread.start()
+    return thread
+
+
+def _complete_capture_stop(
+    app: FastAPI,
+    db: Database,
+    state: dict,
+    *,
+    screen: str,
+    reset_state: Callable[[], None],
+) -> dict | None:
+    """Stop capture hardware, drain audio only, finalize ASR in background when needed."""
+    job_id = state.get("job_id")
+    pcm_chunks = list(state.pop("_finalize_pcm", None) or [])
+    asr_state = _capture_asr_snapshot(state)
+    err = str(state.get("error") or "").strip()
+    if err:
+        asr_state["error"] = err
+    reset_state()
+    if job_id is None:
+        return None
+    jid = int(job_id)
+    screen_state = app.state.live if screen == "live" else app.state.meeting
+    screen_state["job_id"] = jid
+    _start_capture_finalize(app, db, jid, asr_state, pcm_chunks)
+    names = db.list_speaker_names(jid)
+    payload = _job_payload(_require_job(db, jid))
+    payload["segments"] = _segments_payload(db.list_segments(jid), speaker_names=names)
+    return payload
 
 
 def _capture_ingest_overflowed(state: dict) -> bool:
@@ -1721,7 +1826,7 @@ def _live_worker(app: FastAPI, db: Database) -> None:
         for chunk in session.take_ready_chunks():
             _handle_live_chunk(app, db, chunk)
         if stop_event.is_set():
-            _drain_live_session(app, db, session, finalize=True)
+            state["_finalize_pcm"] = _collect_pcm_for_asr(session, finalize=True)
             break
         stop_event.wait(0.1)
 
@@ -2802,7 +2907,6 @@ def create_ui_app(
     @app.post("/api/live/stop")
     def live_stop() -> dict:
         state = app.state.live
-        job_id = state.get("job_id")
         state["listening"] = False
         state["paused"] = False
         state["paused_at"] = None
@@ -2811,17 +2915,16 @@ def create_ui_app(
         _stop_live_stream(app)
         thread = state.get("thread")
         if thread is not None:
-            thread.join(timeout=_LIVE_WORKER_JOIN_TIMEOUT_S)
+            thread.join(timeout=_LIVE_CAPTURE_DRAIN_TIMEOUT_S)
             state["thread"] = None
-        state["session"] = None
-        state["device_id"] = None
-        if job_id is not None:
-            _finalize_capture_job(db, state, job_id)
-            names = db.list_speaker_names(job_id)
-            payload = _job_payload(_require_job(db, job_id))
-            payload["segments"] = _segments_payload(
-                db.list_segments(job_id), speaker_names=names
-            )
+        payload = _complete_capture_stop(
+            app,
+            db,
+            state,
+            screen="live",
+            reset_state=lambda: setattr(app.state, "live", _empty_live_state()),
+        )
+        if payload is not None:
             return payload
         return {"ok": True}
 
@@ -2966,7 +3069,6 @@ def create_ui_app(
     @app.post("/api/meeting/stop")
     def meeting_stop() -> dict:
         state = app.state.meeting
-        job_id = state.get("job_id")
         state["listening"] = False
         state["paused"] = False
         state["paused_at"] = None
@@ -2981,16 +3083,16 @@ def create_ui_app(
             state["capture"] = None
         thread = state.get("thread")
         if thread is not None:
-            thread.join(timeout=_LIVE_WORKER_JOIN_TIMEOUT_S)
+            thread.join(timeout=_LIVE_CAPTURE_DRAIN_TIMEOUT_S)
             state["thread"] = None
-        state["session"] = None
-        if job_id is not None:
-            _finalize_capture_job(db, app.state.meeting, job_id)
-            names = db.list_speaker_names(job_id)
-            payload = _job_payload(_require_job(db, job_id))
-            payload["segments"] = _segments_payload(
-                db.list_segments(job_id), speaker_names=names
-            )
+        payload = _complete_capture_stop(
+            app,
+            db,
+            state,
+            screen="meeting",
+            reset_state=lambda: setattr(app.state, "meeting", _empty_meeting_state()),
+        )
+        if payload is not None:
             return payload
         return {"ok": True}
 
