@@ -641,7 +641,9 @@ def _decorate_job(
     duration = job_duration_s(payload)
     if duration is not None:
         payload["duration_s"] = round(duration, 1)
-    attach_youtube_video(payload, segments, enrich=enrich_youtube)
+    attach_youtube_video(
+        payload, segments, enrich=enrich_youtube, db=getattr(app.state, "db", None)
+    )
     return payload
 
 

@@ -3,6 +3,7 @@ import { reportError } from "./errors.js";
 import { navigate, getRoute, getEditorJobId } from "./router.js";
 import { ensureIntakeAllowed } from "./intake-duplicate.js";
 import { selectJob } from "./legacy.js";
+import { refreshEditorJob } from "./editor.js";
 import { localeDateTag, t } from "./i18n.js";
 import { bindSecretInput, readSecretForSave } from "./secret-field.js";
 
@@ -298,7 +299,8 @@ async function pollIngestJob(jobId) {
       if (statusEl) {
         statusEl.textContent = "";
       }
-      await selectJob(jobId);
+      const loaded = await selectJob(jobId);
+      refreshEditorJob(loaded);
     } else {
       navigate("editor", { jobId });
       if (statusEl) {
@@ -316,7 +318,8 @@ async function pollIngestJob(jobId) {
       if (statusEl) {
         statusEl.textContent = "";
       }
-      await selectJob(jobId);
+      const loaded = await selectJob(jobId);
+      refreshEditorJob(loaded);
     } else if (statusEl) {
       statusEl.textContent = job.error_text || t("youtube.k6715193");
     }
@@ -327,7 +330,8 @@ async function pollIngestJob(jobId) {
     if (statusEl) {
       statusEl.textContent = "";
     }
-    await selectJob(jobId);
+    const loaded = await selectJob(jobId);
+    refreshEditorJob(loaded);
     return;
   }
   if (statusEl) {
@@ -397,13 +401,21 @@ async function ingestYoutube() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url, method: ingestMethod(), language: "ru" }),
     });
+    const jobId = Number(job?.id);
+    if (!Number.isFinite(jobId)) {
+      showToast(t("youtube.k5705747"));
+      if (btn) {
+        btn.disabled = false;
+      }
+      return;
+    }
     if (statusEl) {
       statusEl.textContent = "";
     }
-    navigate("editor", { jobId: job.id });
+    navigate("editor", { jobId });
     stopIngestPoll();
     const runPoll = () =>
-      pollIngestJob(job.id).catch((err) => {
+      pollIngestJob(jobId).catch((err) => {
         stopIngestPoll();
         if (btn) {
           btn.disabled = false;

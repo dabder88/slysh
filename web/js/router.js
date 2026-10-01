@@ -15,6 +15,7 @@ const routes = {
 let currentRoute = "dashboard";
 let editorJobId = null;
 let legacyBatchId = null;
+let suppressNextHashChange = false;
 const listeners = new Set();
 const NAV_STACK_KEY = "nav-stack";
 
@@ -185,7 +186,9 @@ export function navigate(name, params = {}, options = {}) {
       applyRoute(parseHash());
       return;
     }
+    suppressNextHashChange = true;
     location.hash = next;
+    applyRoute(parseHash());
     return;
   }
   if (name === "package" && params.batchId != null) {
@@ -301,7 +304,13 @@ export function notifyCurrentRoute() {
 }
 
 export function initRouter() {
-  window.addEventListener("hashchange", () => applyRoute(parseHash()));
+  window.addEventListener("hashchange", () => {
+    if (suppressNextHashChange) {
+      suppressNextHashChange = false;
+      return;
+    }
+    applyRoute(parseHash());
+  });
 
   document.getElementById("btn-topbar-back")?.addEventListener("click", () => {
     navigateBack();

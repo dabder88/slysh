@@ -92,6 +92,14 @@ let pendingExportJobs = null;
 let exportTargetJobId = null;
 
 let selectedId = null;
+
+export function syncSelectedJobId(id) {
+  if (id !== selectedId) {
+    speakerKeys = [];
+  }
+  selectedId = id;
+}
+
 let segmentsRevision = 0;
 let pollTimer = null;
 let jobs = [];
@@ -375,6 +383,10 @@ function buildJobBannerProgressDom(job) {
     fill,
     track: bar,
   };
+}
+
+export function hideEditorJobBanner() {
+  syncJobBanner(null);
 }
 
 function syncJobBanner(job) {
@@ -899,10 +911,7 @@ function isEditingTranscript() {
 }
 
 async function selectJob(id) {
-  if (id !== selectedId) {
-    speakerKeys = [];
-  }
-  selectedId = id;
+  syncSelectedJobId(id);
   renderLibrary();
   const job = await api(`/api/jobs/${id}`);
   upsertJobInStore(job);
@@ -938,8 +947,18 @@ async function selectJob(id) {
 
 async function pollJobs() {
   await refreshLibrary();
-  if (selectedId != null) {
-    const job = await api(`/api/jobs/${selectedId}`);
+  let pollId = selectedId;
+  if (getRoute() === "editor") {
+    const editorId = getEditorJobId();
+    if (editorId != null) {
+      pollId = editorId;
+      if (selectedId !== editorId) {
+        syncSelectedJobId(editorId);
+      }
+    }
+  }
+  if (pollId != null) {
+    const job = await api(`/api/jobs/${pollId}`);
     if (!isEditingTranscript()) {
       renderTranscript(job.transcript || "");
     }

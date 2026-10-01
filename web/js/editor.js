@@ -11,6 +11,8 @@ import {
   refreshLibrary,
   syncExportActions,
   openBatchExportModal,
+  syncSelectedJobId,
+  hideEditorJobBanner,
 } from "./legacy.js";
 import {
   orderedSpeakerKeys,
@@ -831,7 +833,7 @@ function syncYoutubeSource(job) {
   }
 }
 
-function renderEditor(job) {
+function syncEditorChrome(job) {
   if (!job) {
     return;
   }
@@ -849,6 +851,51 @@ function renderEditor(job) {
   }
 
   syncYoutubeSource(job);
+}
+
+function resetEditorShell(jobId) {
+  currentJob = null;
+  hideEditorJobBanner();
+
+  const sourceName = document.getElementById("editor-source-name");
+  if (sourceName) {
+    sourceName.textContent = t("common.dash");
+  }
+
+  const titleEl = document.getElementById("topbar-title");
+  if (titleEl && getRoute() === "editor") {
+    titleEl.textContent = t("topbar.editor");
+  }
+
+  const container = document.getElementById("editor-segments");
+  if (container) {
+    container.replaceChildren();
+    const loading = document.createElement("p");
+    loading.className = "hint editor-empty";
+    loading.textContent = jobId != null ? t("common.transcribingProgress") : t("editor.k551014");
+    container.appendChild(loading);
+  }
+
+  syncYoutubeSource({
+    id: jobId ?? 0,
+    kind: "file",
+    source_path: "",
+    segments: [],
+    status: jobId != null ? "queued" : "idle",
+  });
+
+  renderBatchPanel(null);
+  const speakersPanel = document.getElementById("editor-speakers");
+  if (speakersPanel) {
+    speakersPanel.replaceChildren();
+  }
+}
+
+function renderEditor(job) {
+  if (!job) {
+    return;
+  }
+  syncEditorChrome(job);
 
   if (editorMode === "view" && !editorDraftDirty) {
     renderSegments(job);
@@ -871,6 +918,13 @@ function renderEditor(job) {
 
 export function editorCurrentJobId() {
   return currentJobId;
+}
+
+export function refreshEditorJob(job) {
+  if (!job || job.id !== currentJobId || getRoute() !== "editor") {
+    return;
+  }
+  renderEditor(job);
 }
 
 export function editorIsDraftDirty() {
@@ -932,12 +986,17 @@ export async function onEditorShow(jobId) {
   applyDefaultPlayerCollapse();
   setEditorMode("view");
   if (!jobId) {
-    renderSegments(null);
+    resetEditorShell(null);
     return;
   }
+  syncSelectedJobId(jobId);
+  resetEditorShell(jobId);
   try {
     await refreshLibrary();
     const job = await selectJob(jobId);
+    if (job.id !== currentJobId) {
+      return;
+    }
     if (restoreEditorDraft(job)) {
       setEditorMode("edit");
     } else {
@@ -946,6 +1005,7 @@ export async function onEditorShow(jobId) {
     renderEditor(job);
   } catch (err) {
     reportError(t("topbar.editor"), err);
+    resetEditorShell(jobId);
     const container = document.getElementById("editor-segments");
     if (container) {
       container.replaceChildren();
@@ -1176,7 +1236,7 @@ export function initEditor() {
     if (getRoute() !== "editor" || job.id !== currentJobId) {
       return;
     }
-    currentJob = job;
+    syncEditorChrome(job);
     if (editorMode === "view" && !editorDraftDirty) {
       renderSegments(job);
     }
@@ -1184,6 +1244,11 @@ export function initEditor() {
     syncSpeakersPanel();
     drawWaveform(job);
     updateTransport(job);
+    if (shouldPollEditorJob(job)) {
+      startEditorPoll();
+    } else {
+      stopEditorPoll();
+    }
   });
 
   bindPlayerControls();

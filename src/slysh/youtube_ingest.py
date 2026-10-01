@@ -122,6 +122,7 @@ def attach_youtube_video(
     segments: list | None = None,
     *,
     enrich: bool = False,
+    db=None,
 ) -> None:
     if str(job.get("kind") or "") != "youtube":
         return
@@ -131,7 +132,7 @@ def attach_youtube_video(
     )
 
     job_id = int(job["id"])
-    video = load_job_youtube_video(job_id) or fallback_youtube_video_from_job(job)
+    video = load_job_youtube_video(job_id, db=db) or fallback_youtube_video_from_job(job)
     if not video.get("chapters") and video.get("chapters_checked"):
         video.pop("chapters_checked", None)
     url = str(video.get("url") or job.get("source_path") or "").strip()
@@ -143,8 +144,8 @@ def attach_youtube_video(
                 enriched != video
                 or list(enriched.get("chapters") or []) != before_chapters
             ):
-                method, language = load_job_ingest_meta(job_id)
-                save_job_ingest_meta(job_id, method, language, enriched)
+                method, language = load_job_ingest_meta(job_id, db=db)
+                save_job_ingest_meta(job_id, method, language, enriched, db=db)
                 video = enriched
         except Exception:
             logging.exception("youtube metadata enrichment failed for job %s", job_id)
