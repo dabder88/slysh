@@ -3,8 +3,26 @@ $ErrorActionPreference = "Stop"
 
 $Root = Split-Path -Parent $PSScriptRoot
 $Payload = Join-Path $Root "dist\payload"
-$PayloadStaging = Join-Path $Root "dist\payload.staging"
 $PayloadPrev = Join-Path $Root "dist\payload.prev"
+$DistDir = Join-Path $Root "dist"
+
+function Remove-StalePayloadDir {
+    param([Parameter(Mandatory)][string]$Path)
+    if (-not (Test-Path -LiteralPath $Path)) {
+        return
+    }
+    try {
+        Remove-Item -LiteralPath $Path -Recurse -Force -ErrorAction Stop
+    } catch {
+        $leaf = Split-Path -Leaf $Path
+        $orphan = Join-Path (Split-Path -Parent $Path) ("$leaf.orphan-" + (Get-Date -Format "yyyyMMddHHmmss"))
+        Write-Warning "Cannot remove $Path ($($_.Exception.Message)); moving to $orphan"
+        if (Test-Path -LiteralPath $orphan) {
+            Remove-Item -LiteralPath $orphan -Recurse -Force -ErrorAction SilentlyContinue
+        }
+        Move-Item -LiteralPath $Path -Destination $orphan -Force -ErrorAction Stop
+    }
+}
 $UvVersion = "0.8.22"
 $UvAsset = "uv-x86_64-pc-windows-msvc.zip"
 $UvUrl = "https://github.com/astral-sh/uv/releases/download/$UvVersion/$UvAsset"
@@ -82,11 +100,18 @@ if (Test-Path -LiteralPath $LauncherScript) {
     }
 }
 
+# Fresh dir each run — do not delete a fixed payload.staging (uv.exe may still be locked).
+$PayloadStaging = Join-Path $DistDir ("payload.build-" + (Get-Date -Format "yyyyMMdd-HHmmss"))
+if (Test-Path -LiteralPath (Join-Path $DistDir "payload.staging")) {
+    Remove-StalePayloadDir (Join-Path $DistDir "payload.staging")
+}
+Get-ChildItem -LiteralPath $DistDir -Directory -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -like "payload.build-*" -or $_.Name -like "payload.staging.orphan-*" } |
+    Where-Object { $_.LastWriteTime -lt (Get-Date).AddHours(-6) } |
+    ForEach-Object { Remove-StalePayloadDir $_.FullName }
+
 Write-Host "Building installer payload (staging: $PayloadStaging)"
 
-if (Test-Path -LiteralPath $PayloadStaging) {
-    Remove-Item -LiteralPath $PayloadStaging -Recurse -Force
-}
 New-Item -ItemType Directory -Path $PayloadStaging -Force | Out-Null
 New-Item -ItemType Directory -Path (Join-Path $PayloadStaging "bin") -Force | Out-Null
 New-Item -ItemType Directory -Path (Join-Path $PayloadStaging "models") -Force | Out-Null
@@ -273,7 +298,8 @@ $Payload = $PayloadFinal
 $pyvenvCfg = Join-Path $PayloadFinal ".venv\pyvenv.cfg"
 if (Test-Path -LiteralPath $pyvenvCfg) {
     $cfgText = Get-Content -LiteralPath $pyvenvCfg -Encoding UTF8
-    $stagingSeg = [regex]::Escape("payload.staging")
+    $stagingLeaf = Split-Path $PayloadStaging -Leaf
+    $stagingSeg = [regex]::Escape($stagingLeaf)
     $cfgFixed = $cfgText | ForEach-Object { $_ -replace $stagingSeg, "payload" }
     $utf8NoBom = New-Object System.Text.UTF8Encoding $false
     [System.IO.File]::WriteAllLines($pyvenvCfg, $cfgFixed, $utf8NoBom)
@@ -283,8 +309,9 @@ if (Test-Path -LiteralPath $sitePackages) {
     $utf8NoBom = New-Object System.Text.UTF8Encoding $false
     Get-ChildItem -LiteralPath $sitePackages -Filter "*.pth" -File | ForEach-Object {
         $pthText = [System.IO.File]::ReadAllText($_.FullName)
-        if ($pthText -match "payload\.staging") {
-            $pthFixed = $pthText -replace "payload\.staging", "payload"
+        $stagingLeaf = Split-Path $PayloadStaging -Leaf
+        if ($pthText -match [regex]::Escape($stagingLeaf)) {
+            $pthFixed = $pthText -replace [regex]::Escape($stagingLeaf), "payload"
             [System.IO.File]::WriteAllText($_.FullName, $pthFixed, $utf8NoBom)
         }
     }
