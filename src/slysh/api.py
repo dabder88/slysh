@@ -1606,7 +1606,9 @@ def _handle_live_chunk(app: FastAPI, db: Database, pcm: np.ndarray) -> None:
         return
     selected = _selected_model()
     if selected is not None and selected.backend == "cli":
-        state["error"] = MEETING_CLI_HINT if state.get("kind") == "meeting" else LIVE_CLI_HINT
+        hint = MEETING_CLI_HINT if state.get("kind") == "meeting" else LIVE_CLI_HINT
+        state["error"] = hint
+        db.set_error(job_id, hint)
         return
     if selected is not None and selected.backend in {"openrouter", "custom", "http"}:
         fd, tmp = tempfile.mkstemp(prefix="gigaam_live_", suffix=".wav")
@@ -1636,6 +1638,9 @@ def _handle_live_chunk(app: FastAPI, db: Database, pcm: np.ndarray) -> None:
         return
     url = _ensure_engine_for_live(app)
     if not url:
+        hint = str(state.get("error") or "").strip() or "Движок расшифровки недоступен."
+        state["error"] = hint
+        db.set_error(job_id, hint)
         return
     try:
         payload = transcribe_chunk(url, np.asarray(pcm, dtype=np.float32).tolist())
@@ -1688,11 +1693,16 @@ def _stop_live_stream(app: FastAPI) -> None:
 
 
 def _finalize_capture_job(db: Database, state: dict, job_id: int) -> None:
-    err = str(state.get("error") or "").strip()
     job = db.get_job(job_id) or {}
-    if err or job.get("error_text"):
-        if job.get("status") != JobStatus.CANCELLED.value:
-            db.set_status(job_id, JobStatus.FAILED)
+    if job.get("status") == JobStatus.CANCELLED.value:
+        return
+    err = str(state.get("error") or "").strip()
+    error_text = str(job.get("error_text") or "").strip()
+    if err and not error_text:
+        db.set_error(job_id, err)
+        error_text = err
+    if err or error_text:
+        db.set_status(job_id, JobStatus.FAILED)
         return
     db.set_progress(job_id, 1)
     db.set_status(job_id, JobStatus.COMPLETED)
