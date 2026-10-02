@@ -11,7 +11,7 @@ import { initQueue, onQueueShow, onQueueHide } from "./queue.js";
 import { initArchive, onArchiveShow } from "./archive.js";
 import { initTranscripts, onTranscriptsShow } from "./transcripts.js";
 import { initLegacyWorkspace, onLegacyShow } from "./legacy.js";
-import { establishUiSession } from "./ui-session.js?v=1";
+import { establishUiSession } from "./ui-session.js?v=2";
 
 function hideBootSplash() {
   document.body?.classList.remove("is-booting");

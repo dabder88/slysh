@@ -64,11 +64,11 @@ if not exist "%PYTHON%" (
     exit /b 1
 )
 
+:start
 set "GIGAAM_UI_AUTH=1"
 set "GIGAAM_LOOPBACK_STRICT=1"
 set "SLYSH_DISABLE_OPENAPI=1"
-
-:start
+set "GIGAAM_UI_BOOTSTRAP_HTML=0"
 if exist "%ROOT%\Slysh.exe" (
     start "" "%ROOT%\Slysh.exe"
     exit /b 0

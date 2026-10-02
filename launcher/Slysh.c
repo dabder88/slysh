@@ -822,6 +822,14 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
         goto env_fail;
     if (!set_env_pair(L"GIGAAM_DIARIZATION_PATH", L""))
         goto env_fail;
+    if (!set_env_pair(L"GIGAAM_UI_AUTH", L"1"))
+        goto env_fail;
+    if (!set_env_pair(L"GIGAAM_LOOPBACK_STRICT", L"1"))
+        goto env_fail;
+    if (!set_env_pair(L"SLYSH_DISABLE_OPENAPI", L"1"))
+        goto env_fail;
+    if (!set_env_pair(L"GIGAAM_UI_BOOTSTRAP_HTML", L"0"))
+        goto env_fail;
     if (!prepend_path_bin(root))
         goto env_fail;
 

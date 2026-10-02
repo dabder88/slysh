@@ -508,6 +508,7 @@ def main() -> None:
     os.environ.setdefault("GIGAAM_UI_AUTH", "1")
     os.environ.setdefault("GIGAAM_LOOPBACK_STRICT", "1")
     os.environ.setdefault("SLYSH_DISABLE_OPENAPI", "1")
+    os.environ.setdefault("GIGAAM_UI_BOOTSTRAP_HTML", "0")
     app = create_ui_app(db, engine=None)
     config = uvicorn.Config(app, host="127.0.0.1", port=0, log_level="warning")
     server = uvicorn.Server(config)

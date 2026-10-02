@@ -11,6 +11,8 @@ from fastapi import FastAPI, Request, Response
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 
 _UI_AUTH_ENV = "GIGAAM_UI_AUTH"
+_BOOTSTRAP_HTML_ENV = "GIGAAM_UI_BOOTSTRAP_HTML"
+_DEFAULT_COOKIE = "slysh_ui_session"
 _PUBLIC_PATHS = frozenset(
     {
         "/",
@@ -26,13 +28,21 @@ def ui_auth_enabled() -> bool:
     return os.environ.get(_UI_AUTH_ENV) == "1"
 
 
+def bootstrap_in_html_enabled() -> bool:
+    return os.environ.get(_BOOTSTRAP_HTML_ENV, "0") == "1"
+
+
+def ui_cookie_name(app: FastAPI) -> str:
+    return str(getattr(app.state, "ui_cookie_name", None) or _DEFAULT_COOKIE)
+
+
 def ui_session_valid(request: Request, app: FastAPI) -> bool:
     if not ui_auth_enabled():
         return True
     expected = getattr(app.state, "ui_auth_token", None)
     if not expected:
         return False
-    cookie = request.cookies.get("slysh_ui_session")
+    cookie = request.cookies.get(ui_cookie_name(app))
     header = (request.headers.get("x-slysh-ui-token") or "").strip()
     return cookie == expected or header == expected
 
@@ -42,6 +52,7 @@ def install_ui_auth(app: FastAPI) -> str:
     session = secrets.token_urlsafe(32)
     app.state.ui_bootstrap_token = bootstrap
     app.state.ui_auth_token = session
+    app.state.ui_cookie_name = f"slysh_{secrets.token_hex(8)}"
 
     @app.middleware("http")
     async def guard(request: Request, call_next: Callable):
@@ -56,7 +67,7 @@ def install_ui_auth(app: FastAPI) -> str:
             return await call_next(request)
         if path.endswith((".css", ".js", ".ico", ".png", ".svg", ".woff2", ".json")):
             return await call_next(request)
-        cookie = request.cookies.get("slysh_ui_session")
+        cookie = request.cookies.get(ui_cookie_name(app))
         header = request.headers.get("x-slysh-ui-token")
         expected = getattr(app.state, "ui_auth_token", None)
         if cookie == expected or header == expected:
@@ -77,7 +88,7 @@ def register_ui_session_route(app: FastAPI) -> None:
             return JSONResponse(status_code=401, content={"detail": "Недопустимый bootstrap UI."})
         session = getattr(app.state, "ui_auth_token", "")
         resp = JSONResponse({"ok": True})
-        set_ui_session_cookie(resp, session)
+        set_ui_session_cookie(resp, session, cookie_name=ui_cookie_name(app))
         return resp
 
 
@@ -86,7 +97,7 @@ def inject_bootstrap_index(app: FastAPI, index_path: Path) -> None:
 
     @app.get("/")
     def spa_index() -> Response:
-        if not ui_auth_enabled():
+        if not ui_auth_enabled() or not bootstrap_in_html_enabled():
             return FileResponse(index_path)
         token = str(getattr(app.state, "ui_bootstrap_token", "") or "")
         html = index_path.read_text(encoding="utf-8")
@@ -104,9 +115,14 @@ def inject_bootstrap_index(app: FastAPI, index_path: Path) -> None:
         )
 
 
-def set_ui_session_cookie(response: Response, token: str) -> None:
+def set_ui_session_cookie(
+    response: Response,
+    token: str,
+    *,
+    cookie_name: str = _DEFAULT_COOKIE,
+) -> None:
     response.set_cookie(
-        "slysh_ui_session",
+        cookie_name,
         token,
         httponly=True,
         samesite="strict",

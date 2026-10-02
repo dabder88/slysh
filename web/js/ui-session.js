@@ -4,23 +4,32 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function readBootstrapToken() {
-  const fromDom = window.__SLYSH_BOOTSTRAP__;
-  if (typeof fromDom === "string" && fromDom.trim()) {
-    return fromDom.trim();
+async function tryBridgeBootstrap() {
+  const bridge = window.pywebview?.api;
+  if (!bridge?.ui_bootstrap_token) {
+    return "";
   }
+  try {
+    const token = await bridge.ui_bootstrap_token();
+    if (typeof token === "string" && token.trim()) {
+      return token.trim();
+    }
+  } catch (_) {
+    /* retry */
+  }
+  return "";
+}
+
+async function readBootstrapToken() {
   const deadline = Date.now() + 12_000;
   while (Date.now() < deadline) {
-    const bridge = window.pywebview?.api;
-    if (bridge?.ui_bootstrap_token) {
-      try {
-        const token = await bridge.ui_bootstrap_token();
-        if (typeof token === "string" && token.trim()) {
-          return token.trim();
-        }
-      } catch (_) {
-        /* retry */
-      }
+    const fromBridge = await tryBridgeBootstrap();
+    if (fromBridge) {
+      return fromBridge;
+    }
+    const fromDom = window.__SLYSH_BOOTSTRAP__;
+    if (typeof fromDom === "string" && fromDom.trim()) {
+      return fromDom.trim();
     }
     await sleep(50);
   }

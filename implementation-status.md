@@ -4,7 +4,7 @@
 
 **Легенда:** ✅ готово · 🟡 частично · 🔵 в работе / не в git · ⬜ не начато · ⏭️ отложено
 
-**Последнее обновление:** 2026-10-02 — D.5 DPAPI; A10 Gemini CLI.
+**Последнее обновление:** 2026-10-02 — D.1–D.2 WebView session; launcher env.
 
 ---
 
@@ -16,7 +16,7 @@
 | **A** | Корректность | 🟡 | A1–A5,A8,A9,A11 ✅ smokes; **A6** 🟡; **A7,A10** остаются |
 | **B** | Надёжность UX | 🟡 | B1–B3,B5,B4.2–B4.3 ✅; B4.4 manual ⏭️ |
 | **C** | Job runtime | 🟡 | C.4 ✅; C.1–C.3 🟡 (не весь §1.1) |
-| **D** | Безопасность | 🟡 | D.3–D.4 ✅; D.1–D.2/D.5–D.6 частично |
+| **D** | Безопасность | ✅ | D.1–D.6 закрыты |
 | **E** | Установщик | 🟡 | |
 | **F** | CI / доки | 🟡 | |
 
@@ -26,7 +26,7 @@
 
 | Блок | ID | Содержание |
 |------|-----|------------|
-| **1** | D.1–D.2 | loopback UI session в WebView |
+| **1** | C / E | coordinator; установщик |
 | **3** | D.1–D.2 | Loopback-only, UI session в WebView |
 
 D.3–D.4 закрыты (см. таблицу D ниже).
@@ -82,8 +82,8 @@ D.3–D.4 закрыты (см. таблицу D ниже).
 
 | ID | Задача | Статус | Smoke / тест |
 |----|--------|--------|----------------|
-| D.1 | Loopback + engine token | 🟡 | `test_engine_requires_token`; bind 127.0.0.1 |
-| D.2 | UI session bootstrap/cookie | 🟡 | `test_ui_session_cookie` |
+| D.1 | Loopback + engine token | ✅ | engine `127.0.0.1` + token; bat/launcher env |
+| D.2 | UI session bootstrap/cookie | ✅ | pywebview bridge; per-instance cookie; `smoke_ui_auth_session.py` |
 | D.3 | Host/Origin на mutating | ✅ | `test_loopback_security`; `smoke_loopback_host_origin.py` |
 | D.4 | Path traversal media/open-path | ✅ | `test_media_access`; `smoke_job_media_traversal.py` |
 | D.5 | DPAPI секреты | ✅ | providers+proxy migrate; `test_secrets_dpapi_migration.py`, smoke |
@@ -116,6 +116,7 @@ D.3–D.4 закрыты (см. таблицу D ниже).
 | `smoke_job_media_traversal.py` | D.4 |
 | `smoke_capture_pause_resume.py` | B4.3 |
 | `smoke_secrets_dpapi_migration.py` | D.5 |
+| `smoke_ui_auth_session.py` | D.2 |
 | `kill_slysh_orphans.ps1` | уборка после проверок |
 
 ---
