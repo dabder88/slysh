@@ -148,6 +148,26 @@ def resolve_engine_subprocess_python() -> str:
     return _prefer_pythonw_for_subprocess(_resolve_engine_python_exe())
 
 
+def engine_subprocess_python_for_venv(venv_root: Path) -> str:
+    """Probe/import python for a specific engine venv directory (e.g. fresh install slot)."""
+    return _prefer_pythonw_for_subprocess(str(_venv_python(venv_root)))
+
+
+def revert_active_engine_venv() -> bool:
+    """Switch back to ``previous_engine_venv`` if its python exists (failed upgrade)."""
+    if not use_split_engine_venv():
+        return False
+    manifest = read_runtime_manifest()
+    prev = str(manifest.get("previous_engine_venv") or "").strip()
+    if not prev:
+        return False
+    prev_dir = install_root() / prev
+    if not _venv_python(prev_dir).is_file():
+        return False
+    write_runtime_manifest(active_slot=prev)
+    return True
+
+
 def engine_sync_subprocess_env() -> dict[str, str]:
     """Environment so ``uv sync`` targets the engine venv, not the light UI ``.venv``."""
     env = os.environ.copy()

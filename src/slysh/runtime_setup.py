@@ -556,26 +556,39 @@ def _run_install() -> None:
             _install["returncode"] = proc.returncode
             if proc.returncode != 0:
                 _install["error"] = f"uv sync завершился с кодом {proc.returncode}"
-            elif not engine_packages_ok():
-                _install["error"] = (
-                    "Пакеты расшифровки не установились в окружение engine "
-                    "(torch/gigaam). Закройте VPN и нажмите «Начать загрузку» снова "
-                    "или переустановите Slysh."
-                )
             else:
-                _install["error"] = None
-                try:
-                    later_flag_path().unlink(missing_ok=True)
-                except OSError:
-                    logging.debug("could not clear setup later flag", exc_info=True)
-                try:
-                    from slysh.updates import save_lock_fingerprint
+                probe_exe: str | None = None
+                if engine_target is not None:
+                    from slysh.runtime_env import engine_subprocess_python_for_venv
 
-                    save_lock_fingerprint()
-                    slot = engine_target.name if engine_target is not None else None
-                    write_runtime_manifest(active_slot=slot)
-                except Exception:
-                    logging.debug("could not save uv.lock fingerprint", exc_info=True)
+                    probe_exe = engine_subprocess_python_for_venv(engine_target)
+                packages_ok = engine_packages_ok(python=probe_exe)
+                if not packages_ok:
+                    from slysh.runtime_env import revert_active_engine_venv
+
+                    if revert_active_engine_venv():
+                        logging.warning(
+                            "engine install failed; reverted to previous_engine_venv"
+                        )
+                    _install["error"] = (
+                        "Пакеты расшифровки не установились в окружение engine "
+                        "(torch/gigaam). Закройте VPN и нажмите «Начать загрузку» снова "
+                        "или переустановите Slysh."
+                    )
+                else:
+                    _install["error"] = None
+                    try:
+                        later_flag_path().unlink(missing_ok=True)
+                    except OSError:
+                        logging.debug("could not clear setup later flag", exc_info=True)
+                    try:
+                        from slysh.updates import save_lock_fingerprint
+
+                        save_lock_fingerprint()
+                        slot = engine_target.name if engine_target is not None else None
+                        write_runtime_manifest(active_slot=slot)
+                    except Exception:
+                        logging.debug("could not save uv.lock fingerprint", exc_info=True)
     except Exception as exc:
         logging.exception("engine package install failed")
         with _lock:

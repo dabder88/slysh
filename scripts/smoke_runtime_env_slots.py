@@ -41,6 +41,14 @@ def main() -> int:
         data2 = runtime_env.read_runtime_manifest()
         if data2.get("previous_engine_venv") != slot.name:
             return _fail(f"expected previous slot, got {data2}")
+        prev_scripts = home / slot.name / "Scripts"
+        prev_scripts.mkdir(parents=True, exist_ok=True)
+        (prev_scripts / "python.exe").write_bytes(b"")
+        if not runtime_env.revert_active_engine_venv():
+            return _fail("revert_active_engine_venv returned False")
+        data3 = runtime_env.read_runtime_manifest()
+        if data3.get("active_engine_venv") != slot.name:
+            return _fail(f"revert did not restore active slot: {data3}")
 
     print("smoke_runtime_env_slots: OK")
     return 0

@@ -4,7 +4,7 @@
 
 **Легенда:** ✅ готово · 🟡 частично · 🔵 в работе / не в git · ⬜ не начато · ⏭️ отложено
 
-**Последнее обновление:** 2026-10-02 — волна E: payload sanity, installer doc, updates smoke.
+**Последнее обновление:** 2026-10-02 — E.7 probe new slot + revert; F.5 audit script.
 
 ---
 
@@ -97,7 +97,7 @@ D.1–D.6 закрыты (таблица D).
 | F.2 | `test_ui_imports` в CI | ✅ | `ci/check_ui_imports.py` |
 | F.3 | JS + CSS в CI | ✅ | `check-web-js.ps1`, `npm run build:css` |
 | F.4 | Сторонние лицензии | 🟡 | `THIRD_PARTY_NOTICES.md` (черновик) |
-| F.5 | Аудит секретов в git | ⬜ | ручная проверка истории |
+| F.5 | Аудит секретов в git | 🟡 | `scripts/audit_git_secrets.ps1` (эвристика) |
 
 Локально (с `tests/`): `powershell -File scripts\ci_mandatory_checks.ps1` — дополнительно полный pytest.
 
@@ -111,7 +111,7 @@ D.1–D.6 закрыты (таблица D).
 | E.4 | SHA-256 обновлений | ✅ | `updates.py`, `smoke_updates_sha256.py` |
 | E.5 | Upgrade ≠ first-run | ✅ | `IsAppUpgrade` / `.fresh-install` |
 | E.6 | Чистые Win10/11 offline | 🟡 | локальный прогон `dist\payload` OK; VM — `e6-offline-vm-verify.ps1 -RequireWheelhouse` |
-| E.7 | UI/engine split (§7.2) | 🟡 | fingerprint slots + `runtime-env.json`; `smoke_runtime_env_slots.py` |
+| E.7 | UI/engine split (§7.2) | 🟡 | probe fresh slot; `revert_active_engine_venv`; smoke slots |
 
 Сборка: [`INSTALLER-BUILD.md`](INSTALLER-BUILD.md).
 

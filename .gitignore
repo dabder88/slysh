@@ -12,6 +12,7 @@ wheels/
 htmlcov/
 
 # Local secrets and env (never commit)
+runtime-env.json
 .env
 .env.*
 
