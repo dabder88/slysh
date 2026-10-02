@@ -7,6 +7,9 @@ from pathlib import Path
 
 
 def resolve_existing(path: str) -> Path:
+    from slysh.source_path import reject_path_traversal
+
+    reject_path_traversal(path)
     target = Path(path).expanduser()
     if not target.exists():
         raise FileNotFoundError(str(target))

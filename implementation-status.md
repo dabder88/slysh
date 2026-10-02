@@ -4,7 +4,7 @@
 
 **Легенда:** ✅ готово · 🟡 частично · 🔵 в работе / не в git · ⬜ не начато · ⏭️ отложено
 
-**Последнее обновление:** 2026-10-02 — A6 export/speaker coerce; B1 revision sync + 409 smoke.
+**Последнее обновление:** 2026-10-02 — D.3 Host/Origin; D.4 traversal на media/open-path.
 
 ---
 
@@ -16,7 +16,7 @@
 | **A** | Корректность | 🟡 | A1–A5,A8,A9,A11 ✅ smokes; **A6** 🟡; **A7,A10** остаются |
 | **B** | Надёжность UX | 🟡 | B1–B3,B5 ✅; B4.2 🟡 lock pause/stop; B4.3 🟡 |
 | **C** | Job runtime | 🟡 | C.4 ✅; C.1–C.3 🟡 (не весь §1.1) |
-| **D** | Безопасность | ⬜ | |
+| **D** | Безопасность | 🟡 | D.3–D.4 ✅; D.1–D.2/D.5–D.6 частично |
 | **E** | Установщик | 🟡 | |
 | **F** | CI / доки | 🟡 | |
 
@@ -26,13 +26,11 @@
 
 | Блок | ID | Содержание |
 |------|-----|------------|
-| **1** | D.3–D.4 | Host/Origin, path traversal |
-| **2** | B4.2–B4.3 | pause/stop сериализация (дожать worker lock) |
-| **3** | A7 + D.5 | Контракт секретов API + DPAPI |
-| **4** | B4.2–B4.3 | Сериализация pause/stop live/meeting |
-| **5** | D.1–D.4 | Loopback, session, Host/Origin, traversal |
+| **1** | B4.2–B4.3 | pause/stop сериализация |
+| **2** | D.5 | DPAPI для локальных секретов |
+| **3** | D.1–D.2 | Loopback-only, UI session в WebView |
 
-Не возвращаться к A8/C capture, пока блок 1 не взят в работу (A8 минимум закрыт).
+D.3–D.4 закрыты (см. таблицу D ниже).
 
 ---
 
@@ -81,9 +79,20 @@
 
 ---
 
-## Волны D–F
+## Волна D
 
-См. предыдущую версию файла; детальные строки D/E/F обновим при старте волны D.
+| ID | Задача | Статус | Smoke / тест |
+|----|--------|--------|----------------|
+| D.1 | Loopback + engine token | 🟡 | `test_engine_requires_token`; bind 127.0.0.1 |
+| D.2 | UI session bootstrap/cookie | 🟡 | `test_ui_session_cookie` |
+| D.3 | Host/Origin на mutating | ✅ | `test_loopback_security`; `smoke_loopback_host_origin.py` |
+| D.4 | Path traversal media/open-path | ✅ | `test_media_access`; `smoke_job_media_traversal.py` |
+| D.5 | DPAPI секреты | ⬜ | |
+| D.6 | OpenAPI off в production | ✅ | `test_openapi_disabled_in_production` |
+
+## Волны E–F
+
+См. `implementation-order.md`; E установщик 🟡.
 
 ---
 
@@ -104,6 +113,8 @@
 | `smoke_engine_cancel_sequence.py` | A2 |
 | `smoke_speaker_rename_twice.py` | A6 |
 | `smoke_segments_revision_409.py` | B1 |
+| `smoke_loopback_host_origin.py` | D.3 |
+| `smoke_job_media_traversal.py` | D.4 |
 | `kill_slysh_orphans.ps1` | уборка после проверок |
 
 ---

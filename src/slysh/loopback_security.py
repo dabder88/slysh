@@ -29,29 +29,36 @@ def _client_is_loopback(request: Request) -> bool:
     return False
 
 
-def _allowed_hosts(request: Request) -> set[str]:
+def _request_port(request: Request) -> int:
     port = request.url.port
-    if port is None:
-        return set()
+    if port is not None:
+        return port
+    scheme = (request.url.scheme or "http").lower()
+    return 443 if scheme == "https" else 80
+
+
+def _allowed_hosts(request: Request) -> set[str]:
+    port = _request_port(request)
     hosts = {
         f"127.0.0.1:{port}",
         f"localhost:{port}",
         f"[::1]:{port}",
     }
     if os.environ.get("PYTEST_CURRENT_TEST"):
-        hosts.add("testserver")
+        hosts.update({"testserver", "127.0.0.1", "localhost", "[::1]"})
     return hosts
 
 
 def _allowed_origins(request: Request) -> set[str]:
-    port = request.url.port
-    if port is None:
-        return set()
-    return {
+    port = _request_port(request)
+    origins = {
         f"http://127.0.0.1:{port}",
         f"http://localhost:{port}",
         f"http://[::1]:{port}",
     }
+    if os.environ.get("PYTEST_CURRENT_TEST"):
+        origins.add("http://testserver")
+    return origins
 
 
 def install_loopback_guards(app: FastAPI) -> None:
@@ -68,7 +75,18 @@ def install_loopback_guards(app: FastAPI) -> None:
         if host_hdr not in _allowed_hosts(request):
             return JSONResponse(status_code=403, content={"detail": "Недопустимый Host."})
         if request.method in _MUTATING:
-            origin = (request.headers.get("origin") or "").strip()
-            if origin and origin.rstrip("/") not in _allowed_origins(request):
-                return JSONResponse(status_code=403, content={"detail": "Недопустимый Origin."})
+            allowed = _allowed_origins(request)
+            origin = (request.headers.get("origin") or "").strip().rstrip("/")
+            if origin:
+                if origin not in allowed:
+                    return JSONResponse(status_code=403, content={"detail": "Недопустимый Origin."})
+            else:
+                referer = (request.headers.get("referer") or "").strip()
+                if not referer or not any(
+                    referer.startswith(f"{base}/") or referer == base for base in allowed
+                ):
+                    return JSONResponse(
+                        status_code=403,
+                        content={"detail": "Требуется Origin или Referer с localhost."},
+                    )
         return await call_next(request)

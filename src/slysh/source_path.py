@@ -35,7 +35,15 @@ def _looks_like_basename(path: Path) -> bool:
     return len(path.parts) <= 1
 
 
+def reject_path_traversal(raw: str) -> None:
+    """Reject parent-directory segments (wave D media/open-path)."""
+    path = normalize_source_path(raw)
+    if ".." in path.parts:
+        raise ValueError("Недопустимый путь к файлу.")
+
+
 def require_existing_file(raw: str) -> Path:
+    reject_path_traversal(raw)
     path = normalize_source_path(raw)
     candidate = path if path.is_absolute() else Path.cwd() / path
     if candidate.is_file():
