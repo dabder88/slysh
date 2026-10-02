@@ -317,6 +317,9 @@ function progressStageLabel(job) {
   if (job.status === "queued") {
     return t("queue.inQueue");
   }
+  if (job.status === "finalizing" || job.capture_finalizing) {
+    return t("legacy.stageFinalizeCapture");
+  }
   return t("legacy.stageTranscribe");
 }
 
@@ -329,6 +332,9 @@ function jobBannerProgressStageKey(job) {
   }
   if (job.status === "queued") {
     return "queued";
+  }
+  if (job.status === "finalizing" || job.capture_finalizing) {
+    return "finalize";
   }
   return "transcribe";
 }
@@ -518,6 +524,8 @@ function isJobBusy(job) {
   return (
     job.status === "queued" ||
     job.status === "running" ||
+    job.status === "finalizing" ||
+    job.capture_finalizing ||
     job.speakers_running ||
     job.engine_starting
   );

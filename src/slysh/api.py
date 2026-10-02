@@ -373,6 +373,14 @@ LIVE_NOT_PAUSED_HINT = "Диктофон не на паузе."
 LIVE_ALREADY_HINT = "Диктофон уже записывает."
 CAPTURE_FINALIZING_HINT = "Дождитесь завершения расшифровки записи."
 
+_JOB_ACTIVE_STATUSES = frozenset(
+    {
+        JobStatus.QUEUED.value,
+        JobStatus.RUNNING.value,
+        JobStatus.FINALIZING.value,
+    }
+)
+
 
 def _parse_last_export_paths(job: dict) -> list[str]:
     raw = job.get("last_export_paths")
@@ -412,11 +420,7 @@ def _decorate_batch(app: FastAPI, batch: dict, jobs: list[dict]) -> dict:
     total = len(decorated_jobs)
     done = sum(1 for j in decorated_jobs if j["status"] == JobStatus.COMPLETED.value)
     failed = sum(1 for j in decorated_jobs if j["status"] == JobStatus.FAILED.value)
-    active = sum(
-        1
-        for j in decorated_jobs
-        if j["status"] in (JobStatus.QUEUED.value, JobStatus.RUNNING.value)
-    )
+    active = sum(1 for j in decorated_jobs if j["status"] in _JOB_ACTIVE_STATUSES)
     payload = {
         "id": batch["id"],
         "name": batch["name"],
@@ -1017,7 +1021,7 @@ def _pipeline_busy(app: FastAPI, db: Database) -> bool:
     if getattr(app.state, "speaker_jobs", {}):
         return True
     for job in db.list_jobs():
-        if job["status"] in (JobStatus.QUEUED.value, JobStatus.RUNNING.value):
+        if job["status"] in _JOB_ACTIVE_STATUSES:
             return True
     return False
 
@@ -1217,6 +1221,11 @@ def _schedule_remote_job(app: FastAPI, db: Database, job_id: int, source_path: s
 def _run_file_asr_job(
     app: FastAPI, db: Database, job_id: int, source_path: str
 ) -> None:
+    if not _selected_asr_is_remote() and is_cloud_only():
+        message = _selected_asr_preflight_error() or CLOUD_ONLY_ENGINE_MSG
+        db.set_error(job_id, message)
+        db.set_status(job_id, JobStatus.FAILED)
+        return
     if _selected_asr_is_remote():
         coord: AsrCoordinator = app.state.asr_coordinator
         if not coord.begin_remote_wait(job_id):
@@ -1367,7 +1376,10 @@ def _start_youtube_job(
 
 
 def _transcription_blocks_editor_save(job: dict) -> bool:
-    if job.get("status") != JobStatus.RUNNING.value:
+    if job.get("status") not in (
+        JobStatus.RUNNING.value,
+        JobStatus.FINALIZING.value,
+    ):
         return False
     if job.get("speakers_running"):
         return True
@@ -1767,6 +1779,14 @@ def _handle_live_chunk(
         db.set_error(jid, str(exc))
 
 
+def _capture_control_lock(app: FastAPI) -> threading.Lock:
+    lock = getattr(app.state, "capture_control_lock", None)
+    if lock is None:
+        lock = threading.Lock()
+        app.state.capture_control_lock = lock
+    return lock
+
+
 def _collect_pcm_for_asr(session: LiveSession, *, finalize: bool) -> list[np.ndarray]:
     chunks: list[np.ndarray] = list(session.take_ready_chunks())
     if finalize:
@@ -1866,6 +1886,9 @@ def _start_capture_finalize(
         if _capture_asr_slot_kind(app, job_id) is not None:
             _release_capture_asr_slot(app, db, job_id)
         return None
+    job = db.get_job(job_id) or {}
+    if job.get("status") != JobStatus.CANCELLED.value:
+        db.set_status(job_id, JobStatus.FINALIZING)
     if not hasattr(app.state, "capture_finalize_threads"):
         app.state.capture_finalize_threads = {}
     thread = threading.Thread(
@@ -2363,7 +2386,7 @@ def create_ui_app(
     @app.post("/api/jobs/{job_id}/start")
     def start_job(job_id: int, body: JobTranscribeBody = JobTranscribeBody()) -> dict:
         job = _require_job(db, job_id)
-        if job["status"] in (JobStatus.RUNNING.value, JobStatus.QUEUED.value):
+        if job["status"] in _JOB_ACTIVE_STATUSES:
             return _decorate_job(app, _job_payload(job))
         if _is_youtube_job(job):
             method, language = load_job_ingest_meta(job_id, db=db)
@@ -2406,7 +2429,10 @@ def create_ui_app(
         fin_thread = finalize_threads.get(job_id)
         on_local = coord.local_job_id() == job_id
         on_finalize = fin_thread is not None and fin_thread.is_alive()
-        if url and job["status"] == JobStatus.RUNNING.value and (on_local or on_finalize):
+        if url and job["status"] in (
+            JobStatus.RUNNING.value,
+            JobStatus.FINALIZING.value,
+        ) and (on_local or on_finalize):
             try:
                 engine_cancel(url)
             except Exception:
@@ -2435,7 +2461,7 @@ def create_ui_app(
                     proc.terminate()
                 except OSError:
                     logging.exception("speaker yt-dlp terminate failed for job %s", job_id)
-        if job["status"] in (JobStatus.QUEUED.value, JobStatus.RUNNING.value):
+        if job["status"] in _JOB_ACTIVE_STATUSES:
             db.set_status(job_id, JobStatus.CANCELLED)
         return {"ok": True}
 
@@ -2999,14 +3025,15 @@ def create_ui_app(
             raise HTTPException(status_code=400, detail=LIVE_NOT_ACTIVE_HINT)
         if state.get("paused"):
             raise HTTPException(status_code=400, detail=LIVE_ALREADY_PAUSED_HINT)
-        state["paused"] = True
-        state["paused_at"] = time.monotonic()
-        state["listening"] = False
-        state["rms"] = 0.0
-        _stop_live_stream(app)
-        session = state.get("session")
-        if session is not None:
-            _drain_live_session(app, db, session, finalize=False)
+        with _capture_control_lock(app):
+            state["paused"] = True
+            state["paused_at"] = time.monotonic()
+            state["listening"] = False
+            state["rms"] = 0.0
+            _stop_live_stream(app)
+            session = state.get("session")
+            if session is not None:
+                _drain_live_session(app, db, session, finalize=False)
         return _live_status_payload(app, db, state)
 
     @app.post("/api/live/resume")
@@ -3046,23 +3073,24 @@ def create_ui_app(
     @app.post("/api/live/stop")
     def live_stop() -> dict:
         state = app.state.live
-        state["listening"] = False
-        state["paused"] = False
-        state["paused_at"] = None
-        if state.get("stop_event") is not None:
-            state["stop_event"].set()
-        _stop_live_stream(app)
-        thread = state.get("thread")
-        if thread is not None:
-            thread.join(timeout=_LIVE_CAPTURE_DRAIN_TIMEOUT_S)
-            state["thread"] = None
-        payload = _complete_capture_stop(
-            app,
-            db,
-            state,
-            screen="live",
-            reset_state=lambda: setattr(app.state, "live", _empty_live_state()),
-        )
+        with _capture_control_lock(app):
+            state["listening"] = False
+            state["paused"] = False
+            state["paused_at"] = None
+            if state.get("stop_event") is not None:
+                state["stop_event"].set()
+            _stop_live_stream(app)
+            thread = state.get("thread")
+            if thread is not None:
+                thread.join(timeout=_LIVE_CAPTURE_DRAIN_TIMEOUT_S)
+                state["thread"] = None
+            payload = _complete_capture_stop(
+                app,
+                db,
+                state,
+                screen="live",
+                reset_state=lambda: setattr(app.state, "live", _empty_live_state()),
+            )
         if payload is not None:
             return payload
         return {"ok": True}
@@ -3190,13 +3218,14 @@ def create_ui_app(
             raise HTTPException(status_code=400, detail=MEETING_NOT_ACTIVE_HINT)
         if state.get("paused"):
             raise HTTPException(status_code=400, detail=MEETING_ALREADY_PAUSED_HINT)
-        capture = state.get("capture")
-        if capture is not None:
-            capture.pause()
-        state["paused"] = True
-        state["paused_at"] = time.monotonic()
-        state["rms_mic"] = 0.0
-        state["rms_system"] = 0.0
+        with _capture_control_lock(app):
+            capture = state.get("capture")
+            if capture is not None:
+                capture.pause()
+            state["paused"] = True
+            state["paused_at"] = time.monotonic()
+            state["rms_mic"] = 0.0
+            state["rms_system"] = 0.0
         return _meeting_status_payload(app, db, state)
 
     @app.post("/api/meeting/resume")
@@ -3221,29 +3250,30 @@ def create_ui_app(
     @app.post("/api/meeting/stop")
     def meeting_stop() -> dict:
         state = app.state.meeting
-        state["listening"] = False
-        state["paused"] = False
-        state["paused_at"] = None
-        if state.get("stop_event") is not None:
-            state["stop_event"].set()
-        capture = state.get("capture")
-        if capture is not None:
-            try:
-                capture.stop()
-            except Exception:
-                pass
-            state["capture"] = None
-        thread = state.get("thread")
-        if thread is not None:
-            thread.join(timeout=_LIVE_CAPTURE_DRAIN_TIMEOUT_S)
-            state["thread"] = None
-        payload = _complete_capture_stop(
-            app,
-            db,
-            state,
-            screen="meeting",
-            reset_state=lambda: setattr(app.state, "meeting", _empty_meeting_state()),
-        )
+        with _capture_control_lock(app):
+            state["listening"] = False
+            state["paused"] = False
+            state["paused_at"] = None
+            if state.get("stop_event") is not None:
+                state["stop_event"].set()
+            capture = state.get("capture")
+            if capture is not None:
+                try:
+                    capture.stop()
+                except Exception:
+                    pass
+                state["capture"] = None
+            thread = state.get("thread")
+            if thread is not None:
+                thread.join(timeout=_LIVE_CAPTURE_DRAIN_TIMEOUT_S)
+                state["thread"] = None
+            payload = _complete_capture_stop(
+                app,
+                db,
+                state,
+                screen="meeting",
+                reset_state=lambda: setattr(app.state, "meeting", _empty_meeting_state()),
+            )
         if payload is not None:
             return payload
         return {"ok": True}

@@ -49,7 +49,12 @@ function statusLabel(job, statusLabelFn) {
   if (job.status === "queued") {
     return t("queue.inQueue");
   }
-  if (job.status === "running" || job.speakers_running) {
+  if (
+    job.status === "running" ||
+    job.status === "finalizing" ||
+    job.capture_finalizing ||
+    job.speakers_running
+  ) {
     return t("common.inProgress");
   }
   return statusLabelFn(job);

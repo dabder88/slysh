@@ -102,38 +102,53 @@ def main() -> int:
     uses_exe_launcher = (ROOT / "Slysh.exe").is_file()
     before_pids = _slysh_ui_pids()
     print("Launching Slysh.bat (expect UI process for 20s)...")
+    bat: subprocess.Popen | None = None
+    spawned_ui: set[int] = set()
     try:
-        bat = subprocess.Popen(
-            ["cmd.exe", "/c", "Slysh.bat"],
-            cwd=str(ROOT),
-            env=env,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-    except OSError as exc:
-        return _fail(f"could not start Slysh.bat: {exc}")
+        try:
+            bat = subprocess.Popen(
+                ["cmd.exe", "/c", "Slysh.bat"],
+                cwd=str(ROOT),
+                env=env,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+        except OSError as exc:
+            return _fail(f"could not start Slysh.bat: {exc}")
 
-    deadline = time.time() + 20.0
-    while time.time() < deadline:
-        new_ui = _slysh_ui_pids() - before_pids
-        if new_ui:
-            print(f"Slysh UI process up (pids={sorted(new_ui)}) — OK")
+        deadline = time.time() + 20.0
+        while time.time() < deadline:
+            new_ui = _slysh_ui_pids() - before_pids
+            if new_ui:
+                spawned_ui = new_ui
+                print(f"Slysh UI process up (pids={sorted(new_ui)}) — OK")
+                return 0
+            code = bat.poll()
+            if code is not None:
+                if uses_exe_launcher and code == 0:
+                    time.sleep(0.5)
+                    continue
+                return _fail(f"Slysh.bat exited early with code {code}")
+            time.sleep(0.25)
+
+        return _fail("no Slysh UI process within 20s")
+    finally:
+        for pid in spawned_ui:
             subprocess.run(
-                ["taskkill", "/F", "/T", "/PID", str(next(iter(new_ui)))],
+                ["taskkill", "/F", "/T", "/PID", str(pid)],
                 capture_output=True,
                 check=False,
             )
-            bat.wait(timeout=5)
-            return 0
-        code = bat.poll()
-        if code is not None:
-            if uses_exe_launcher and code == 0:
-                time.sleep(0.5)
-                continue
-            return _fail(f"Slysh.bat exited early with code {code}")
-        time.sleep(0.25)
-
-    return _fail("no Slysh UI process within 20s")
+        if bat is not None and bat.poll() is None:
+            subprocess.run(
+                ["taskkill", "/F", "/T", "/PID", str(bat.pid)],
+                capture_output=True,
+                check=False,
+            )
+            try:
+                bat.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                pass
 
 
 if __name__ == "__main__":

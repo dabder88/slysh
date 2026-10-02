@@ -22,7 +22,7 @@ def job_duration_s(job: dict, now: datetime | None = None) -> float | None:
     end = _parse_iso(job.get("finished_at"))
     if end is None:
         status = job.get("status")
-        if status not in {"running", "queued"}:
+        if status not in {"running", "queued", "finalizing"}:
             return None
         end = now or datetime.now(timezone.utc)
     return max(0.0, (end - start).total_seconds())

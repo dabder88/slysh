@@ -355,6 +355,7 @@
     "stageModelLoad": "Loading model",
     "stageSpeakers": "Speaker ID",
     "stageTranscribe": "Transcription",
+    "stageFinalizeCapture": "Finishing recording",
     "startedCount": "Started: {count}",
     "stoppedCount": "Stopped: {count}",
     "tabBatches": "Batches",

@@ -357,6 +357,7 @@
     "stageModelLoad": "Загрузка модели",
     "stageSpeakers": "Определение спикеров",
     "stageTranscribe": "Расшифровка",
+    "stageFinalizeCapture": "Завершение записи",
     "startedCount": "Запущено: {count}",
     "stoppedCount": "Остановлено: {count}",
     "youtubeBatchNoFiles": "Выбран YouTube-пакет — файлы сюда не добавляются. Новые видео: сайдбар → YouTube → Пакет.",

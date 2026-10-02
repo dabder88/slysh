@@ -489,7 +489,11 @@ class Database:
                 self.update_batch(int(batch["id"]), status=BatchStatus.IDLE)
                 reset += 1
         for job in self.list_jobs():
-            if job["status"] in (JobStatus.QUEUED.value, JobStatus.RUNNING.value):
+            if job["status"] in (
+                JobStatus.QUEUED.value,
+                JobStatus.RUNNING.value,
+                JobStatus.FINALIZING.value,
+            ):
                 self.set_status(int(job["id"]), JobStatus.IDLE)
                 self.set_progress(int(job["id"]), 0)
                 reset += 1

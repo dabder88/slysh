@@ -1,10 +1,12 @@
-"""Smoke: /cancel must not suppress the next /transcribe_chunk (wave A2)."""
+"""Smoke: engine /cancel does not break the next /transcribe_chunk (A2)."""
 from __future__ import annotations
 
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT / "src") not in sys.path:
+    sys.path.insert(0, str(ROOT / "src"))
 
 
 def _fail(msg: str) -> int:
@@ -15,16 +17,29 @@ def _fail(msg: str) -> int:
 def main() -> int:
     from fastapi.testclient import TestClient
 
-    from slysh.engine_server import _CliFakeBackend, _decode_pcm, create_app
+    from slysh.engine_server import _decode_pcm, create_app
+    from slysh.models import Segment
 
-    client = TestClient(create_app(_CliFakeBackend(), _decode_pcm))
+    class Tracking:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def transcribe_chunk(self, pcm, cancelled):
+            self.calls += 1
+            if cancelled():
+                return []
+            return [Segment(0, 50, f"seg-{self.calls}")]
+
+    backend = Tracking()
+    client = TestClient(create_app(backend, _decode_pcm))
     client.post("/cancel")
-    resp = client.post("/transcribe_chunk", json={"samples": [0.0, 0.1]})
-    if resp.status_code != 200:
-        return _fail(f"HTTP {resp.status_code}: {resp.text[:200]}")
-    segments = resp.json().get("segments") or []
-    if not segments:
-        return _fail("expected segments after cancel+chunk")
+    first = client.post("/transcribe_chunk", json={"samples": [0.0]})
+    if not first.json().get("segments"):
+        return _fail("first chunk empty after prior cancel")
+    second = client.post("/transcribe_chunk", json={"samples": [0.0]})
+    text = (second.json().get("segments") or [{}])[0].get("text")
+    if text != "seg-2":
+        return _fail(f"expected seg-2, got {text!r}")
     print("smoke_engine_cancel_sequence: OK")
     return 0
 

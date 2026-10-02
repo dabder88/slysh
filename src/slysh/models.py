@@ -12,6 +12,7 @@ class JobStatus(str, Enum):
     IDLE = "idle"
     QUEUED = "queued"
     RUNNING = "running"
+    FINALIZING = "finalizing"
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELLED = "cancelled"
