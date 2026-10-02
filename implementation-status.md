@@ -4,7 +4,7 @@
 
 **Легенда:** ✅ готово · 🟡 частично · 🔵 в работе / не в git · ⬜ не начато · ⏭️ отложено
 
-**Последнее обновление:** 2026-10-02 — UI engine-repair (E.7); настройки ASR.
+**Последнее обновление:** 2026-10-02 — `PRODUCT_OUT_OF_SCOPE.md`; F ✅; план без подписи/автообнов/legal/models-mandatory.
 
 ---
 
@@ -18,7 +18,7 @@
 | **C** | Job runtime | ✅ | C.1–C.5 smokes + coordinator pytest (локально) |
 | **D** | Безопасность | ✅ | D.1–D.6 закрыты |
 | **E** | Установщик | 🟡 | [`INSTALLER-BUILD.md`](INSTALLER-BUILD.md); E.1–E.5 в коде |
-| **F** | CI / доки | 🟡 | GitHub workflow + `ci_mandatory_checks.ps1`; [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) |
+| **F** | CI / доки | ✅ | CI + `ci_mandatory_checks`; справочник лицензий в payload (не legal roadmap) |
 
 ---
 
@@ -27,9 +27,13 @@
 | Блок | ID | Содержание |
 |------|-----|------------|
 | **1** | E | E.6 прогон матрицы на реальной VM (журнал в `installer/E6-OFFLINE-VM.md`) |
-| **2** | F | ручной аудит секретов в **истории** git (F.5 — tracked файлы) |
+| **2** | — | Опционально: B.4.4 (10+ мин live manual), push + зелёный GitHub CI |
 
-D.1–D.6 закрыты (таблица D).
+D.1–D.6 закрыты (таблица D). Волна **F** закрыта по пунктам F.1–F.5.
+
+## Вне плана (не делаем)
+
+См. [`PRODUCT_OUT_OF_SCOPE.md`](PRODUCT_OUT_OF_SCOPE.md): подпись Setup / SmartScreen, автообновление в фоне, юридический due diligence, обязательное скачивание всех весов в `models/`.
 
 ---
 
@@ -96,7 +100,7 @@ D.1–D.6 закрыты (таблица D).
 | F.1 | Windows CI без torch | ✅ | `.github/workflows/pytest.yml` + smokes |
 | F.2 | `test_ui_imports` в CI | ✅ | `ci/check_ui_imports.py` |
 | F.3 | JS + CSS в CI | ✅ | `check-web-js.ps1`, `npm run build:css` |
-| F.4 | Сторонние лицензии | ✅ | `THIRD_PARTY_NOTICES.md` → `licenses\` в payload |
+| F.4 | Сторонние лицензии (справочник) | ✅ | `THIRD_PARTY_NOTICES.md` → `licenses\`; legal due diligence **вне плана** |
 | F.5 | Аудит секретов в git | ✅ | `audit_git_secrets.ps1` в CI + `ci_mandatory_checks` |
 
 `powershell -File scripts\ci_mandatory_checks.ps1` — smokes + полный `pytest tests`.

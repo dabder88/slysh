@@ -228,8 +228,16 @@
 | §6.3 word alignment | Документация ограничений, не блокер фикса |
 | §1.4 single-instance | После C.1 |
 | §0.2 п.3 404 vs parent folder | Продуктовое решение в B5 |
-| 10+ мин mic/loopback в CI | Manual release only |
-| Подпись Setup | Вне scope исполнителя (plan-fix уже так) |
+| 10+ мин mic/loopback в CI | Manual release only (B.4.4) |
+
+## Вне плана продукта (не roadmap)
+
+Зафиксировано в [`PRODUCT_OUT_OF_SCOPE.md`](PRODUCT_OUT_OF_SCOPE.md):
+
+- Подпись Setup / SmartScreen  
+- Автообновление в фоне (остаётся ручная проверка + SHA-256)  
+- Юридический due diligence (справочник лицензий — да, отдельная legal-работа — нет)  
+- Обязательное скачивание всех весов в `models/` при клоне  
 
 ---
 

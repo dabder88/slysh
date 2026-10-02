@@ -83,5 +83,5 @@ powershell -ExecutionPolicy Bypass -File .\e6-offline-vm-verify.ps1 `
 ## Ограничения
 
 - Авто-скрипт **не** поднимает VM и **не** запускает Inno Setup.
-- Проверка SHA-256 релиза и подпись Setup — отдельные задачи (E.4 / владелец).
+- SHA-256 релиза покрывается E.4 (ручное обновление в приложении). Подпись Setup — вне плана ([`PRODUCT_OUT_OF_SCOPE.md`](../PRODUCT_OUT_OF_SCOPE.md)).
 - Engine wheels **не** входят в базовый offline payload; тяжёлая установка требует сети или заранее заполненного engine venv.
