@@ -4,7 +4,7 @@
 
 **Легенда:** ✅ готово · 🟡 частично · 🔵 в работе / не в git · ⬜ не начато · ⏭️ отложено
 
-**Последнее обновление:** 2026-10-02 — волна C: pump при cancel QUEUED; smoke coordinator.
+**Последнее обновление:** 2026-10-02 — C.1 remote queue smoke; C.2/C.4 run_id tests; C.5 lock pytest.
 
 ---
 
@@ -15,7 +15,7 @@
 | **0** | Основа тестов | 🟡 | pytest ~450; таблица «8 fail» не оформлена |
 | **A** | Корректность | 🟡 | A1–A11 ✅ smokes; хвосты по plan-fix §1 |
 | **B** | Надёжность UX | 🟡 | B1–B3,B5,B4.2–B4.3 ✅; B4.4 manual ⏭️ |
-| **C** | Job runtime | 🟡 | C.4 ✅; C.1–C.3 🟡 (pump/cancel smoke; coordinator tests) |
+| **C** | Job runtime | 🟡 | C.4 ✅; C.1–C.3 ✅ smokes; C.5 smoke bat |
 | **D** | Безопасность | ✅ | D.1–D.6 закрыты |
 | **E** | Установщик | 🟡 | |
 | **F** | CI / доки | 🟡 | |
@@ -70,11 +70,11 @@ D.1–D.6 закрыты (таблица D).
 
 | ID | Задача | Статус |
 |----|--------|--------|
-| C.1 | Coordinator local/remote | 🟡 | `pump_*`, debug busy; `test_pump_local_skips_when_slot_busy` |
-| C.2 | `run_id` | 🟡 | `job_run_active` в тестах coordinator |
-| C.3 | Cancel + engine | 🟡 | cancel QUEUED → `_pump_asr_queues`; `smoke_coordinator_queued_cancel.py` |
-| C.4 | Idempotent start | ✅ |
-| C.5 | Single-instance | 🟡 |
+| C.1 | Coordinator local/remote | 🟡 | local+remote smokes; `test_pump_*_when_slot_busy` |
+| C.2 | `run_id` | 🟡 | `test_job_start_run_id.py`, `job_run_active` |
+| C.3 | Cancel + engine | 🟡 | cancel QUEUED → pump; finalize smokes |
+| C.4 | Idempotent start | ✅ | повторный `/start` в QUEUED не меняет `run_id` |
+| C.5 | Single-instance | 🟡 | `test_single_instance.py`; mutex в `app.main` |
 
 ---
 
@@ -118,6 +118,8 @@ D.1–D.6 закрыты (таблица D).
 | `smoke_secrets_dpapi_migration.py` | D.5 |
 | `smoke_ui_auth_session.py` | D.2 |
 | `smoke_coordinator_queued_cancel.py` | C.3 |
+| `smoke_asr_coordinator_queue.py` | C.1 |
+| `smoke_asr_coordinator_remote_queue.py` | C.1 |
 | `kill_slysh_orphans.ps1` | уборка после проверок |
 
 ---
