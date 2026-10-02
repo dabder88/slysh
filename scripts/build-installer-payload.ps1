@@ -181,7 +181,10 @@ if (Test-Path -LiteralPath $lgpl) {
     Copy-Item -LiteralPath $lgpl -Destination (Join-Path $Payload "licenses\ffmpeg-LGPL.txt") -Force
 }
 $notices = Join-Path $Root "installer\licenses\THIRD-PARTY-NOTICES.md"
-if (Test-Path -LiteralPath $notices) {
+$rootNotices = Join-Path $Root "THIRD_PARTY_NOTICES.md"
+if (Test-Path -LiteralPath $rootNotices) {
+    Copy-Item -LiteralPath $rootNotices -Destination (Join-Path $Payload "licenses\THIRD-PARTY-NOTICES.md") -Force
+} elseif (Test-Path -LiteralPath $notices) {
     Copy-Item -LiteralPath $notices -Destination (Join-Path $Payload "licenses\THIRD-PARTY-NOTICES.md") -Force
 }
 
@@ -325,6 +328,12 @@ if (-not (Test-Path -LiteralPath $SmokePy)) {
 & $SmokePy $Smoke
 if ($LASTEXITCODE -ne 0) {
     throw "smoke_installer_layout.py failed"
+}
+
+$Sanity = Join-Path $Root "scripts\check_payload_sanity.py"
+& $SmokePy $Sanity
+if ($LASTEXITCODE -ne 0) {
+    throw "check_payload_sanity.py failed"
 }
 
 Write-Host "Payload OK: $Payload"

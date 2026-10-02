@@ -535,8 +535,12 @@ def _run_install() -> None:
         )
 
         sync_env = engine_sync_subprocess_env()
+        engine_target: Path | None = None
         if use_split_engine_venv():
-            engine_py = ensure_engine_venv(uv)
+            from slysh.runtime_env import resolve_engine_venv_target
+
+            engine_target = resolve_engine_venv_target()
+            engine_py = ensure_engine_venv(uv, engine_target)
             sync_cmd.extend(["--python", str(engine_py)])
         with log_path.open("w", encoding="utf-8") as log:
             proc = subprocess.run(
@@ -568,7 +572,8 @@ def _run_install() -> None:
                     from slysh.updates import save_lock_fingerprint
 
                     save_lock_fingerprint()
-                    write_runtime_manifest()
+                    slot = engine_target.name if engine_target is not None else None
+                    write_runtime_manifest(active_slot=slot)
                 except Exception:
                     logging.debug("could not save uv.lock fingerprint", exc_info=True)
     except Exception as exc:

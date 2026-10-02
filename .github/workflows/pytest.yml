@@ -17,23 +17,28 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[dev]" httpx pytest
-      - name: JS syntax check (web/js)
+      - name: Mandatory checks (wave F; tests/ not in git)
         shell: pwsh
-        run: |
-          if (Test-Path scripts/check-web-js.ps1) {
-            powershell -NoProfile -File scripts/check-web-js.ps1
-          } else {
-            node --check web/js/main.js
-          }
-      - name: CSS build
-        run: |
-          npm ci
-          npm run build:css
-      - name: Pytest
         env:
-          PYTHONPATH: src
           GIGAAM_UI_AUTH: "0"
           GIGAAM_LOOPBACK_STRICT: "0"
           SLYSH_DISABLE_OPENAPI: "1"
           GIGAAM_SKIP_ENGINE: "1"
-        run: python -m pytest tests -q
+        run: |
+          $py = (Get-Command python).Source
+          powershell -NoProfile -File scripts/check-web-js.ps1
+          npm ci
+          npm run build:css
+          python ci/check_import_path.py
+          python ci/check_ui_imports.py
+          python ci/check_gemini_cli_prompt.py
+          $smokes = @(
+            'scripts/smoke_engine_cancel_sequence.py',
+            'scripts/smoke_providers_secret_contract.py',
+            'scripts/smoke_open_path_api.py',
+            'scripts/smoke_ui_auth_session.py',
+            'scripts/smoke_loopback_host_origin.py',
+            'scripts/smoke_coordinator_queued_cancel.py',
+            'scripts/smoke_updates_sha256.py'
+          )
+          foreach ($s in $smokes) { python $s }

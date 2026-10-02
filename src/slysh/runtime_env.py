@@ -10,6 +10,7 @@ from slysh.paths import install_root, project_root
 
 UI_VENV_DIR = ".venv"
 ENGINE_VENV_DIR = ".venv-engine"
+ENGINE_VENV_PREFIX = ".venv-engine-"
 RUNTIME_MANIFEST = "runtime-env.json"
 
 
@@ -27,6 +28,35 @@ def engine_venv_dir() -> Path:
     return install_root() / ENGINE_VENV_DIR
 
 
+def engine_venv_dir_for_fingerprint(fingerprint: str) -> Path:
+    safe = "".join(c for c in fingerprint.lower() if c in "0123456789abcdef")[:16]
+    if not safe:
+        safe = "default"
+    return install_root() / f"{ENGINE_VENV_PREFIX}{safe}"
+
+
+def resolve_engine_venv_target() -> Path:
+    from slysh.updates import uv_lock_fingerprint
+
+    fp = uv_lock_fingerprint()
+    if fp:
+        return engine_venv_dir_for_fingerprint(fp)
+    return engine_venv_dir()
+
+
+def active_engine_venv_dir() -> Path:
+    manifest = read_runtime_manifest()
+    name = str(manifest.get("active_engine_venv") or "").strip()
+    if name:
+        candidate = install_root() / name
+        if _venv_python(candidate).is_file():
+            return candidate
+    legacy = engine_venv_dir()
+    if _venv_python(legacy).is_file():
+        return legacy
+    return resolve_engine_venv_target()
+
+
 def _venv_python(venv_root: Path) -> Path:
     return venv_root / "Scripts" / "python.exe"
 
@@ -40,7 +70,7 @@ def ui_python_executable() -> Path:
 
 
 def engine_python_executable() -> Path | None:
-    path = _venv_python(engine_venv_dir())
+    path = _venv_python(active_engine_venv_dir())
     return path if path.is_file() else None
 
 
@@ -122,48 +152,62 @@ def engine_sync_subprocess_env() -> dict[str, str]:
     """Environment so ``uv sync`` targets the engine venv, not the light UI ``.venv``."""
     env = os.environ.copy()
     if use_split_engine_venv():
-        venv = engine_venv_dir()
+        venv = resolve_engine_venv_target()
         env["UV_PROJECT_ENVIRONMENT"] = str(venv)
         env["VIRTUAL_ENV"] = str(venv)
     return env
 
 
-def ensure_engine_venv(uv: str) -> Path:
+def ensure_engine_venv(uv: str, target: Path | None = None) -> Path:
     """Create engine venv directory if missing (installed layout only)."""
     root = project_root()
-    target = engine_venv_dir()
-    py = _venv_python(target)
+    venv_root = target or resolve_engine_venv_target()
+    py = _venv_python(venv_root)
     if py.is_file():
         return py
-    target.parent.mkdir(parents=True, exist_ok=True)
+    venv_root.parent.mkdir(parents=True, exist_ok=True)
     import subprocess
 
     from slysh.subprocess_win import subprocess_no_console_kwargs
 
     proc = subprocess.run(
-        [uv, "venv", str(target)],
+        [uv, "venv", str(venv_root)],
         cwd=str(root),
         check=False,
         **subprocess_no_console_kwargs(),
     )
     if proc.returncode != 0 or not py.is_file():
-        raise RuntimeError(f"Не удалось создать окружение engine: {target}")
+        raise RuntimeError(f"Не удалось создать окружение engine: {venv_root}")
     return py
 
 
-def write_runtime_manifest() -> None:
+def write_runtime_manifest(*, active_slot: str | None = None) -> None:
     if not use_split_engine_venv():
         return
     from slysh.updates import uv_lock_fingerprint
 
+    previous = read_runtime_manifest()
+    slot = active_slot or str(previous.get("active_engine_venv") or "").strip()
+    if not slot:
+        target = resolve_engine_venv_target()
+        slot = target.name
+    prev_slot = previous.get("active_engine_venv")
     payload = {
         "ui_venv": UI_VENV_DIR,
         "engine_venv": ENGINE_VENV_DIR,
+        "active_engine_venv": slot,
+        "previous_engine_venv": (
+            prev_slot
+            if active_slot and prev_slot and prev_slot != active_slot
+            else previous.get("previous_engine_venv")
+        ),
         "lock_fingerprint": uv_lock_fingerprint(),
     }
     path = install_root() / RUNTIME_MANIFEST
+    tmp = path.with_suffix(".json.tmp")
     try:
-        path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+        tmp.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+        tmp.replace(path)
     except OSError:
         pass
 
