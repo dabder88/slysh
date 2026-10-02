@@ -1185,6 +1185,7 @@ def _start_engine_job(app: FastAPI, db: Database, job_id: int, source_path: str)
     def boot() -> None:
         coord: AsrCoordinator = app.state.asr_coordinator
         if not coord.try_begin_local(job_id):
+            logging.debug("local ASR busy; job %s stays queued", job_id)
             return
         try:
             if is_cloud_only():
@@ -1233,6 +1234,7 @@ def _schedule_remote_job(app: FastAPI, db: Database, job_id: int, source_path: s
     def boot() -> None:
         coord: AsrCoordinator = app.state.asr_coordinator
         if not coord.try_begin_remote(job_id):
+            logging.debug("remote ASR busy; job %s stays queued", job_id)
             return
         try:
             _run_remote_job(app, db, job_id, source_path)
@@ -2501,8 +2503,11 @@ def create_ui_app(
                     proc.terminate()
                 except OSError:
                     logging.exception("speaker yt-dlp terminate failed for job %s", job_id)
+        was_queued = job.get("status") == JobStatus.QUEUED.value
         if job["status"] in _JOB_ACTIVE_STATUSES:
             db.set_status(job_id, JobStatus.CANCELLED)
+        if was_queued:
+            _pump_asr_queues(app, db)
         return {"ok": True}
 
     @app.post("/api/jobs/{job_id}/speakers")

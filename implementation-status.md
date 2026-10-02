@@ -4,7 +4,7 @@
 
 **Легенда:** ✅ готово · 🟡 частично · 🔵 в работе / не в git · ⬜ не начато · ⏭️ отложено
 
-**Последнее обновление:** 2026-10-02 — D.1–D.2 WebView session; launcher env.
+**Последнее обновление:** 2026-10-02 — волна C: pump при cancel QUEUED; smoke coordinator.
 
 ---
 
@@ -13,9 +13,9 @@
 | Волна | Фокус | Статус | Комментарий |
 |-------|--------|--------|-------------|
 | **0** | Основа тестов | 🟡 | pytest ~450; таблица «8 fail» не оформлена |
-| **A** | Корректность | 🟡 | A1–A5,A8,A9,A11 ✅ smokes; **A6** 🟡; **A7,A10** остаются |
+| **A** | Корректность | 🟡 | A1–A11 ✅ smokes; хвосты по plan-fix §1 |
 | **B** | Надёжность UX | 🟡 | B1–B3,B5,B4.2–B4.3 ✅; B4.4 manual ⏭️ |
-| **C** | Job runtime | 🟡 | C.4 ✅; C.1–C.3 🟡 (не весь §1.1) |
+| **C** | Job runtime | 🟡 | C.4 ✅; C.1–C.3 🟡 (pump/cancel smoke; coordinator tests) |
 | **D** | Безопасность | ✅ | D.1–D.6 закрыты |
 | **E** | Установщик | 🟡 | |
 | **F** | CI / доки | 🟡 | |
@@ -26,10 +26,10 @@
 
 | Блок | ID | Содержание |
 |------|-----|------------|
-| **1** | C / E | coordinator; установщик |
-| **3** | D.1–D.2 | Loopback-only, UI session в WebView |
+| **1** | C / E | coordinator (C.1–C.3); установщик |
+| **2** | E | payload, WebView2 offline, обновления |
 
-D.3–D.4 закрыты (см. таблицу D ниже).
+D.1–D.6 закрыты (таблица D).
 
 ---
 
@@ -70,9 +70,9 @@ D.3–D.4 закрыты (см. таблицу D ниже).
 
 | ID | Задача | Статус |
 |----|--------|--------|
-| C.1 | Coordinator local/remote | 🟡 |
-| C.2 | `run_id` | 🟡 |
-| C.3 | Cancel + engine | 🟡 |
+| C.1 | Coordinator local/remote | 🟡 | `pump_*`, debug busy; `test_pump_local_skips_when_slot_busy` |
+| C.2 | `run_id` | 🟡 | `job_run_active` в тестах coordinator |
+| C.3 | Cancel + engine | 🟡 | cancel QUEUED → `_pump_asr_queues`; `smoke_coordinator_queued_cancel.py` |
 | C.4 | Idempotent start | ✅ |
 | C.5 | Single-instance | 🟡 |
 
@@ -117,6 +117,7 @@ D.3–D.4 закрыты (см. таблицу D ниже).
 | `smoke_capture_pause_resume.py` | B4.3 |
 | `smoke_secrets_dpapi_migration.py` | D.5 |
 | `smoke_ui_auth_session.py` | D.2 |
+| `smoke_coordinator_queued_cancel.py` | C.3 |
 | `kill_slysh_orphans.ps1` | уборка после проверок |
 
 ---
