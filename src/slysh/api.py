@@ -1573,6 +1573,46 @@ def _capture_finalize_uses_remote_engine(app: FastAPI) -> bool:
     return selected is not None and selected.backend in REMOTE_BACKENDS
 
 
+def _capture_asr_slot_kind(app: FastAPI, job_id: int) -> str | None:
+    slots: dict = getattr(app.state, "capture_asr_slots", None) or {}
+    return slots.get(int(job_id))
+
+
+def _acquire_capture_asr_slot(app: FastAPI, db: Database, job_id: int) -> str | None:
+    """Reserve local/remote ASR coordinator for live/meeting capture. Returns error text or None."""
+    jid = int(job_id)
+    if _capture_asr_slot_kind(app, jid) is not None:
+        return None
+    coord: AsrCoordinator = app.state.asr_coordinator
+    if not hasattr(app.state, "capture_asr_slots"):
+        app.state.capture_asr_slots = {}
+    if _capture_finalize_uses_local_engine(app):
+        if not coord.begin_local_wait(jid, timeout_s=60.0):
+            return "Не удалось занять локальный движок для записи."
+        app.state.capture_asr_slots[jid] = "local"
+        return None
+    if _capture_finalize_uses_remote_engine(app):
+        if not coord.begin_remote_wait(jid, timeout_s=60.0):
+            return "Не удалось занять облачный исполнитель для записи."
+        app.state.capture_asr_slots[jid] = "remote"
+        return None
+    return None
+
+
+def _release_capture_asr_slot(app: FastAPI, db: Database, job_id: int) -> None:
+    jid = int(job_id)
+    slots: dict = getattr(app.state, "capture_asr_slots", None) or {}
+    kind = slots.pop(jid, None)
+    if not kind:
+        return
+    coord: AsrCoordinator = app.state.asr_coordinator
+    if kind == "local":
+        coord.end_local(jid)
+    elif kind == "remote":
+        coord.end_remote(jid)
+    _pump_asr_queues(app, db)
+
+
 def _live_is_busy(app: FastAPI) -> bool:
     live = app.state.live
     return bool(live.get("listening") or live.get("session") or _capture_finalize_busy(app))
@@ -1771,18 +1811,21 @@ def _run_capture_finalize(
     coord: AsrCoordinator = app.state.asr_coordinator
     uses_local = _capture_finalize_uses_local_engine(app)
     uses_remote = _capture_finalize_uses_remote_engine(app)
+    slot_kind = _capture_asr_slot_kind(app, job_id)
     if uses_local:
-        if not coord.begin_local_wait(job_id, timeout_s=300.0):
-            db.set_error(job_id, "Не удалось дождаться локального движка для завершения записи.")
-            db.set_status(job_id, JobStatus.FAILED)
-            threads.pop(job_id, None)
-            return
+        if slot_kind != "local":
+            if not coord.begin_local_wait(job_id, timeout_s=300.0):
+                db.set_error(job_id, "Не удалось дождаться локального движка для завершения записи.")
+                db.set_status(job_id, JobStatus.FAILED)
+                threads.pop(job_id, None)
+                return
     elif uses_remote:
-        if not coord.begin_remote_wait(job_id, timeout_s=300.0):
-            db.set_error(job_id, "Не удалось дождаться облачного исполнителя для завершения записи.")
-            db.set_status(job_id, JobStatus.FAILED)
-            threads.pop(job_id, None)
-            return
+        if slot_kind != "remote":
+            if not coord.begin_remote_wait(job_id, timeout_s=300.0):
+                db.set_error(job_id, "Не удалось дождаться облачного исполнителя для завершения записи.")
+                db.set_status(job_id, JobStatus.FAILED)
+                threads.pop(job_id, None)
+                return
     run_id = job_run_id(db, job_id)
     try:
         for pcm in pcm_chunks:
@@ -1800,11 +1843,13 @@ def _run_capture_finalize(
         db.set_error(job_id, "Не удалось завершить расшифровку записи.")
         db.set_status(job_id, JobStatus.FAILED)
     finally:
-        if uses_local:
+        if _capture_asr_slot_kind(app, job_id) is not None:
+            _release_capture_asr_slot(app, db, job_id)
+        elif uses_local:
             coord.end_local(job_id)
+            _pump_asr_queues(app, db)
         elif uses_remote:
             coord.end_remote(job_id)
-        if uses_local or uses_remote:
             _pump_asr_queues(app, db)
         threads.pop(job_id, None)
 
@@ -1818,6 +1863,8 @@ def _start_capture_finalize(
 ) -> threading.Thread | None:
     if not pcm_chunks:
         _finalize_capture_job(db, asr_state, job_id)
+        if _capture_asr_slot_kind(app, job_id) is not None:
+            _release_capture_asr_slot(app, db, job_id)
         return None
     if not hasattr(app.state, "capture_finalize_threads"):
         app.state.capture_finalize_threads = {}
@@ -2929,6 +2976,16 @@ def create_ui_app(
             db.set_status(job_id, JobStatus.FAILED)
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+        slot_err = _acquire_capture_asr_slot(app, db, job_id)
+        if slot_err:
+            stream.stop()
+            stream.close()
+            session.flush()
+            _close_live_ingest(app.state.live)
+            app.state.live = _empty_live_state()
+            db.set_error(job_id, slot_err)
+            db.set_status(job_id, JobStatus.FAILED)
+            raise HTTPException(status_code=400, detail=slot_err)
         app.state.live["stream"] = stream
         worker = threading.Thread(target=_live_worker, args=(app, db), daemon=True)
         app.state.live["thread"] = worker
@@ -3109,6 +3166,17 @@ def create_ui_app(
             db.set_error(job_id, str(exc))
             db.set_status(job_id, JobStatus.FAILED)
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+        slot_err = _acquire_capture_asr_slot(app, db, job_id)
+        if slot_err:
+            try:
+                capture.stop()
+            except Exception:
+                pass
+            session.flush()
+            app.state.meeting = _empty_meeting_state()
+            db.set_error(job_id, slot_err)
+            db.set_status(job_id, JobStatus.FAILED)
+            raise HTTPException(status_code=400, detail=slot_err)
         app.state.meeting["capture"] = capture
         worker = threading.Thread(target=_live_worker, args=(app, db), daemon=True)
         app.state.meeting["thread"] = worker
