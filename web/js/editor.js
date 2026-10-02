@@ -227,6 +227,9 @@ async function pollEditorJob() {
   }
   currentJob = job;
   syncEditModeAvailability(job);
+  if (!editorDraftDirty) {
+    window.__syncSegmentsRevision?.(job.segments_revision);
+  }
   if (editorMode === "view" && !editorDraftDirty) {
     renderSegments(job);
   }

@@ -660,6 +660,35 @@ def _decorate_job(
     return payload
 
 
+def _coerce_segment_speaker_keys(
+    db: Database,
+    job_id: int,
+    segments: list[Segment],
+) -> list[Segment]:
+    """Map display names from edited transcript back to stable speaker keys (A6)."""
+    names = db.list_speaker_names(job_id)
+    if not names:
+        return segments
+    display_to_key = {display: key for key, display in names.items() if display}
+    out: list[Segment] = []
+    for seg in segments:
+        speaker = seg.speaker
+        if not speaker:
+            out.append(seg)
+            continue
+        if speaker in names:
+            out.append(seg)
+            continue
+        key = display_to_key.get(speaker)
+        if key:
+            out.append(
+                Segment(seg.start_ms, seg.end_ms, seg.text, speaker=key)
+            )
+        else:
+            out.append(seg)
+    return out
+
+
 def _display_segments(
     db: Database,
     job_id: int,
@@ -2314,6 +2343,7 @@ def create_ui_app(
                 status_code=409,
                 detail="Расшифровка ещё идёт. Дождитесь завершения или отмените задание.",
             )
+        segments = _coerce_segment_speaker_keys(db, job_id, segments)
         try:
             revision = db.replace_segments(
                 job_id,

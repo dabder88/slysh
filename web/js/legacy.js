@@ -918,6 +918,17 @@ function isEditingTranscript() {
   return document.activeElement === transcriptEl;
 }
 
+function syncSegmentsRevision(rev) {
+  if (isEditingTranscript()) {
+    return;
+  }
+  segmentsRevision = Number(rev) || 0;
+}
+
+if (typeof window !== "undefined") {
+  window.__syncSegmentsRevision = syncSegmentsRevision;
+}
+
 async function selectJob(id) {
   syncSelectedJobId(id);
   renderLibrary();

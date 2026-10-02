@@ -4,7 +4,7 @@
 
 **Легенда:** ✅ готово · 🟡 частично · 🔵 в работе / не в git · ⬜ не начато · ⏭️ отложено
 
-**Последнее обновление:** 2026-10-02 — блок A2/A6/B4.2: smokes cancel/speakers, `capture_control_lock`, тест спикеров.
+**Последнее обновление:** 2026-10-02 — A6 export/speaker coerce; B1 revision sync + 409 smoke.
 
 ---
 
@@ -26,8 +26,8 @@
 
 | Блок | ID | Содержание |
 |------|-----|------------|
-| **1** | A7 + D.5 | Контракт секретов API + DPAPI |
-| **2** | A6 + B1 ext | Unicode/export edge cases; ревизия 409 |
+| **1** | D.3–D.4 | Host/Origin, path traversal |
+| **2** | B4.2–B4.3 | pause/stop сериализация (дожать worker lock) |
 | **3** | A7 + D.5 | Контракт секретов API + DPAPI |
 | **4** | B4.2–B4.3 | Сериализация pause/stop live/meeting |
 | **5** | D.1–D.4 | Loopback, session, Host/Origin, traversal |
@@ -45,7 +45,7 @@
 | A3 | Пакет `cloud_only` | ✅ | `smoke_cloud_batch_route.py` + guard в `_run_file_asr_job` |
 | A4 | `on_error=stop`, итог пакета | ✅ | `smoke_batch_on_error_stop.py` |
 | A5 | Коллизии экспорта пакета | ✅ | `smoke_batch_export_collision.py` |
-| A6 | Спикер = ключ | 🟡 | API `speaker_key`; `smoke_speaker_rename_twice.py`; без `apply_speaker_names` |
+| A6 | Спикер = ключ | ✅ | coerce на PATCH; export display; `test_speaker_patch_export.py` |
 | A7 | Секреты в API | ✅ | masked + session; PUT omit/``; `smoke_providers_secret_contract.py` |
 | A8 | Live/meeting finalize | ✅ | `finalizing` в БД, smokes finalize/double_stop, pytest live |
 | A9 | YAML экспорт | ✅ | `json.dumps` в front matter; `smoke_export_yaml_windows_path.py` |
@@ -58,7 +58,7 @@
 
 | ID | Задача | Статус |
 |----|--------|--------|
-| B1 | Редактор dirty/stash | ✅ |
+| B1 | Редактор dirty/stash | ✅ | `expected_revision` + 409; poll `syncSegmentsRevision`; smoke `smoke_segments_revision_409.py` |
 | B2 | Атомарные settings, YT meta | ✅ |
 | B3 | UI shutdown | ✅ |
 | B4.1 | Audio ingest queue | ✅ |
@@ -103,6 +103,7 @@
 | `smoke_export_yaml_windows_path.py` | A9 |
 | `smoke_engine_cancel_sequence.py` | A2 |
 | `smoke_speaker_rename_twice.py` | A6 |
+| `smoke_segments_revision_409.py` | B1 |
 | `kill_slysh_orphans.ps1` | уборка после проверок |
 
 ---
