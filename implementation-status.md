@@ -4,7 +4,7 @@
 
 **Легенда:** ✅ готово · 🟡 частично · 🔵 в работе / не в git · ⬜ не начато · ⏭️ отложено
 
-**Последнее обновление:** 2026-10-02 — E.7 probe new slot + revert; F.5 audit script.
+**Последнее обновление:** 2026-10-02 — E.7 prune stale engine slots; F.5 в CI.
 
 ---
 
@@ -15,7 +15,7 @@
 | **0** | Основа тестов | ✅ | [`TEST_BASELINE.md`](TEST_BASELINE.md); `ci/check_import_path.py` |
 | **A** | Корректность | ✅ | A1–A11 + smokes; Gemini prompt test (A10) |
 | **B** | Надёжность UX | 🟡 | B1–B3,B5,B4.2–B4.3 ✅; B4.4 manual ⏭️ |
-| **C** | Job runtime | 🟡 | C.4 ✅; C.1–C.3 ✅ smokes; C.5 smoke bat |
+| **C** | Job runtime | ✅ | C.1–C.5 smokes + coordinator pytest (локально) |
 | **D** | Безопасность | ✅ | D.1–D.6 закрыты |
 | **E** | Установщик | 🟡 | [`INSTALLER-BUILD.md`](INSTALLER-BUILD.md); E.1–E.5 в коде |
 | **F** | CI / доки | 🟡 | GitHub workflow + `ci_mandatory_checks.ps1`; [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) |
@@ -97,7 +97,7 @@ D.1–D.6 закрыты (таблица D).
 | F.2 | `test_ui_imports` в CI | ✅ | `ci/check_ui_imports.py` |
 | F.3 | JS + CSS в CI | ✅ | `check-web-js.ps1`, `npm run build:css` |
 | F.4 | Сторонние лицензии | 🟡 | `THIRD_PARTY_NOTICES.md` (черновик) |
-| F.5 | Аудит секретов в git | 🟡 | `scripts/audit_git_secrets.ps1` (эвристика) |
+| F.5 | Аудит секретов в git | ✅ | `audit_git_secrets.ps1` в CI + `ci_mandatory_checks` |
 
 Локально (с `tests/`): `powershell -File scripts\ci_mandatory_checks.ps1` — дополнительно полный pytest.
 
@@ -111,7 +111,7 @@ D.1–D.6 закрыты (таблица D).
 | E.4 | SHA-256 обновлений | ✅ | `updates.py`, `smoke_updates_sha256.py` |
 | E.5 | Upgrade ≠ first-run | ✅ | `IsAppUpgrade` / `.fresh-install` |
 | E.6 | Чистые Win10/11 offline | 🟡 | локальный прогон `dist\payload` OK; VM — `e6-offline-vm-verify.ps1 -RequireWheelhouse` |
-| E.7 | UI/engine split (§7.2) | 🟡 | probe fresh slot; `revert_active_engine_venv`; smoke slots |
+| E.7 | UI/engine split (§7.2) | 🟡 | probe/revert; `prune_stale_engine_venv_slots`; smoke slots |
 
 Сборка: [`INSTALLER-BUILD.md`](INSTALLER-BUILD.md).
 

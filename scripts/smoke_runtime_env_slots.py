@@ -50,6 +50,23 @@ def main() -> int:
         if data3.get("active_engine_venv") != slot.name:
             return _fail(f"revert did not restore active slot: {data3}")
 
+        stale = home / ".venv-engine-deadbeefdeadbeef"
+        stale.mkdir(parents=True)
+        keep_other = home / ".venv-engine-bbbbbbbbbbbbbbbb"
+        keep_other.mkdir(parents=True, exist_ok=True)
+        runtime_env.write_runtime_manifest(active_slot=keep_other.name)
+        removed = runtime_env.prune_stale_engine_venv_slots()
+        if stale.name not in removed:
+            return _fail(f"expected stale slot pruned, removed={removed}")
+        if not stale.is_dir():
+            pass
+        elif stale.exists():
+            return _fail("stale slot dir still exists")
+        if not keep_other.is_dir():
+            return _fail("kept slot was removed")
+        if slot.is_dir() and slot.name not in runtime_env.engine_venv_slot_names_to_keep():
+            return _fail("previous active slot should be kept")
+
     print("smoke_runtime_env_slots: OK")
     return 0
 

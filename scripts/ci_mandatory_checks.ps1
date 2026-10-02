@@ -24,6 +24,12 @@ Write-Host "=== ci/check_ui_imports.py ==="
 Write-Host "=== ci/check_gemini_cli_prompt.py ==="
 & $Python (Join-Path $Root "ci\check_gemini_cli_prompt.py")
 
+Write-Host "=== audit_git_secrets.ps1 ==="
+powershell -NoProfile -File (Join-Path $Root "scripts\audit_git_secrets.ps1")
+if ($LASTEXITCODE -ne 0) {
+    throw "audit_git_secrets failed"
+}
+
 $Smokes = @(
     "scripts\smoke_engine_cancel_sequence.py",
     "scripts\smoke_providers_secret_contract.py",
@@ -31,7 +37,8 @@ $Smokes = @(
     "scripts\smoke_ui_auth_session.py",
     "scripts\smoke_loopback_host_origin.py",
     "scripts\smoke_coordinator_queued_cancel.py",
-    "scripts\smoke_updates_sha256.py"
+    "scripts\smoke_updates_sha256.py",
+    "scripts\smoke_runtime_env_slots.py"
 )
 foreach ($rel in $Smokes) {
     $path = Join-Path $Root $rel

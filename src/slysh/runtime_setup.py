@@ -587,6 +587,9 @@ def _run_install() -> None:
                         save_lock_fingerprint()
                         slot = engine_target.name if engine_target is not None else None
                         write_runtime_manifest(active_slot=slot)
+                        from slysh.runtime_env import prune_stale_engine_venv_slots
+
+                        prune_stale_engine_venv_slots()
                     except Exception:
                         logging.debug("could not save uv.lock fingerprint", exc_info=True)
     except Exception as exc:

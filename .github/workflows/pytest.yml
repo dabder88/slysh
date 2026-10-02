@@ -32,6 +32,7 @@ jobs:
           python ci/check_import_path.py
           python ci/check_ui_imports.py
           python ci/check_gemini_cli_prompt.py
+          powershell -NoProfile -File scripts/audit_git_secrets.ps1
           $smokes = @(
             'scripts/smoke_engine_cancel_sequence.py',
             'scripts/smoke_providers_secret_contract.py',
@@ -39,6 +40,7 @@ jobs:
             'scripts/smoke_ui_auth_session.py',
             'scripts/smoke_loopback_host_origin.py',
             'scripts/smoke_coordinator_queued_cancel.py',
-            'scripts/smoke_updates_sha256.py'
+            'scripts/smoke_updates_sha256.py',
+            'scripts/smoke_runtime_env_slots.py'
           )
           foreach ($s in $smokes) { python $s }

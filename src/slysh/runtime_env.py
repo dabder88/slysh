@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
+import shutil
 import sys
 from pathlib import Path
 
@@ -241,3 +243,41 @@ def read_runtime_manifest() -> dict:
     except (OSError, json.JSONDecodeError):
         return {}
     return data if isinstance(data, dict) else {}
+
+
+def engine_venv_slot_names_to_keep() -> set[str]:
+    """Dirs under install root that must not be pruned (active, rollback, target, legacy)."""
+    manifest = read_runtime_manifest()
+    keep: set[str] = set()
+    for key in ("active_engine_venv", "previous_engine_venv"):
+        name = str(manifest.get(key) or "").strip()
+        if name:
+            keep.add(name)
+    keep.add(resolve_engine_venv_target().name)
+    keep.add(ENGINE_VENV_DIR)
+    return keep
+
+
+def prune_stale_engine_venv_slots() -> list[str]:
+    """Delete old ``.venv-engine-<fp>`` dirs after a successful slot switch (installed layout)."""
+    if not use_split_engine_venv():
+        return []
+    root = install_root()
+    keep = engine_venv_slot_names_to_keep()
+    removed: list[str] = []
+    try:
+        entries = list(root.iterdir())
+    except OSError:
+        logging.debug("could not list install root for engine prune", exc_info=True)
+        return []
+    for child in entries:
+        if not child.is_dir() or not child.name.startswith(ENGINE_VENV_PREFIX):
+            continue
+        if child.name in keep:
+            continue
+        try:
+            shutil.rmtree(child)
+            removed.append(child.name)
+        except OSError:
+            logging.warning("could not remove stale engine venv %s", child, exc_info=True)
+    return removed
