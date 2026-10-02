@@ -4,7 +4,7 @@
 
 **Легенда:** ✅ готово · 🟡 частично · 🔵 в работе / не в git · ⬜ не начато · ⏭️ отложено
 
-**Последнее обновление:** 2026-10-02 — `tests/` в git; conftest ASR defaults; pytest в CI.
+**Последнее обновление:** 2026-10-02 — UI engine-repair (E.7); настройки ASR.
 
 ---
 
@@ -26,7 +26,7 @@
 
 | Блок | ID | Содержание |
 |------|-----|------------|
-| **1** | E | E.6 прогон матрицы на реальной VM (журнал в E6-OFFLINE-VM) |
+| **1** | E | E.6 прогон матрицы на реальной VM (журнал в `installer/E6-OFFLINE-VM.md`) |
 | **2** | F | ручной аудит секретов в **истории** git (F.5 — tracked файлы) |
 
 D.1–D.6 закрыты (таблица D).
@@ -111,7 +111,7 @@ D.1–D.6 закрыты (таблица D).
 | E.4 | SHA-256 обновлений | ✅ | `updates.py`, `smoke_updates_sha256.py` |
 | E.5 | Upgrade ≠ first-run | ✅ | `IsAppUpgrade` / `.fresh-install` |
 | E.6 | Чистые Win10/11 offline | 🟡 | [`installer/E6-OFFLINE-VM.md`](installer/E6-OFFLINE-VM.md); verify + `-ProbeOfflineUiSync`; VM журнал — вручную |
-| E.7 | UI/engine split (§7.2) | 🟡 | repair API; `engine_slot_needs_resync`; probe/revert/prune |
+| E.7 | UI/engine split (§7.2) | ✅ | repair API + UI; probe/revert/prune; smokes/pytest |
 
 Сборка: [`INSTALLER-BUILD.md`](INSTALLER-BUILD.md).
 

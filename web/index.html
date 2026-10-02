@@ -1201,6 +1201,16 @@
         </button>
         <pre id="engine-setup-settings-log" class="engine-setup-log" hidden></pre>
       </div>
+
+      <div id="engine-resync-settings" class="settings-engine-block settings-bento-tile" hidden>
+        <p id="engine-resync-hint" class="hint" data-i18n="settings.engineResyncHint">
+          После обновления программы нужно пересобрать окружение локальной расшифровки (новый uv.lock).
+        </p>
+        <button type="button" id="btn-engine-repair" class="btn-outline settings-reload-btn">
+          <span class="material-symbols-outlined" aria-hidden="true">sync</span>
+          <span data-i18n="settings.engineResyncButton">Обновить окружение engine</span>
+        </button>
+      </div>
       </div>
 
       <div id="settings-pane-proxy" class="settings-bento-pane" role="tabpanel" aria-labelledby="settings-tab-proxy" hidden>
@@ -1709,7 +1719,7 @@
       "/js/orphan-files-table.js": "/js/orphan-files-table.js?v=46",
       "/js/queue.js": "/js/queue.js?v=46",
       "/js/router.js": "/js/router.js?v=48",
-      "/js/shell.js": "/js/shell.js?v=83",
+      "/js/shell.js": "/js/shell.js?v=84",
       "/js/state.js": "/js/state.js?v=45",
       "/js/transcripts.js": "/js/transcripts.js?v=45",
       "/js/version.js": "/js/version.js?v=45",

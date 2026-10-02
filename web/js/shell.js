@@ -2082,7 +2082,9 @@ function initEngineSetup() {
   const logToggle = document.getElementById("engine-setup-log-toggle");
   const choicesEl = document.querySelector(".engine-setup-choices");
   const settingsBlock = document.getElementById("engine-setup-settings");
+  const resyncBlock = document.getElementById("engine-resync-settings");
   const settingsBtn = document.getElementById("btn-install-engine");
+  const repairBtn = document.getElementById("btn-engine-repair");
   const settingsLog = document.getElementById("engine-setup-settings-log");
   const settingsError = document.getElementById("engine-setup-settings-error");
   let pollTimer = null;
@@ -2301,10 +2303,22 @@ function initEngineSetup() {
     }
   }
 
+  function engineNeedsResync(status) {
+    return Boolean(
+      status &&
+        !status.cloud_only &&
+        status.engine_packages &&
+        (status.engine_resync_recommended || status.engine_slot_needs_resync),
+    );
+  }
+
   function apply(status) {
     const missing = !status.engine_packages;
     if (settingsBlock) {
       settingsBlock.hidden = !missing;
+    }
+    if (resyncBlock) {
+      resyncBlock.hidden = !engineNeedsResync(status) || Boolean(status.installing);
     }
     const logText = status.log_tail || "";
     if (logEl) {
@@ -2359,6 +2373,9 @@ function initEngineSetup() {
     }
     if (settingsBtn) {
       settingsBtn.disabled = busy || Boolean(status.engine_packages);
+    }
+    if (repairBtn) {
+      repairBtn.disabled = busy;
     }
     if (laterBtn) {
       laterBtn.disabled = busy;
@@ -2422,6 +2439,28 @@ function initEngineSetup() {
     }
   }
 
+  async function startEngineRepair() {
+    installFinishHandled = false;
+    clearInstallSuccessTimer();
+    if (modal) {
+      modal.hidden = false;
+    }
+    setEngineSetupPhase("install");
+    try {
+      const status = await api("/api/setup/engine-repair", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ force: false }),
+      });
+      apply(status);
+      if (status.installing) {
+        startPoll();
+      }
+    } catch (err) {
+      reportError(t("settings.engineSetup"), err);
+    }
+  }
+
   async function dismiss() {
     try {
       await api("/api/setup/later", { method: "POST" });
@@ -2459,6 +2498,9 @@ function initEngineSetup() {
   installBtn?.addEventListener("click", () => openConfirmModal(true));
   cloudBtn?.addEventListener("click", () => chooseCloudOnly());
   settingsBtn?.addEventListener("click", () => openConfirmModal(false));
+  repairBtn?.addEventListener("click", () => {
+    startEngineRepair().catch((err) => reportError(t("settings.engineSetup"), err));
+  });
   laterBtn?.addEventListener("click", () => dismiss());
 
   modal?.addEventListener("click", (event) => {
@@ -2494,11 +2536,12 @@ function initEngineSetup() {
   refresh()
     .then((status) => {
       if (
-        status?.engine_resync_recommended &&
+        engineNeedsResync(status) &&
         !sessionStorage.getItem("slysh-engine-resync-hint")
       ) {
         sessionStorage.setItem("slysh-engine-resync-hint", "1");
         showToast("updates.engineResync");
+        openSettingsModal();
       }
       openEngineSetupModalIfNeeded(status);
       if (status.installing) {

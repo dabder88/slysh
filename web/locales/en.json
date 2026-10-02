@@ -803,6 +803,8 @@
     "enginePackagesRequired": "Install local transcription packages in Settings first.",
     "enginePackagesFirst": "Install transcription packages first (button below).",
     "enginePackagesHint": "Local transcription needs packages (~3–5 GB). Use the button below; disable VPN during download if installs stall.",
+    "engineResyncHint": "After an app update, rebuild the local transcription environment (lockfile changed).",
+    "engineResyncButton": "Refresh engine environment",
     "modelNotInstalled": "{label} (not installed)",
     "modelOptionInstalled": "{label} — installed",
     "modelOptionNotInstalled": "{label} — not installed",
