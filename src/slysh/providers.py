@@ -615,6 +615,18 @@ def any_remote_ready(which: Callable[[str], str | None] | None = None) -> bool:
     return bool(find_gemini_binary(which=which))
 
 
+def migrate_legacy_provider_secrets() -> None:
+    """Move plaintext provider keys from settings.json into DPAPI (idempotent)."""
+    openrouter_api_key()
+    apify_api_key()
+    for preset in HTTP_PRESETS:
+        http_api_key(preset.id)
+    for item in list_custom_providers():
+        cid = str(item.get("id") or "").strip()
+        if cid:
+            custom_api_key(cid)
+
+
 def public_providers(which: Callable[[str], str | None] | None = None) -> dict:
     return {
         "openrouter": public_openrouter(),

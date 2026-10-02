@@ -3,8 +3,11 @@ from __future__ import annotations
 import json
 import logging
 import re
+import shutil
 import subprocess
 import sys
+import tempfile
+import time
 from collections.abc import Callable
 from pathlib import Path
 
@@ -19,7 +22,6 @@ GEMINI_PROMPT = (
     '[{"start":0.0,"end":1.2,"text":"..."}]. No commentary.'
 )
 
-
 def _ffmpeg_hidden_kwargs() -> dict:
     kwargs: dict = {}
     if sys.platform == "win32":
@@ -28,6 +30,12 @@ def _ffmpeg_hidden_kwargs() -> dict:
         kwargs["startupinfo"] = startupinfo
         kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
     return kwargs
+
+
+def _assert_safe_gemini_cmd(cmd: list[str]) -> None:
+    flat = " ".join(str(part) for part in cmd).lower()
+    if "yolo" in flat or "--approval-mode" in flat:
+        raise RemoteAsrError("Gemini CLI: недопустимый режим approval-mode.")
 
 
 def parse_gemini_output(raw: str, duration_ms: int) -> list[Segment]:
@@ -59,6 +67,60 @@ def parse_gemini_output(raw: str, duration_ms: int) -> list[Segment]:
     return [Segment(0, max(int(duration_ms), 1), text)]
 
 
+def _run_gemini_subprocess(
+    cmd: list[str],
+    *,
+    cwd: str,
+    timeout: float,
+    cancelled: Callable[[], bool] | None,
+    runner,
+) -> subprocess.CompletedProcess | None:
+    env = subprocess_env_for_target("gemini")
+    hidden = _ffmpeg_hidden_kwargs()
+    if runner is not None:
+        return runner(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=False,
+            env=env,
+            cwd=cwd,
+            **hidden,
+        )
+    deadline = time.monotonic() + max(float(timeout), 1.0)
+    proc = subprocess.Popen(
+        cmd,
+        cwd=cwd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        env=env,
+        **hidden,
+    )
+    try:
+        while proc.poll() is None:
+            if cancelled and cancelled():
+                proc.kill()
+                proc.wait(timeout=5)
+                return None
+            if time.monotonic() >= deadline:
+                proc.kill()
+                proc.wait(timeout=5)
+                raise subprocess.TimeoutExpired(cmd, timeout)
+            time.sleep(0.15)
+        stdout, stderr = proc.communicate(timeout=1)
+        return subprocess.CompletedProcess(
+            cmd,
+            proc.returncode or 0,
+            stdout=stdout,
+            stderr=stderr,
+        )
+    finally:
+        if proc.poll() is None:
+            proc.kill()
+
+
 def transcribe_gemini_file(
     audio_path: str,
     duration_ms: int,
@@ -74,30 +136,36 @@ def transcribe_gemini_file(
         )
     if cancelled and cancelled():
         return []
-    path = Path(audio_path).resolve()
-    prompt = f"{GEMINI_PROMPT} @{path}"
-    cmd = [
-        exe,
-        "-p",
-        prompt,
-        "--output-format",
-        "json",
-    ]
-    run = runner or subprocess.run
-    try:
-        completed = run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            check=False,
-            env=subprocess_env_for_target("gemini"),
-            **_ffmpeg_hidden_kwargs(),
-        )
-    except subprocess.TimeoutExpired as exc:
-        raise RemoteAsrError("Gemini CLI превысил время ожидания.") from exc
-    except FileNotFoundError as exc:
-        raise RemoteAsrError("Gemini CLI не найден.") from exc
+    src = Path(audio_path).resolve()
+    if not src.is_file():
+        raise RemoteAsrError("Gemini CLI: аудиофайл не найден.")
+    with tempfile.TemporaryDirectory(prefix="slysh-gemini-") as tmp:
+        work = Path(tmp)
+        dest = work / f"audio{src.suffix or '.wav'}"
+        shutil.copy2(src, dest)
+        prompt = f"{GEMINI_PROMPT} @{dest.name}"
+        cmd = [
+            exe,
+            "-p",
+            prompt,
+            "--output-format",
+            "json",
+        ]
+        _assert_safe_gemini_cmd(cmd)
+        try:
+            completed = _run_gemini_subprocess(
+                cmd,
+                cwd=str(work),
+                timeout=timeout,
+                cancelled=cancelled,
+                runner=runner,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise RemoteAsrError("Gemini CLI превысил время ожидания.") from exc
+        except FileNotFoundError as exc:
+            raise RemoteAsrError("Gemini CLI не найден.") from exc
+    if completed is None:
+        return []
     if cancelled and cancelled():
         return []
     code = int(getattr(completed, "returncode", 1) or 0)

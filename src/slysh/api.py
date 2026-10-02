@@ -2064,6 +2064,11 @@ def create_ui_app(
         lifespan=_ui_lifespan,
     )
     app.state.db = db
+    from slysh.http_proxy import migrate_proxy_secret
+    from slysh.providers import migrate_legacy_provider_secrets
+
+    migrate_legacy_provider_secrets()
+    migrate_proxy_secret()
     install_ui_auth(app)
     register_ui_session_route(app)
     install_loopback_guards(app)

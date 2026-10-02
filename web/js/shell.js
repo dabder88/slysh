@@ -1442,10 +1442,12 @@ function initProxySettings() {
       proxyUsername.value = cfg.username || "";
     }
     if (proxyPassword) {
-      proxyPassword.value = cfg.password || "";
+      proxyPassword.value = "";
     }
     if (proxyPasswordHint) {
-      proxyPasswordHint.textContent = t("shell.k8910786");
+      proxyPasswordHint.textContent = cfg.password_set
+        ? t("shell.k2661382")
+        : t("shell.k8910786");
     }
     const targets = cfg.targets || {};
     for (const input of proxyTargetInputs()) {

@@ -4,7 +4,7 @@
 
 **Легенда:** ✅ готово · 🟡 частично · 🔵 в работе / не в git · ⬜ не начато · ⏭️ отложено
 
-**Последнее обновление:** 2026-10-02 — B4.2–B4.3 pause/stop lock + тесты.
+**Последнее обновление:** 2026-10-02 — D.5 DPAPI; A10 Gemini CLI.
 
 ---
 
@@ -26,8 +26,7 @@
 
 | Блок | ID | Содержание |
 |------|-----|------------|
-| **1** | D.5 / A10 | DPAPI; Gemini yolo |
-| **2** | D.5 | DPAPI для локальных секретов |
+| **1** | D.1–D.2 | loopback UI session в WebView |
 | **3** | D.1–D.2 | Loopback-only, UI session в WebView |
 
 D.3–D.4 закрыты (см. таблицу D ниже).
@@ -47,7 +46,7 @@ D.3–D.4 закрыты (см. таблицу D ниже).
 | A7 | Секреты в API | ✅ | masked + session; PUT omit/``; `smoke_providers_secret_contract.py` |
 | A8 | Live/meeting finalize | ✅ | `finalizing` в БД, smokes finalize/double_stop, pytest live |
 | A9 | YAML экспорт | ✅ | `json.dumps` в front matter; `smoke_export_yaml_windows_path.py` |
-| A10 | Gemini без yolo | 🟡 | `yolo` в коде нет |
+| A10 | Gemini без yolo | ✅ | temp cwd, cancel/timeout; `test_gemini_cli.py` |
 | A11 | Диаризация в engine | ✅ | |
 
 ---
@@ -87,7 +86,7 @@ D.3–D.4 закрыты (см. таблицу D ниже).
 | D.2 | UI session bootstrap/cookie | 🟡 | `test_ui_session_cookie` |
 | D.3 | Host/Origin на mutating | ✅ | `test_loopback_security`; `smoke_loopback_host_origin.py` |
 | D.4 | Path traversal media/open-path | ✅ | `test_media_access`; `smoke_job_media_traversal.py` |
-| D.5 | DPAPI секреты | ⬜ | |
+| D.5 | DPAPI секреты | ✅ | providers+proxy migrate; `test_secrets_dpapi_migration.py`, smoke |
 | D.6 | OpenAPI off в production | ✅ | `test_openapi_disabled_in_production` |
 
 ## Волны E–F
@@ -116,6 +115,7 @@ D.3–D.4 закрыты (см. таблицу D ниже).
 | `smoke_loopback_host_origin.py` | D.3 |
 | `smoke_job_media_traversal.py` | D.4 |
 | `smoke_capture_pause_resume.py` | B4.3 |
+| `smoke_secrets_dpapi_migration.py` | D.5 |
 | `kill_slysh_orphans.ps1` | уборка после проверок |
 
 ---

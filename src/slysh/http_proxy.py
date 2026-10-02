@@ -7,6 +7,8 @@ from urllib.parse import quote
 from urllib.request import ProxyHandler, build_opener, urlopen
 
 from slysh.compute import _read_settings, mutate_settings
+from slysh.providers import mask_secret_preview
+from slysh.secrets_dpapi import clear_nested, get_nested, set_nested
 
 PROXY_TARGET_IDS = frozenset(
     {
@@ -26,6 +28,27 @@ _DEFAULT_TARGETS = {tid: True for tid in PROXY_TARGET_IDS}
 
 def _default_targets() -> dict[str, bool]:
     return dict(_DEFAULT_TARGETS)
+
+
+def _read_stored_proxy_password() -> str:
+    stored = get_nested(("proxy", "password"))
+    if stored:
+        return stored
+    raw = _read_settings().get("proxy")
+    if not isinstance(raw, dict):
+        return ""
+    plain = str(raw.get("password") or "").strip()
+    if not plain:
+        return ""
+    set_nested(("proxy", "password"), plain)
+
+    def patch(data: dict) -> None:
+        block = dict(data.get("proxy") or {})
+        block.pop("password", None)
+        data["proxy"] = block
+
+    mutate_settings(patch)
+    return plain
 
 
 def load_proxy_config() -> dict[str, Any]:
@@ -55,7 +78,7 @@ def load_proxy_config() -> dict[str, Any]:
         "host": str(raw.get("host") or "").strip(),
         "port": port_int,
         "username": str(raw.get("username") or ""),
-        "password": str(raw.get("password") or ""),
+        "password": _read_stored_proxy_password(),
         "targets": merged,
     }
 
@@ -95,9 +118,15 @@ def save_proxy_config(
     if username is not None:
         current["username"] = str(username)
     if password is not None:
-        current["password"] = str(password)
+        text = str(password)
+        if text:
+            set_nested(("proxy", "password"), text)
+            current["password"] = text
+        else:
+            clear_nested(("proxy", "password"))
+            current["password"] = ""
     elif keep_password:
-        pass
+        current["password"] = _read_stored_proxy_password()
     if targets is not None:
         merged = dict(current["targets"])
         for key, value in targets.items():
@@ -111,7 +140,6 @@ def save_proxy_config(
         "host": current["host"],
         "port": current["port"],
         "username": current["username"],
-        "password": current["password"],
         "targets": current["targets"],
     }
 
@@ -125,15 +153,21 @@ def save_proxy_config(
 def public_proxy_config() -> dict[str, Any]:
     cfg = load_proxy_config()
     pwd = cfg["password"]
+    masked = mask_secret_preview(pwd) if pwd else ""
     return {
         "enabled": cfg["enabled"],
         "host": cfg["host"],
         "port": cfg["port"],
         "username": cfg["username"],
-        "password": pwd,
+        "password": "",
         "password_set": bool(pwd),
+        "password_masked": masked,
         "targets": dict(cfg["targets"]),
     }
+
+
+def migrate_proxy_secret() -> None:
+    _read_stored_proxy_password()
 
 
 def build_proxy_url(config: dict[str, Any] | None = None) -> str:
