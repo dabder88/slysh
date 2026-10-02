@@ -1,8 +1,8 @@
 # Волна 0: baseline pytest (историческая сводка)
 
-Исходный аудит (`plan-fix.md`): **364 passed, 8 failed**. Текущий локальный прогон (копия GPT, venv с dev): **469+ passed** при `GIGAAM_SKIP_ENGINE=1` и изолированном `GIGAAM_DESKTOP_HOME` в фикстурах.
+Исходный аудит (`plan-fix.md`): **364 passed, 8 failed**. Текущий целевой прогон: **470 passed** при `GIGAAM_SKIP_ENGINE=1`, фикстурах `isolated_desktop_home` и `default_local_asr_ready` (`tests/conftest.py`).
 
-`tests/` в этой ветке **не в git** (см. `.gitignore`); CI использует `scripts/ci_mandatory_checks.ps1` и каталог `ci/`.
+`tests/` **в git**; CI и локально: `scripts/ci_mandatory_checks.ps1` (smokes + `pytest tests`) и каталог `ci/`.
 
 ## Было 8 fail → причина → что сделано
 

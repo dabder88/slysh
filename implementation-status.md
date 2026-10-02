@@ -4,7 +4,7 @@
 
 **Легенда:** ✅ готово · 🟡 частично · 🔵 в работе / не в git · ⬜ не начато · ⏭️ отложено
 
-**Последнее обновление:** 2026-10-02 — E.6 матрица VM + расширен verify; F.4 THIRD_PARTY_NOTICES.
+**Последнее обновление:** 2026-10-02 — `tests/` в git; conftest ASR defaults; pytest в CI.
 
 ---
 
@@ -12,7 +12,7 @@
 
 | Волна | Фокус | Статус | Комментарий |
 |-------|--------|--------|-------------|
-| **0** | Основа тестов | ✅ | [`TEST_BASELINE.md`](TEST_BASELINE.md); `ci/check_import_path.py` |
+| **0** | Основа тестов | ✅ | `tests/` в git; `pytest` в CI; [`TEST_BASELINE.md`](TEST_BASELINE.md) |
 | **A** | Корректность | ✅ | A1–A11 + smokes; Gemini prompt test (A10) |
 | **B** | Надёжность UX | 🟡 | B1–B3,B5,B4.2–B4.3 ✅; B4.4 manual ⏭️ |
 | **C** | Job runtime | ✅ | C.1–C.5 smokes + coordinator pytest (локально) |
@@ -99,7 +99,7 @@ D.1–D.6 закрыты (таблица D).
 | F.4 | Сторонние лицензии | ✅ | `THIRD_PARTY_NOTICES.md` → `licenses\` в payload |
 | F.5 | Аудит секретов в git | ✅ | `audit_git_secrets.ps1` в CI + `ci_mandatory_checks` |
 
-Локально (с `tests/`): `powershell -File scripts\ci_mandatory_checks.ps1` — дополнительно полный pytest.
+`powershell -File scripts\ci_mandatory_checks.ps1` — smokes + полный `pytest tests`.
 
 ## Волна E
 

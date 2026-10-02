@@ -17,31 +17,11 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[dev]" httpx pytest
-      - name: Mandatory checks (wave F; tests/ not in git)
+      - name: Mandatory checks (wave F)
         shell: pwsh
         env:
           GIGAAM_UI_AUTH: "0"
           GIGAAM_LOOPBACK_STRICT: "0"
           SLYSH_DISABLE_OPENAPI: "1"
           GIGAAM_SKIP_ENGINE: "1"
-        run: |
-          $py = (Get-Command python).Source
-          powershell -NoProfile -File scripts/check-web-js.ps1
-          npm ci
-          npm run build:css
-          python ci/check_import_path.py
-          python ci/check_ui_imports.py
-          python ci/check_gemini_cli_prompt.py
-          powershell -NoProfile -File scripts/audit_git_secrets.ps1
-          $smokes = @(
-            'scripts/smoke_engine_cancel_sequence.py',
-            'scripts/smoke_providers_secret_contract.py',
-            'scripts/smoke_open_path_api.py',
-            'scripts/smoke_ui_auth_session.py',
-            'scripts/smoke_loopback_host_origin.py',
-            'scripts/smoke_coordinator_queued_cancel.py',
-            'scripts/smoke_updates_sha256.py',
-            'scripts/smoke_runtime_env_slots.py',
-            'scripts/smoke_engine_slot_resync.py'
-          )
-          foreach ($s in $smokes) { python $s }
+        run: powershell -NoProfile -File scripts/ci_mandatory_checks.ps1

@@ -35,10 +35,9 @@ bin/ffmpeg.exe
 bin/ffprobe.exe
 installer/redist/*.exe
 
-# In git: app sources, installer/, launcher/, scripts for build/run (see README).
-# Not in git: tests, internal docs, agent configs, one-off maintainer scripts (below).
+# In git: app sources, installer/, launcher/, scripts, tests/ (see README, TEST_BASELINE.md).
+# Not in git: internal docs, agent configs, one-off maintainer scripts (below).
 
-tests/
 docs/
 wiki/
 .cursor/

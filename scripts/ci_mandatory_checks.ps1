@@ -1,4 +1,4 @@
-# Wave F: mandatory checks without local tests/ tree (prod-launch CI + maintainer).
+# Wave F: mandatory checks (prod-launch CI + maintainer), including pytest when tests/ exists.
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location $Root
@@ -53,17 +53,19 @@ foreach ($rel in $Smokes) {
     }
 }
 
-if (Test-Path (Join-Path $Root "tests")) {
-    Write-Host "=== pytest tests (optional local) ==="
-    $env:PYTHONPATH = "src"
-    $env:GIGAAM_SKIP_ENGINE = "1"
-    $env:GIGAAM_UI_AUTH = "0"
-    $env:GIGAAM_LOOPBACK_STRICT = "0"
-    $env:SLYSH_DISABLE_OPENAPI = "1"
-    & $Python -m pytest tests -q
-    if ($LASTEXITCODE -ne 0) {
-        throw "pytest failed"
-    }
+$TestsDir = Join-Path $Root "tests"
+if (-not (Test-Path $TestsDir)) {
+    throw "missing tests/ (required for ci_mandatory_checks)"
+}
+Write-Host "=== pytest tests ==="
+$env:PYTHONPATH = "src"
+$env:GIGAAM_SKIP_ENGINE = "1"
+$env:GIGAAM_UI_AUTH = "0"
+$env:GIGAAM_LOOPBACK_STRICT = "0"
+$env:SLYSH_DISABLE_OPENAPI = "1"
+& $Python -m pytest tests -q
+if ($LASTEXITCODE -ne 0) {
+    throw "pytest failed"
 }
 
 Write-Host "ci_mandatory_checks: OK"
