@@ -32,11 +32,11 @@ powershell -File scripts\build-slysh-setup.ps1
 | E.3 | WebView2 offline | `installer\redist\MicrosoftEdgeWebview2Setup.exe`, `[Run]` в `Slysh.iss` |
 | E.4 | Обновления + SHA-256 | `updates.py`, `smoke_updates_sha256.py`; без digest — нет auto-install |
 | E.5 | Upgrade vs first-run | `IsAppUpgrade` в `Slysh.iss` — `.fresh-install` только для новой установки |
-| E.6 | Чистые Win10/11 | [`docs/features/E6-OFFLINE-VM.md`](docs/features/E6-OFFLINE-VM.md) + `e6-offline-vm-verify.ps1` |
+| E.6 | Чистые Win10/11 | [`installer/E6-OFFLINE-VM.md`](installer/E6-OFFLINE-VM.md) + `e6-offline-vm-verify.ps1` |
 
 ## E.6 — чистая VM offline
 
-Полная **матрица приёмки** (Win10/11, пробелы, кириллица, engine, upgrade): [`docs/features/E6-OFFLINE-VM.md`](docs/features/E6-OFFLINE-VM.md).
+Полная **матрица приёмки** (Win10/11, пробелы, кириллица, engine, upgrade): [`installer/E6-OFFLINE-VM.md`](installer/E6-OFFLINE-VM.md).
 
 На VM **без Python/uv/ffmpeg**, сеть отключена после Setup:
 

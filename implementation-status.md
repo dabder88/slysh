@@ -110,7 +110,7 @@ D.1–D.6 закрыты (таблица D).
 | E.3 | WebView2 в Setup | ✅ | `fetch-installer-redist.ps1`, `Slysh.iss` |
 | E.4 | SHA-256 обновлений | ✅ | `updates.py`, `smoke_updates_sha256.py` |
 | E.5 | Upgrade ≠ first-run | ✅ | `IsAppUpgrade` / `.fresh-install` |
-| E.6 | Чистые Win10/11 offline | 🟡 | [`docs/features/E6-OFFLINE-VM.md`](docs/features/E6-OFFLINE-VM.md); verify + `-ProbeOfflineUiSync`; VM журнал — вручную |
+| E.6 | Чистые Win10/11 offline | 🟡 | [`installer/E6-OFFLINE-VM.md`](installer/E6-OFFLINE-VM.md); verify + `-ProbeOfflineUiSync`; VM журнал — вручную |
 | E.7 | UI/engine split (§7.2) | 🟡 | repair API; `engine_slot_needs_resync`; probe/revert/prune |
 
 Сборка: [`INSTALLER-BUILD.md`](INSTALLER-BUILD.md).
