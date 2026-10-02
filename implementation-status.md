@@ -4,7 +4,7 @@
 
 **Легенда:** ✅ готово · 🟡 частично · 🔵 в работе / не в git · ⬜ не начато · ⏭️ отложено
 
-**Последнее обновление:** 2026-10-02 — D.3 Host/Origin; D.4 traversal на media/open-path.
+**Последнее обновление:** 2026-10-02 — B4.2–B4.3 pause/stop lock + тесты.
 
 ---
 
@@ -14,7 +14,7 @@
 |-------|--------|--------|-------------|
 | **0** | Основа тестов | 🟡 | pytest ~450; таблица «8 fail» не оформлена |
 | **A** | Корректность | 🟡 | A1–A5,A8,A9,A11 ✅ smokes; **A6** 🟡; **A7,A10** остаются |
-| **B** | Надёжность UX | 🟡 | B1–B3,B5 ✅; B4.2 🟡 lock pause/stop; B4.3 🟡 |
+| **B** | Надёжность UX | 🟡 | B1–B3,B5,B4.2–B4.3 ✅; B4.4 manual ⏭️ |
 | **C** | Job runtime | 🟡 | C.4 ✅; C.1–C.3 🟡 (не весь §1.1) |
 | **D** | Безопасность | 🟡 | D.3–D.4 ✅; D.1–D.2/D.5–D.6 частично |
 | **E** | Установщик | 🟡 | |
@@ -26,7 +26,7 @@
 
 | Блок | ID | Содержание |
 |------|-----|------------|
-| **1** | B4.2–B4.3 | pause/stop сериализация |
+| **1** | D.5 / A10 | DPAPI; Gemini yolo |
 | **2** | D.5 | DPAPI для локальных секретов |
 | **3** | D.1–D.2 | Loopback-only, UI session в WebView |
 
@@ -60,8 +60,8 @@ D.3–D.4 закрыты (см. таблицу D ниже).
 | B2 | Атомарные settings, YT meta | ✅ |
 | B3 | UI shutdown | ✅ |
 | B4.1 | Audio ingest queue | ✅ |
-| B4.2 | Сериализация pause/stop | 🟡 | `capture_control_lock` на live/meeting pause/stop |
-| B4.3 | Тесты pause/resume | 🟡 |
+| B4.2 | Сериализация pause/stop | ✅ | lock на pause/resume/stop + worker; meeting pause drain |
+| B4.3 | Тесты pause/resume | ✅ | `test_live_buffer` cycles; `smoke_capture_pause_resume.py` |
 | B4.4 | 10+ мин manual | ⏭️ |
 | B5 | open_path 404 | ✅ |
 
@@ -115,6 +115,7 @@ D.3–D.4 закрыты (см. таблицу D ниже).
 | `smoke_segments_revision_409.py` | B1 |
 | `smoke_loopback_host_origin.py` | D.3 |
 | `smoke_job_media_traversal.py` | D.4 |
+| `smoke_capture_pause_resume.py` | B4.3 |
 | `kill_slysh_orphans.ps1` | уборка после проверок |
 
 ---

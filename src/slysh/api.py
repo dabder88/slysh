@@ -1981,8 +1981,7 @@ def _live_worker(app: FastAPI, db: Database) -> None:
     state = _active_capture_state(app)
     stop_event: threading.Event = state["stop_event"]
     while True:
-        session = state.get("session")
-        if session is None:
+        if state.get("session") is None:
             break
         if _capture_ingest_overflowed(state):
             notify_capture_overflow(state)
@@ -1993,10 +1992,16 @@ def _live_worker(app: FastAPI, db: Database) -> None:
                     str(state.get("error") or AUDIO_INGEST_OVERFLOW_MESSAGE),
                 )
             stop_event.set()
-        for chunk in session.take_ready_chunks():
-            _handle_live_chunk(app, db, chunk)
+        with _capture_control_lock(app):
+            session = state.get("session")
+            if session is None:
+                break
+            for chunk in session.take_ready_chunks():
+                _handle_live_chunk(app, db, chunk)
+            if stop_event.is_set():
+                state["_finalize_pcm"] = _collect_pcm_for_asr(session, finalize=True)
+                break
         if stop_event.is_set():
-            state["_finalize_pcm"] = _collect_pcm_for_asr(session, finalize=True)
             break
         stop_event.wait(0.1)
 
@@ -3073,31 +3078,34 @@ def create_ui_app(
             raise HTTPException(status_code=400, detail=LIVE_NOT_ACTIVE_HINT)
         if not state.get("paused"):
             raise HTTPException(status_code=400, detail=LIVE_NOT_PAUSED_HINT)
-        paused_at = state.get("paused_at")
-        if paused_at is not None:
-            state["total_paused_s"] = float(state.get("total_paused_s") or 0.0) + (
-                time.monotonic() - float(paused_at)
-            )
-        state["paused"] = False
-        state["paused_at"] = None
-        _ensure_live_ingest(state)
+        with _capture_control_lock(app):
+            paused_at = state.get("paused_at")
+            if paused_at is not None:
+                state["total_paused_s"] = float(state.get("total_paused_s") or 0.0) + (
+                    time.monotonic() - float(paused_at)
+                )
+            state["paused"] = False
+            state["paused_at"] = None
+            _ensure_live_ingest(state)
 
-        def _callback_for_rate(capture_rate: int):
-            return _live_mic_callback(app, capture_rate)
+            def _callback_for_rate(capture_rate: int):
+                return _live_mic_callback(app, capture_rate)
 
-        try:
-            stream, _capture_rate = open_mic_input_stream(state.get("device_id"), _callback_for_rate)
-            stream.start()
-        except MeetingCaptureError as exc:
-            state["paused"] = True
-            state["paused_at"] = time.monotonic()
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
-        except Exception as exc:
-            state["paused"] = True
-            state["paused_at"] = time.monotonic()
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
-        state["stream"] = stream
-        state["listening"] = True
+            try:
+                stream, _capture_rate = open_mic_input_stream(
+                    state.get("device_id"), _callback_for_rate
+                )
+                stream.start()
+            except MeetingCaptureError as exc:
+                state["paused"] = True
+                state["paused_at"] = time.monotonic()
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+            except Exception as exc:
+                state["paused"] = True
+                state["paused_at"] = time.monotonic()
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+            state["stream"] = stream
+            state["listening"] = True
         return _live_status_payload(app, db, state)
 
     @app.post("/api/live/stop")
@@ -3111,9 +3119,11 @@ def create_ui_app(
                 state["stop_event"].set()
             _stop_live_stream(app)
             thread = state.get("thread")
-            if thread is not None:
-                thread.join(timeout=_LIVE_CAPTURE_DRAIN_TIMEOUT_S)
+        if thread is not None:
+            thread.join(timeout=_LIVE_CAPTURE_DRAIN_TIMEOUT_S)
+            with _capture_control_lock(app):
                 state["thread"] = None
+        with _capture_control_lock(app):
             payload = _complete_capture_stop(
                 app,
                 db,
@@ -3256,6 +3266,9 @@ def create_ui_app(
             state["paused_at"] = time.monotonic()
             state["rms_mic"] = 0.0
             state["rms_system"] = 0.0
+            session = state.get("session")
+            if session is not None:
+                _drain_live_session(app, db, session, finalize=False)
         return _meeting_status_payload(app, db, state)
 
     @app.post("/api/meeting/resume")
@@ -3265,16 +3278,17 @@ def create_ui_app(
             raise HTTPException(status_code=400, detail=MEETING_NOT_ACTIVE_HINT)
         if not state.get("paused"):
             raise HTTPException(status_code=400, detail=MEETING_NOT_PAUSED_HINT)
-        paused_at = state.get("paused_at")
-        if paused_at is not None:
-            state["total_paused_s"] = float(state.get("total_paused_s") or 0.0) + (
-                time.monotonic() - float(paused_at)
-            )
-        state["paused"] = False
-        state["paused_at"] = None
-        capture = state.get("capture")
-        if capture is not None:
-            capture.resume()
+        with _capture_control_lock(app):
+            paused_at = state.get("paused_at")
+            if paused_at is not None:
+                state["total_paused_s"] = float(state.get("total_paused_s") or 0.0) + (
+                    time.monotonic() - float(paused_at)
+                )
+            state["paused"] = False
+            state["paused_at"] = None
+            capture = state.get("capture")
+            if capture is not None:
+                capture.resume()
         return _meeting_status_payload(app, db, state)
 
     @app.post("/api/meeting/stop")
@@ -3294,9 +3308,11 @@ def create_ui_app(
                     pass
                 state["capture"] = None
             thread = state.get("thread")
-            if thread is not None:
-                thread.join(timeout=_LIVE_CAPTURE_DRAIN_TIMEOUT_S)
+        if thread is not None:
+            thread.join(timeout=_LIVE_CAPTURE_DRAIN_TIMEOUT_S)
+            with _capture_control_lock(app):
                 state["thread"] = None
+        with _capture_control_lock(app):
             payload = _complete_capture_stop(
                 app,
                 db,
