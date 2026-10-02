@@ -46,7 +46,7 @@
 | A4 | `on_error=stop`, итог пакета | ✅ | `smoke_batch_on_error_stop.py` |
 | A5 | Коллизии экспорта пакета | ✅ | `smoke_batch_export_collision.py` |
 | A6 | Спикер = ключ | 🟡 | API `speaker_key`; `smoke_speaker_rename_twice.py`; без `apply_speaker_names` |
-| A7 | Секреты в API | 🟡 | |
+| A7 | Секреты в API | ✅ | masked + session; PUT omit/``; `smoke_providers_secret_contract.py` |
 | A8 | Live/meeting finalize | ✅ | `finalizing` в БД, smokes finalize/double_stop, pytest live |
 | A9 | YAML экспорт | ✅ | `json.dumps` в front matter; `smoke_export_yaml_windows_path.py` |
 | A10 | Gemini без yolo | 🟡 | `yolo` в коде нет |
