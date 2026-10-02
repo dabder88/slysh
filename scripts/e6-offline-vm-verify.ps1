@@ -2,7 +2,9 @@
 param(
     [Parameter(Mandatory = $true)]
     [string]$InstallRoot,
-    [switch]$RequireWheelhouse
+    [switch]$RequireWheelhouse,
+    [switch]$ProbeOfflineUiSync,
+    [string]$ResultJson = ""
 )
 $ErrorActionPreference = "Stop"
 $Root = (Resolve-Path -LiteralPath $InstallRoot).Path
@@ -12,19 +14,106 @@ $Uv = Join-Path $Root "bin\uv.exe"
 $Ffmpeg = Join-Path $Root "bin\ffmpeg.exe"
 $Exe = Join-Path $Root "Slysh.exe"
 $Wheelhouse = Join-Path $Root "wheelhouse"
+$PyvenvCfg = Join-Path $Root ".venv\pyvenv.cfg"
+$Notices = Join-Path $Root "licenses\THIRD-PARTY-NOTICES.md"
+
+$checks = [ordered]@{}
 
 function Fail($msg) {
-    Write-Error "e6-offline-vm-verify: FAIL: $msg"
-    exit 1
+    $checks["error"] = $msg
+    Write-ResultAndExit -Ok $false -Message $msg
 }
 
-@($Python, $Pythonw, $Uv, $Ffmpeg, $Exe, (Join-Path $Root "Slysh.bat")) | ForEach-Object {
-    if (-not (Test-Path -LiteralPath $_)) { Fail "missing $_" }
+function Write-ResultAndExit {
+    param([bool]$Ok, [string]$Message)
+    if ($ResultJson) {
+        $payload = @{
+            ok               = $Ok
+            install_root     = $Root
+            wheelhouse_count = $whCount
+            checks           = $checks
+            message          = $Message
+            timestamp_utc    = (Get-Date).ToUniversalTime().ToString("o")
+        }
+        $payload | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $ResultJson -Encoding UTF8
+    }
+    if (-not $Ok) {
+        Write-Error "e6-offline-vm-verify: FAIL: $Message"
+        exit 1
+    }
+    Write-Host "e6-offline-vm-verify: OK ($Root, wheelhouse=$whCount)"
+    exit 0
 }
 
-$wh = @(Get-ChildItem -LiteralPath $Wheelhouse -Filter "*.whl" -ErrorAction SilentlyContinue).Count
-if ($RequireWheelhouse -and $wh -lt 10) { Fail "wheelhouse needs 10+ wheels, got $wh" }
-if ($wh -lt 10) { Write-Warning "wheelhouse has $wh wheels (offline repair may be limited)" }
+$whCount = @(Get-ChildItem -LiteralPath $Wheelhouse -Filter "*.whl" -ErrorAction SilentlyContinue).Count
+$checks["wheelhouse_count"] = $whCount
+
+@(
+    @{ Path = $Python; Name = "ui_python" }
+    @{ Path = $Pythonw; Name = "ui_pythonw" }
+    @{ Path = $Uv; Name = "uv" }
+    @{ Path = $Ffmpeg; Name = "ffmpeg" }
+    @{ Path = $Exe; Name = "Slysh.exe" }
+    @{ Path = (Join-Path $Root "Slysh.bat"); Name = "Slysh.bat" }
+    @{ Path = (Join-Path $Root "pyproject.toml"); Name = "pyproject.toml" }
+    @{ Path = (Join-Path $Root "uv.lock"); Name = "uv.lock" }
+    @{ Path = (Join-Path $Root "src\slysh\app.py"); Name = "src_slysh" }
+) | ForEach-Object {
+    if (-not (Test-Path -LiteralPath $_.Path)) {
+        Fail "missing $($_.Path)"
+    }
+    $checks[$_.Name] = "present"
+}
+
+$runtimePython = Join-Path $Root "runtime\python"
+if (-not (Test-Path -LiteralPath $runtimePython)) {
+    Fail "missing runtime\python"
+}
+$bundledPy = Get-ChildItem -LiteralPath $runtimePython -Recurse -Filter "python.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+if (-not $bundledPy) {
+    Fail "no bundled python.exe under runtime\python"
+}
+$checks["runtime_python"] = $bundledPy.FullName
+
+if ($RequireWheelhouse -and $whCount -lt 10) {
+    Fail "wheelhouse needs 10+ wheels, got $whCount"
+}
+if ($whCount -lt 10) {
+    Write-Warning "wheelhouse has $whCount wheels (offline repair may be limited)"
+}
+
+if (-not (Test-Path -LiteralPath $Notices)) {
+    Fail "missing licenses\THIRD-PARTY-NOTICES.md (rebuild payload after THIRD_PARTY_NOTICES.md update)"
+}
+$checks["third_party_notices"] = "present"
+
+if (-not (Test-Path -LiteralPath $PyvenvCfg)) {
+    Fail "missing .venv\pyvenv.cfg"
+}
+$homeLine = $null
+foreach ($line in (Get-Content -LiteralPath $PyvenvCfg)) {
+    if ($line -match '^home\s*=\s*(.+)$') {
+        $homeLine = $Matches[1].Trim()
+        break
+    }
+}
+if (-not $homeLine) {
+    Fail "pyvenv.cfg missing home ="
+}
+$homePath = $null
+try {
+    $homePath = (Resolve-Path -LiteralPath $homeLine).Path
+} catch {
+    Fail "pyvenv.cfg home not found: $homeLine"
+}
+$rootNorm = (Resolve-Path -LiteralPath $Root).Path.TrimEnd('\')
+if (-not $homePath.StartsWith($rootNorm, [StringComparison]::OrdinalIgnoreCase)) {
+    Fail "pyvenv.cfg home must be under install root; home=$homePath root=$rootNorm"
+}
+if ($homeLine -match 'Roaming' -and $homeLine -match 'uv') {
+    Fail "pyvenv.cfg must not point at user uv cache: $homeLine"
+}
+$checks["pyvenv_home"] = $homePath
 
 $env:SLYSH_INSTALL_ROOT = $Root
 $env:PATH = (Join-Path $Root "bin") + ";" + $env:PATH
@@ -36,22 +125,44 @@ Push-Location $Root
 try {
     & $Python -c "import slysh"
     if ($LASTEXITCODE -ne 0) { Fail "python import slysh" }
+    $checks["import_slysh_python"] = "ok"
+
     & $Pythonw -c 'import slysh'
     if ($LASTEXITCODE -ne 0) { Fail "pythonw import slysh" }
+    $checks["import_slysh_pythonw"] = "ok"
 
     & $Python -c "import torch"
     if ($LASTEXITCODE -eq 0) { Fail "UI venv must not import torch" }
+    $checks["ui_no_torch"] = "ok"
+
+    if ($ProbeOfflineUiSync) {
+        if ($whCount -lt 10) {
+            Fail "ProbeOfflineUiSync requires wheelhouse with 10+ wheels"
+        }
+        $syncArgs = @(
+            "sync",
+            "--find-links", $Wheelhouse,
+            "--offline",
+            "--no-progress"
+        )
+        & $Uv @syncArgs
+        if ($LASTEXITCODE -ne 0) {
+            Fail "uv sync --offline --find-links wheelhouse failed"
+        }
+        $checks["offline_ui_sync"] = "ok"
+    }
 } finally {
     Pop-Location
 }
 
-$SmokePy = Join-Path (Split-Path -Parent $PSScriptRoot) ".venv\Scripts\python.exe"
+$repoRoot = Split-Path -Parent $PSScriptRoot
+$SmokePy = Join-Path $repoRoot ".venv\Scripts\python.exe"
 if (-not (Test-Path -LiteralPath $SmokePy)) { $SmokePy = "python" }
-$Sanity = Join-Path (Split-Path -Parent $PSScriptRoot) "scripts\check_payload_sanity.py"
-if (Test-Path -LiteralPath $Sanity) {
+$Sanity = Join-Path $repoRoot "scripts\check_payload_sanity.py"
+if ((Resolve-Path -LiteralPath $Root).Path -eq (Join-Path $repoRoot "dist\payload") -and (Test-Path -LiteralPath $Sanity)) {
     & $SmokePy $Sanity
     if ($LASTEXITCODE -ne 0) { Fail "check_payload_sanity" }
+    $checks["payload_sanity"] = "ok"
 }
 
-Write-Host "e6-offline-vm-verify: OK ($Root, wheelhouse=$wh)"
-exit 0
+Write-ResultAndExit -Ok $true -Message "OK"

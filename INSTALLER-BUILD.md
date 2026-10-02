@@ -32,20 +32,26 @@ powershell -File scripts\build-slysh-setup.ps1
 | E.3 | WebView2 offline | `installer\redist\MicrosoftEdgeWebview2Setup.exe`, `[Run]` в `Slysh.iss` |
 | E.4 | Обновления + SHA-256 | `updates.py`, `smoke_updates_sha256.py`; без digest — нет auto-install |
 | E.5 | Upgrade vs first-run | `IsAppUpgrade` в `Slysh.iss` — `.fresh-install` только для новой установки |
-| E.6 | Чистые Win10/11 | `scripts\e6-offline-vm-verify.ps1` на VM без сети после Setup |
+| E.6 | Чистые Win10/11 | [`docs/features/E6-OFFLINE-VM.md`](docs/features/E6-OFFLINE-VM.md) + `e6-offline-vm-verify.ps1` |
 
 ## E.6 — чистая VM offline
 
-На VM **без Python/uv/ffmpeg**, сеть отключена после копирования `Slysh-Setup.exe` (или payload):
+Полная **матрица приёмки** (Win10/11, пробелы, кириллица, engine, upgrade): [`docs/features/E6-OFFLINE-VM.md`](docs/features/E6-OFFLINE-VM.md).
+
+На VM **без Python/uv/ffmpeg**, сеть отключена после Setup:
 
 ```powershell
-powershell -File scripts\e6-offline-vm-verify.ps1 -InstallRoot "$env:LOCALAPPDATA\Programs\Slysh" -RequireWheelhouse
+powershell -ExecutionPolicy Bypass -File .\e6-offline-vm-verify.ps1 `
+  -InstallRoot "$env:LOCALAPPDATA\Programs\Slysh" `
+  -RequireWheelhouse `
+  -ProbeOfflineUiSync `
+  -ResultJson "$env:USERPROFILE\Desktop\e6-result.json"
 ```
 
 Локальная проверка payload (не заменяет VM):
 
 ```powershell
-powershell -File scripts\e6-offline-vm-verify.ps1 -InstallRoot dist\payload
+powershell -File scripts\e6-offline-vm-verify.ps1 -InstallRoot dist\payload -RequireWheelhouse
 ```
 
 ## E.7 — UI / engine (fingerprint slots)

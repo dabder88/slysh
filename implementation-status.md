@@ -4,7 +4,7 @@
 
 **Легенда:** ✅ готово · 🟡 частично · 🔵 в работе / не в git · ⬜ не начато · ⏭️ отложено
 
-**Последнее обновление:** 2026-10-02 — E.7 engine-repair API + slot resync hint.
+**Последнее обновление:** 2026-10-02 — E.6 матрица VM + расширен verify; F.4 THIRD_PARTY_NOTICES.
 
 ---
 
@@ -26,8 +26,8 @@
 
 | Блок | ID | Содержание |
 |------|-----|------------|
-| **1** | E | §7.2 dual venv (отдельно); E.6 manual matrix |
-| **2** | F | лицензии/секреты в истории git (ручной аудит) |
+| **1** | E | E.6 прогон матрицы на реальной VM (журнал в E6-OFFLINE-VM) |
+| **2** | F | ручной аудит секретов в **истории** git (F.5 — tracked файлы) |
 
 D.1–D.6 закрыты (таблица D).
 
@@ -96,7 +96,7 @@ D.1–D.6 закрыты (таблица D).
 | F.1 | Windows CI без torch | ✅ | `.github/workflows/pytest.yml` + smokes |
 | F.2 | `test_ui_imports` в CI | ✅ | `ci/check_ui_imports.py` |
 | F.3 | JS + CSS в CI | ✅ | `check-web-js.ps1`, `npm run build:css` |
-| F.4 | Сторонние лицензии | 🟡 | `THIRD_PARTY_NOTICES.md` (черновик) |
+| F.4 | Сторонние лицензии | ✅ | `THIRD_PARTY_NOTICES.md` → `licenses\` в payload |
 | F.5 | Аудит секретов в git | ✅ | `audit_git_secrets.ps1` в CI + `ci_mandatory_checks` |
 
 Локально (с `tests/`): `powershell -File scripts\ci_mandatory_checks.ps1` — дополнительно полный pytest.
@@ -110,7 +110,7 @@ D.1–D.6 закрыты (таблица D).
 | E.3 | WebView2 в Setup | ✅ | `fetch-installer-redist.ps1`, `Slysh.iss` |
 | E.4 | SHA-256 обновлений | ✅ | `updates.py`, `smoke_updates_sha256.py` |
 | E.5 | Upgrade ≠ first-run | ✅ | `IsAppUpgrade` / `.fresh-install` |
-| E.6 | Чистые Win10/11 offline | 🟡 | локальный прогон `dist\payload` OK; VM — `e6-offline-vm-verify.ps1 -RequireWheelhouse` |
+| E.6 | Чистые Win10/11 offline | 🟡 | [`docs/features/E6-OFFLINE-VM.md`](docs/features/E6-OFFLINE-VM.md); verify + `-ProbeOfflineUiSync`; VM журнал — вручную |
 | E.7 | UI/engine split (§7.2) | 🟡 | repair API; `engine_slot_needs_resync`; probe/revert/prune |
 
 Сборка: [`INSTALLER-BUILD.md`](INSTALLER-BUILD.md).
