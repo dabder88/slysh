@@ -38,7 +38,8 @@ $Smokes = @(
     "scripts\smoke_loopback_host_origin.py",
     "scripts\smoke_coordinator_queued_cancel.py",
     "scripts\smoke_updates_sha256.py",
-    "scripts\smoke_runtime_env_slots.py"
+    "scripts\smoke_runtime_env_slots.py",
+    "scripts\smoke_engine_slot_resync.py"
 )
 foreach ($rel in $Smokes) {
     $path = Join-Path $Root $rel

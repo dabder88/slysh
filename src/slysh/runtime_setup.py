@@ -477,6 +477,13 @@ def setup_status(python: str | None = None, runner=None) -> dict:
         engine_packages=bool(payload["engine_packages"])
     )
     try:
+        from slysh.runtime_env import engine_slot_needs_resync
+
+        payload["engine_slot_needs_resync"] = engine_slot_needs_resync()
+    except Exception:
+        logging.debug("engine slot resync check skipped", exc_info=True)
+        payload["engine_slot_needs_resync"] = False
+    try:
         from slysh.updates import engine_resync_recommended
 
         payload["engine_resync_recommended"] = engine_resync_recommended()
@@ -491,8 +498,13 @@ def start_engine_install(
     runner=None,
     *,
     mark_pending_model: bool = False,
+    force: bool = False,
 ) -> dict:
-    if engine_packages_ok(python=python, runner=runner):
+    if (
+        not force
+        and engine_packages_ok(python=python, runner=runner)
+        and not engine_slot_needs_resync_safe()
+    ):
         return setup_status(python=python, runner=runner)
     clear_prompt_engine_setup()
     started = False
@@ -509,6 +521,41 @@ def start_engine_install(
             set_pending_model_setup()
         _spawn_install_thread()
     return setup_status(python=python, runner=runner)
+
+
+def engine_slot_needs_resync_safe() -> bool:
+    try:
+        from slysh.runtime_env import engine_slot_needs_resync
+
+        return engine_slot_needs_resync()
+    except Exception:
+        logging.debug("engine_slot_needs_resync skipped", exc_info=True)
+        return False
+
+
+def start_engine_repair(
+    python: str | None = None,
+    runner=None,
+    *,
+    force: bool = False,
+) -> dict:
+    """Re-run engine ``uv sync`` when lock/slot drifted or probe failed (§7.2 repair)."""
+    invalidate_engine_packages_cache()
+    try:
+        from slysh.compute import is_cloud_only
+
+        if is_cloud_only():
+            return setup_status(python=python, runner=runner)
+    except Exception:
+        logging.debug("cloud_only check skipped for engine repair", exc_info=True)
+    needs = force or engine_slot_needs_resync_safe() or not engine_packages_ok(
+        python=python, runner=runner
+    )
+    if not needs:
+        return setup_status(python=python, runner=runner)
+    return start_engine_install(
+        python=python, runner=runner, force=True
+    )
 
 
 def _spawn_install_thread() -> None:

@@ -258,6 +258,26 @@ def engine_venv_slot_names_to_keep() -> set[str]:
     return keep
 
 
+def engine_slot_needs_resync() -> bool:
+    """True when uv.lock fingerprint or target slot dir differs from active manifest (installed layout)."""
+    if not use_split_engine_venv():
+        return False
+    from slysh.updates import uv_lock_fingerprint
+
+    current_fp = uv_lock_fingerprint()
+    if not current_fp:
+        return False
+    manifest = read_runtime_manifest()
+    manifest_fp = str(manifest.get("lock_fingerprint") or "").strip()
+    target_name = resolve_engine_venv_target().name
+    active_name = str(manifest.get("active_engine_venv") or "").strip()
+    if manifest_fp and manifest_fp != current_fp:
+        return True
+    if active_name and active_name != target_name:
+        return True
+    return False
+
+
 def prune_stale_engine_venv_slots() -> list[str]:
     """Delete old ``.venv-engine-<fp>`` dirs after a successful slot switch (installed layout)."""
     if not use_split_engine_venv():

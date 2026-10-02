@@ -4,7 +4,7 @@
 
 **Легенда:** ✅ готово · 🟡 частично · 🔵 в работе / не в git · ⬜ не начато · ⏭️ отложено
 
-**Последнее обновление:** 2026-10-02 — E.7 prune stale engine slots; F.5 в CI.
+**Последнее обновление:** 2026-10-02 — E.7 engine-repair API + slot resync hint.
 
 ---
 
@@ -111,7 +111,7 @@ D.1–D.6 закрыты (таблица D).
 | E.4 | SHA-256 обновлений | ✅ | `updates.py`, `smoke_updates_sha256.py` |
 | E.5 | Upgrade ≠ first-run | ✅ | `IsAppUpgrade` / `.fresh-install` |
 | E.6 | Чистые Win10/11 offline | 🟡 | локальный прогон `dist\payload` OK; VM — `e6-offline-vm-verify.ps1 -RequireWheelhouse` |
-| E.7 | UI/engine split (§7.2) | 🟡 | probe/revert; `prune_stale_engine_venv_slots`; smoke slots |
+| E.7 | UI/engine split (§7.2) | 🟡 | repair API; `engine_slot_needs_resync`; probe/revert/prune |
 
 Сборка: [`INSTALLER-BUILD.md`](INSTALLER-BUILD.md).
 
@@ -150,6 +150,7 @@ D.1–D.6 закрыты (таблица D).
 | `smoke_updates_sha256.py` | E.4 |
 | `e6-offline-vm-verify.ps1` | E.6 |
 | `smoke_runtime_env_slots.py` | E.7 |
+| `smoke_engine_slot_resync.py` | E.7 |
 
 ---
 

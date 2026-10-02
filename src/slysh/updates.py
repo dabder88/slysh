@@ -398,11 +398,14 @@ def save_lock_fingerprint() -> None:
 
 
 def engine_resync_recommended() -> bool:
+    from slysh.runtime_env import engine_slot_needs_resync
     from slysh.runtime_setup import engine_packages_ok
 
     if not engine_packages_ok():
         consume_app_update_marker()
         return False
+    if engine_slot_needs_resync():
+        return True
     marker_path = app_dir() / POST_UPDATE_MARKER
     had_marker = marker_path.is_file()
     if had_marker:

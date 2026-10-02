@@ -122,6 +122,7 @@ from slysh.runtime_setup import (
     engine_packages_ok,
     setup_status,
     start_engine_install,
+    start_engine_repair,
 )
 from slysh.subprocess_win import subprocess_no_console_kwargs, terminate_process_tree
 from slysh.updates import (
@@ -269,6 +270,10 @@ class ModelDownloadBody(BaseModel):
 
 class EngineSetupBody(BaseModel):
     mark_pending_model: bool = False
+
+
+class EngineRepairBody(BaseModel):
+    force: bool = False
 
 
 class OpenRouterBody(BaseModel):
@@ -2650,6 +2655,11 @@ def create_ui_app(
     def post_setup_engine(body: EngineSetupBody | None = None) -> dict:
         mark = bool(body and body.mark_pending_model)
         return start_engine_install(mark_pending_model=mark)
+
+    @app.post("/api/setup/engine-repair")
+    def post_setup_engine_repair(body: EngineRepairBody | None = None) -> dict:
+        force = bool(body and body.force)
+        return start_engine_repair(force=force)
 
     @app.post("/api/setup/later")
     def post_setup_later() -> dict:
