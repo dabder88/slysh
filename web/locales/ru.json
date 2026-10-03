@@ -170,7 +170,8 @@
     "rangeStartPh": "начало",
     "rangeTo": "До",
     "searchPlaceholder": "Поиск по тексту…",
-    "speakerNames": "Имена спикеров"
+    "speakerNames": "Имена спикеров",
+    "draftPreview": "Черновик: не сохранено на сервере"
   },
   "exportUi": {
     "addFolder": "Добавить папку",

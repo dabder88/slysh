@@ -170,7 +170,8 @@
     "rangeStartPh": "start",
     "rangeTo": "To",
     "searchPlaceholder": "Search text…",
-    "speakerNames": "Speaker names"
+    "speakerNames": "Speaker names",
+    "draftPreview": "Draft preview — not saved to server"
   },
   "exportUi": {
     "addFolder": "Add folder",

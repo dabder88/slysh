@@ -5819,6 +5819,17 @@
     color: var(--on-background);
   }
 
+  .editor-draft-preview-hint {
+    flex: 1 1 100%;
+    margin: 0;
+    font-size: 11px;
+    color: var(--tertiary);
+  }
+
+  .editor-panel--draft-preview {
+    box-shadow: inset 0 2px 0 color-mix(in srgb, var(--tertiary) 55%, transparent);
+  }
+
   .editor-search {
     display: flex;
     align-items: center;

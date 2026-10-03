@@ -2029,10 +2029,16 @@ async function saveSegments() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
+    const job = await api(`/api/jobs/${jobId}`);
+    upsertJobInStore(job);
     if (res?.segments_revision != null) {
       segmentsRevision = Number(res.segments_revision) || segmentsRevision;
+    } else {
+      segmentsRevision = Number(job.segments_revision) || segmentsRevision;
     }
+    renderTranscript(job.transcript || "");
     window.__editorMarkDraftSaved?.();
+    window.__editorRefreshJob?.(job);
     showToast("common.saved");
   } catch (err) {
     if (err.status === 409) {

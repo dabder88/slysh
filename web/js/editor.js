@@ -19,6 +19,7 @@ import {
   parseSpeakerOrdinal,
   speakerDisplayName,
 } from "./library-utils.js";
+import { parseTranscript } from "./transcript-format.js";
 
 let editorBound = false;
 let currentJobId = null;
@@ -185,6 +186,34 @@ function setEditorMode(mode) {
     syncExportActions(currentJob);
   }
   syncEditModeAvailability(currentJob);
+  if (mode === "edit") {
+    document.getElementById("editor-transcript-panel")?.classList.remove("editor-panel--draft-preview");
+    const draftHint = document.getElementById("editor-draft-preview-hint");
+    if (draftHint) {
+      draftHint.hidden = true;
+    }
+  }
+}
+
+function renderViewSegments(job) {
+  if (!job) {
+    return;
+  }
+  const panel = document.getElementById("editor-transcript-panel");
+  const textarea = document.getElementById("transcript-edit");
+  const useDraft =
+    editorDraftDirty && textarea && String(textarea.value || "").trim().length > 0;
+  panel?.classList.toggle("editor-panel--draft-preview", useDraft);
+  const draftHint = document.getElementById("editor-draft-preview-hint");
+  if (draftHint) {
+    draftHint.hidden = !useDraft;
+  }
+  if (useDraft) {
+    const preview = parseTranscript(textarea.value);
+    renderSegments({ ...job, id: `${job.id}:draft`, segments: preview });
+  } else {
+    renderSegments(job);
+  }
 }
 
 function syncEditModeAvailability(job) {
@@ -231,7 +260,7 @@ async function pollEditorJob() {
     window.__syncSegmentsRevision?.(job.segments_revision);
   }
   if (editorMode === "view" && !editorDraftDirty) {
-    renderSegments(job);
+    renderViewSegments(job);
   }
   updateTransport(job);
   if (!shouldPollEditorJob(job)) {
@@ -900,8 +929,8 @@ function renderEditor(job) {
   }
   syncEditorChrome(job);
 
-  if (editorMode === "view" && !editorDraftDirty) {
-    renderSegments(job);
+  if (editorMode === "view") {
+    renderViewSegments(job);
   }
   renderBatchPanel(job);
   syncSpeakersPanel();
@@ -946,6 +975,7 @@ if (typeof window !== "undefined") {
   window.__editorCurrentJobId = editorCurrentJobId;
   window.__editorMarkDraftSaved = markEditorDraftSaved;
   window.__editorIsDraftDirty = editorIsDraftDirty;
+  window.__editorRefreshJob = refreshEditorJob;
 }
 
 function stashEditorDraft(jobId) {
@@ -1240,8 +1270,8 @@ export function initEditor() {
       return;
     }
     syncEditorChrome(job);
-    if (editorMode === "view" && !editorDraftDirty) {
-      renderSegments(job);
+    if (editorMode === "view") {
+      renderViewSegments(job);
     }
     renderBatchPanel(job);
     syncSpeakersPanel();
@@ -1279,7 +1309,7 @@ export function initEditor() {
     }
     setEditorMode("view");
     if (currentJob) {
-      renderSegments(currentJob);
+      renderViewSegments(currentJob);
     }
   });
   document.getElementById("editor-mode-edit")?.addEventListener("click", () => {
@@ -1311,8 +1341,8 @@ export function initEditor() {
   });
   document.getElementById("editor-search")?.addEventListener("input", (event) => {
     searchQuery = event.target.value || "";
-    if (currentJob) {
-      renderSegments(currentJob);
+    if (currentJob && editorMode === "view") {
+      renderViewSegments(currentJob);
     }
   });
 
