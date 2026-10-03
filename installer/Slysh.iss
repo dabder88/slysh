@@ -10,13 +10,23 @@
 #ifndef VersionInfoVersion
 #define VersionInfoVersion "0.1.0.0"
 #endif
+#ifndef SetupSegment
+#define SetupSegment "ru"
+#endif
+#if SetupSegment == "en"
+#define MyOutputBase "Slysh-Setup-en"
+#define MyLicenseFile "LICENSE-EN.txt"
+#else
+#define MyOutputBase "Slysh-Setup"
+#define MyLicenseFile "LICENSE-RU.txt"
+#endif
 #define MyAppUserModelId "Slysh.DesktopApp"
 
 [Setup]
 AppId={{B7E4C1A8-2F63-4D90-8A15-6C3E9B0D47F2}
 AppName=Slysh
 AppVersion={#AppVersion}
-AppPublisher=Slysh
+AppPublisher=Сергачев Антон Константинович
 DefaultDirName={localappdata}\Programs\Slysh
 DefaultGroupName=Slysh
 DisableProgramGroupPage=yes
@@ -24,18 +34,23 @@ PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir=..\dist
-OutputBaseFilename=Slysh-Setup
+OutputBaseFilename={#MyOutputBase}
 SetupIconFile={#Payload}\slysh.ico
 UninstallDisplayIcon={app}\slysh.ico
 Compression=lzma2/ultra
 SolidCompression=yes
 WizardStyle=modern
+LicenseFile={#MyLicenseFile}
 CloseApplications=no
 VersionInfoProductName=Slysh
 VersionInfoVersion={#VersionInfoVersion}
 
 [Languages]
-Name: "ru"; MessagesFile: "compiler:Languages\Russian.isl"
+#if SetupSegment == "en"
+Name: "english"; MessagesFile: "compiler:Default.isl"
+#else
+Name: "russian"; MessagesFile: "compiler:Languages\Russian.isl"
+#endif
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
@@ -66,6 +81,7 @@ Type: filesandordirs; Name: "{app}\.venv-engine"
 Type: filesandordirs; Name: "{app}\runtime"
 Type: files; Name: "{app}\runtime-env.json"
 Type: files; Name: "{app}\launch-last-error.txt"
+Type: files; Name: "{app}\venv-check.log"
 Type: files; Name: "{app}\.install-ui-locale"
 Type: files; Name: "{app}\.fresh-install"
 Type: dirifempty; Name: "{app}"
@@ -98,6 +114,29 @@ end;
 procedure RefreshStartMenuCache;
 begin
   SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, 0, 0);
+end;
+
+procedure RemoveEngineVenvSlots;
+var
+  FindRec: TFindRec;
+  AppDir: String;
+  SlotPath: String;
+begin
+  AppDir := ExpandConstant('{app}');
+  if FindFirst(AppDir + '\.venv-engine-*', FindRec) then
+  begin
+    try
+      repeat
+        if (FindRec.Attributes and FILE_ATTRIBUTE_DIRECTORY) <> 0 then
+        begin
+          SlotPath := AppDir + '\' + FindRec.Name;
+          DelTree(SlotPath, True, True, True);
+        end;
+      until not FindNext(FindRec);
+    finally
+      FindClose(FindRec);
+    end;
+  end;
 end;
 
 function DefaultInstallDir: String;
@@ -150,6 +189,24 @@ end;
 
 procedure InitializeWizard;
 begin
+#if SetupSegment == "en"
+  UiLocalePage := CreateCustomPage(
+    wpWelcome,
+    'Interface language',
+    'Choose the Slysh interface language. You can change it later in Settings.' + #13#10 +
+    'Русский: выберите «Russian» ниже.');
+
+  UiLocaleCombo := TNewComboBox.Create(UiLocalePage);
+  UiLocaleCombo.Parent := UiLocalePage.Surface;
+  UiLocaleCombo.Left := ScaleX(0);
+  UiLocaleCombo.Top := ScaleY(24);
+  UiLocaleCombo.Width := UiLocalePage.SurfaceWidth;
+  UiLocaleCombo.Style := csDropDownList;
+  UiLocaleCombo.Items.Add('English');
+  UiLocaleCombo.Items.Add('Russian');
+  UiLocaleCombo.ItemIndex := 0;
+  SelectedUiLocale := 'en';
+#else
   UiLocalePage := CreateCustomPage(
     wpWelcome,
     'Язык интерфейса / Interface language',
@@ -166,16 +223,24 @@ begin
   UiLocaleCombo.Items.Add('English');
   UiLocaleCombo.ItemIndex := 0;
   SelectedUiLocale := 'ru';
+#endif
 end;
 
 procedure CurPageChanged(CurPageID: Integer);
 begin
   if (UiLocalePage <> nil) and (CurPageID = UiLocalePage.ID) then
   begin
+#if SetupSegment == "en"
+    if UiLocaleCombo.ItemIndex = 0 then
+      SelectedUiLocale := 'en'
+    else
+      SelectedUiLocale := 'ru';
+#else
     if UiLocaleCombo.ItemIndex = 1 then
       SelectedUiLocale := 'en'
     else
       SelectedUiLocale := 'ru';
+#endif
   end;
 end;
 
@@ -187,10 +252,17 @@ begin
     RemoveLegacyStartMenuShortcut;
   if CurStep = ssPostInstall then
   begin
+#if SetupSegment == "en"
+    if UiLocaleCombo.ItemIndex = 0 then
+      SelectedUiLocale := 'en'
+    else
+      SelectedUiLocale := 'ru';
+#else
     if UiLocaleCombo.ItemIndex = 1 then
       SelectedUiLocale := 'en'
     else
       SelectedUiLocale := 'ru';
+#endif
     LocalePath := ExpandConstant('{app}\.install-ui-locale');
     SaveStringToFile(LocalePath, SelectedUiLocale, False);
     if not IsAppUpgrade then
@@ -206,6 +278,15 @@ begin
   if UninstallSilent then
     KeepModelsOnUninstall := False
   else
+#if SetupSegment == "en"
+    KeepModelsOnUninstall :=
+      MsgBox(
+        'Remove the models folder with the program?' + #13#10 + #13#10 +
+        'Yes — delete models (downloaded GigaAM/Whisper weights).' + #13#10 +
+        'No — keep models on disk.',
+        mbConfirmation,
+        MB_YESNO or MB_DEFBUTTON1) = IDNO;
+#else
     KeepModelsOnUninstall :=
       MsgBox(
         'Удалить папку models вместе с программой?' + #13#10 + #13#10 +
@@ -213,11 +294,14 @@ begin
         '«Нет» — оставить models на диске.',
         mbConfirmation,
         MB_YESNO or MB_DEFBUTTON1) = IDNO;
+#endif
   Result := True;
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 begin
+  if CurUninstallStep = usUninstall then
+    RemoveEngineVenvSlots;
   if CurUninstallStep = usPostUninstall then
   begin
     if not KeepModelsOnUninstall then

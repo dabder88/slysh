@@ -27,6 +27,7 @@ class JsApi:
     def __init__(self) -> None:
         self._window = None
         self._ui_bootstrap_token = ""
+        self._user_approved_exit = False
 
     def ui_bootstrap_token(self) -> str:
         return str(self._ui_bootstrap_token or "")
@@ -124,6 +125,34 @@ class JsApi:
         if not text.lower().startswith(("http://", "https://")):
             raise ValueError("Недопустимый URL")
         webbrowser.open(text)
+        return True
+
+    def exit_confirm_skipped(self) -> bool:
+        from slysh.ui_prefs import load_skip_exit_confirm
+
+        return load_skip_exit_confirm()
+
+    def finish_app_exit(self, remember=False, proceed=False) -> bool:
+        from slysh.ui_prefs import save_skip_exit_confirm
+
+        remember_flag = remember is True or str(remember).lower() in {
+            "1",
+            "true",
+            "yes",
+        }
+        proceed_flag = proceed is True or str(proceed).lower() in {
+            "1",
+            "true",
+            "yes",
+        }
+        if remember_flag:
+            save_skip_exit_confirm(True)
+        if not proceed_flag:
+            return False
+        self._user_approved_exit = True
+        window = self._active_window()
+        if window is not None:
+            window.destroy()
         return True
 
 
@@ -539,6 +568,45 @@ def main() -> None:
             logging.debug("window.resize not available", exc_info=True)
 
     window.events.loaded += on_loaded
+
+    exit_prompt_lock = threading.Lock()
+    exit_prompt_scheduled = False
+
+    def schedule_exit_prompt() -> None:
+        nonlocal exit_prompt_scheduled
+        with exit_prompt_lock:
+            if exit_prompt_scheduled:
+                return
+            exit_prompt_scheduled = True
+
+        def show_prompt() -> None:
+            nonlocal exit_prompt_scheduled
+            try:
+                window.evaluate_js(
+                    "window.__promptAppExit && window.__promptAppExit()"
+                )
+            except Exception:
+                logging.debug("exit prompt js failed", exc_info=True)
+            finally:
+                with exit_prompt_lock:
+                    exit_prompt_scheduled = False
+
+        # evaluate_js from closing handler deadlocks WinForms; run after FormClosing returns.
+        threading.Timer(0.05, show_prompt).start()
+
+    def on_closing() -> bool | None:
+        from slysh.app_exit import should_prompt_before_close
+        from slysh.ui_prefs import load_skip_exit_confirm
+
+        if not should_prompt_before_close(
+            load_skip_exit_confirm(),
+            api._user_approved_exit,
+        ):
+            return None
+        schedule_exit_prompt()
+        return False
+
+    window.events.closing += on_closing
     icon = app_icon_path()
     start_kwargs: dict[str, str] = {}
     if icon is not None:

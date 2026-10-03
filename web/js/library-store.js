@@ -173,7 +173,7 @@ export function hasActiveLibraryJobs(list) {
 export async function addToBatch(batchId, paths, recursive) {
   const unique = [...new Set((paths || []).filter(Boolean))];
   if (!unique.length) {
-    return;
+    return null;
   }
   const scan = await api("/api/batches/scan", {
     method: "POST",
@@ -184,10 +184,10 @@ export async function addToBatch(batchId, paths, recursive) {
   if (resolved.length) {
     const allowed = await ensureIntakeAllowed({ paths: resolved });
     if (!allowed) {
-      return;
+      return null;
     }
   }
-  await api(`/api/batches/${batchId}/items`, {
+  return api(`/api/batches/${batchId}/items`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ paths: unique, recursive }),

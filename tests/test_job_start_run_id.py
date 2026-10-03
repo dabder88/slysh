@@ -29,7 +29,7 @@ def test_start_while_queued_keeps_run_id(tmp_path: Path) -> None:
     app.state.engine_url = "http://127.0.0.1:9"
     gate = threading.Event()
 
-    def block_engine(_db, _url, jid: int, _path: str) -> None:
+    def block_engine(_db, _url, jid: int, _path: str, *, reset_segments: bool = True) -> None:
         gate.wait(timeout=5.0)
         _db.set_status(jid, JobStatus.COMPLETED)
 

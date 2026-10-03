@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <title>Slysh</title>
   <link rel="icon" href="/branding/favicon-32.png" type="image/png" sizes="32x32">
-  <link rel="stylesheet" href="/app.css?v=119">
+  <link rel="stylesheet" href="/app.css?v=123">
   <style>
     .boot-error {
       position: fixed;
@@ -166,6 +166,19 @@
             <button type="button" id="topbar-tab-single" class="topbar-tab is-active" data-i18n="page.ad41559a4ca7">Прямая загрузка</button>
             <button type="button" id="topbar-tab-batch" class="topbar-tab" data-i18n="page.c3c5cb4ce7f5">Пакетная обработка</button>
           </nav>
+        </div>
+        <div id="topbar-asr-strip" class="topbar-asr-strip" hidden>
+          <button
+            type="button"
+            id="topbar-asr-strip-btn"
+            class="topbar-asr-strip-btn"
+            data-i18n-title="topbar.asrOpenSettings"
+            title="Сменить в настройках"
+          >
+            <span id="topbar-asr-mode" class="topbar-asr-mode"></span>
+            <span class="topbar-asr-sep" aria-hidden="true">·</span>
+            <span id="topbar-asr-model" class="topbar-asr-model"></span>
+          </button>
         </div>
         <div id="topbar-actions" class="topbar-actions" hidden>
           <button type="button" id="btn-queue-pause-all" class="btn-outline btn-compact" hidden>
@@ -868,125 +881,239 @@
     </div>
   </div>
 
-  <div id="engine-setup-modal" class="modal engine-setup-modal" hidden>
-    <div class="modal-card" role="dialog" aria-labelledby="engine-setup-title" aria-describedby="engine-setup-copy">
+  <div id="engine-setup-modal" class="modal engine-setup-modal slysh-onboarding-modal" hidden>
+    <div class="modal-card slysh-modal-card" role="dialog" aria-labelledby="engine-setup-title" aria-describedby="engine-setup-copy">
       <div id="engine-setup-step-choose">
-        <h2 id="engine-setup-title" data-i18n="firstRun.engineTitle">Как расшифровывать</h2>
-        <p id="engine-setup-copy" class="hint" data-i18n="firstRun.engineCopy">
-          Выберите, как расшифровывать. Позже это можно сменить в «Настройках».
-        </p>
-        <div class="engine-setup-choices modal-actions modal-actions--stack">
-          <button type="button" id="engine-setup-install" class="engine-setup-choice btn-primary">
-            <span class="engine-setup-choice-title" data-i18n="firstRun.engineLocalTitle">Локально на этом компьютере</span>
-            <span class="engine-setup-choice-hint" data-i18n="firstRun.engineLocalHint">Сразу начнётся загрузка около 3 ГБ — программы распознавания. Лучше видеокарта NVIDIA, на процессоре будет медленнее. Затем можно скачать модель для распознавания.</span>
-          </button>
-          <button type="button" id="engine-setup-cloud" class="engine-setup-choice btn-outline">
-            <span class="engine-setup-choice-title" data-i18n="firstRun.engineCloudTitle">Через облако (без нейросетей на ПК)</span>
-            <span class="engine-setup-choice-hint" data-i18n="firstRun.engineCloudHint">Нужен ваш ключ Groq, OpenAI, Gladia или другого сервиса. Аудио уходит на сервер провайдера, на компьютер пакеты не качаются.</span>
-          </button>
-          <button type="button" id="engine-setup-later" class="ghost" data-i18n="firstRun.engineLater">Напомнить позже</button>
+        <div class="p-6 pb-4">
+          <div class="flex items-center justify-between mb-2.5">
+            <span class="onboarding-badge font-bold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200/80 font-mono" data-i18n="firstRun.engineStepBadge">Первый запуск · Шаг 1 из 3</span>
+            <button type="button" id="engine-setup-dismiss" class="w-7 h-7 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700 transition text-xs" data-i18n-title="page.4ae50d30739d" title="Закрыть" aria-label="Закрыть">
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </button>
+          </div>
+          <h2 id="engine-setup-title" class="onboarding-title tracking-tight" data-i18n="firstRun.engineTitle">Как расшифровывать</h2>
+          <p id="engine-setup-copy" class="onboarding-lead" data-i18n="firstRun.engineCopy">
+            Выберите, как расшифровывать. Позже это можно сменить в «Настройках».
+          </p>
+        </div>
+        <div id="engine-setup-choices" class="engine-setup-choices px-6 space-y-3 pb-6">
+          <div id="engine-setup-opt-local" data-choice="local" class="slysh-radio-card is-active p-4 rounded-2xl border-2 border-blue-600 bg-blue-50/40 flex items-start gap-3.5" role="button" tabindex="0">
+            <div class="w-5 h-5 rounded-full border-2 border-blue-600 flex items-center justify-center flex-shrink-0 mt-0.5 bg-white">
+              <div class="slysh-radio-dot w-2.5 h-2.5 rounded-full bg-blue-600"></div>
+            </div>
+            <div class="space-y-1.5 flex-1 min-w-0">
+              <div class="flex items-center justify-between gap-2">
+                <span class="onboarding-option-title text-slate-900" data-i18n="firstRun.engineLocalTitle">Локально на этом компьютере</span>
+                <span class="onboarding-chip font-bold px-2 py-0.5 rounded-md bg-blue-100 text-blue-800 font-mono flex-shrink-0" data-i18n="firstRun.engineBadgeGpu">GPU / CPU</span>
+              </div>
+              <p class="onboarding-option-hint text-slate-600" data-i18n="firstRun.engineLocalHint">Сразу начнётся загрузка около 3 ГБ — программы распознавания. Лучше видеокарта NVIDIA, на процессоре будет медленнее. Затем можно скачать модель для распознавания.</p>
+            </div>
+          </div>
+          <div id="engine-setup-opt-cloud" data-choice="cloud" class="slysh-radio-card p-4 rounded-2xl border border-slate-200 bg-slate-50/60 flex items-start gap-3.5" role="button" tabindex="0">
+            <div class="w-5 h-5 rounded-full border border-slate-400 flex items-center justify-center flex-shrink-0 mt-0.5 bg-white">
+              <div class="slysh-radio-dot w-2.5 h-2.5 rounded-full bg-transparent"></div>
+            </div>
+            <div class="space-y-1.5 flex-1 min-w-0">
+              <div class="flex items-center justify-between gap-2">
+                <span class="onboarding-option-title text-slate-800" data-i18n="firstRun.engineCloudTitle">Через облако (без нейросетей на ПК)</span>
+                <span class="onboarding-chip font-bold px-2 py-0.5 rounded-md bg-slate-200 text-slate-700 font-mono flex-shrink-0" data-i18n="firstRun.engineBadgeApi">API Keys</span>
+              </div>
+              <p class="onboarding-option-hint text-slate-500" data-i18n="firstRun.engineCloudHint">Нужен ваш ключ Groq, OpenAI, Gladia или другого сервиса. Аудио уходит на сервер провайдера, на компьютер пакеты не качаются.</p>
+            </div>
+          </div>
+        </div>
+        <div class="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-3">
+          <button type="button" id="engine-setup-later" class="onboarding-btn-ghost rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 transition" data-i18n="firstRun.engineLater">Напомнить позже</button>
+          <button type="button" id="engine-setup-continue" class="onboarding-btn-primary rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition active:scale-[0.98]" data-i18n="firstRun.engineContinue">Продолжить →</button>
         </div>
       </div>
       <div id="engine-setup-step-install" hidden>
-        <h2 id="engine-setup-install-title" data-i18n="firstRun.engineInstallTitle">Загрузка программ для локальной расшифровки</h2>
-        <ul class="engine-confirm-list engine-setup-body">
-          <li data-i18n="firstRun.engineInstallWhat">Скачиваются библиотеки (PyTorch и др.) — не веса модели речи.</li>
-          <li data-i18n="firstRun.engineInstallTime">Обычно 10–30 минут; окно можно не закрывать.</li>
-          <li data-i18n="firstRun.engineInstallVpn">При включённом VPN загрузка часто «замирает» — на время установки лучше отключить VPN.</li>
-        </ul>
+        <div class="p-6 pb-3 space-y-2.5">
+          <div class="flex items-center justify-between">
+            <span class="onboarding-badge font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200/80 font-mono flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-blue-600 animate-pulse" aria-hidden="true"></span>
+              <span id="engine-setup-installing-badge" data-i18n="firstRun.engineInstallingBadge">Выполняется установка</span>
+            </span>
+            <span class="onboarding-meta font-mono text-slate-400">uv sync</span>
+          </div>
+          <h2 id="engine-setup-install-title" class="onboarding-title tracking-tight" data-i18n="firstRun.engineInstallTitle">Загрузка программ для локальной расшифровки</h2>
+        </div>
+        <div class="px-6">
+          <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 onboarding-body text-slate-600 space-y-2 engine-setup-body">
+            <div class="flex items-start gap-2.5">
+              <span class="w-1.5 h-1.5 rounded-full bg-blue-600 mt-1.5 flex-shrink-0" aria-hidden="true"></span>
+              <span class="leading-relaxed" data-i18n="firstRun.engineInstallWhat">Скачиваются библиотеки (PyTorch и др.) — не веса модели речи.</span>
+            </div>
+            <div class="flex items-start gap-2.5">
+              <span class="w-1.5 h-1.5 rounded-full bg-blue-600 mt-1.5 flex-shrink-0" aria-hidden="true"></span>
+              <span class="leading-relaxed" data-i18n="firstRun.engineInstallTime">Обычно 10–30 минут; окно можно не закрывать.</span>
+            </div>
+            <div class="flex items-start gap-2.5 text-amber-900 font-medium">
+              <span class="w-1.5 h-1.5 rounded-full bg-amber-600 mt-1.5 flex-shrink-0" aria-hidden="true"></span>
+              <span class="leading-relaxed" data-i18n="firstRun.engineInstallVpn">При включённом VPN загрузка часто «замирает» — на время установки лучше отключить VPN.</span>
+            </div>
+          </div>
+        </div>
+        <div id="engine-setup-progress-wrap" class="engine-setup-progress-wrap p-6 space-y-3" hidden>
+          <div class="flex items-center justify-between onboarding-meta">
+            <span id="engine-setup-progress-label" class="font-mono font-bold text-slate-800 engine-setup-progress-label"></span>
+            <span id="engine-setup-progress-pct" class="font-mono font-bold text-blue-600"></span>
+          </div>
+          <div class="w-full h-3 rounded-full bg-slate-100 p-0.5 border border-slate-200 overflow-hidden">
+            <div id="engine-setup-progress-fill" class="h-full bg-blue-600 slysh-progress-animated rounded-full transition-all duration-300" style="width: 35%;"></div>
+          </div>
+          <progress id="engine-setup-progress" class="engine-setup-progress settings-bento-progress-native" max="100" aria-hidden="true"></progress>
+          <p id="engine-setup-progress-summary" class="hint engine-setup-progress-summary text-slate-500" hidden></p>
+          <p id="engine-setup-progress-hint" class="hint engine-setup-progress-hint text-slate-400" hidden data-i18n="firstRun.engineProgressHint">Загрузка может занять 10–30 минут. Окно можно не закрывать.</p>
+          <p id="engine-setup-progress-stalled" class="hint engine-setup-progress-stalled text-amber-800" hidden></p>
+          <button type="button" id="engine-setup-log-toggle" class="onboarding-btn-ghost w-full mt-2 flex items-center justify-center gap-2 rounded-xl border border-slate-300 hover:bg-slate-50 text-slate-700 transition">
+            <span id="engine-setup-log-toggle-label" data-i18n="firstRun.engineShowLog">Показать лог</span>
+            <svg id="engine-setup-log-chevron" class="w-4 h-4 text-slate-500 transition-transform duration-200" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </button>
+          <pre id="engine-setup-log" class="slysh-terminal-log mt-3 rounded-2xl p-4 font-mono max-h-48 overflow-y-auto shadow-inner" hidden></pre>
+        </div>
+        <p id="engine-setup-status" class="hint px-6 pb-4 text-emerald-700" hidden></p>
       </div>
-      <div id="engine-setup-progress-wrap" class="engine-setup-progress-wrap" hidden>
-        <progress id="engine-setup-progress" class="engine-setup-progress" max="100"></progress>
-        <p id="engine-setup-progress-summary" class="hint engine-setup-progress-summary" hidden></p>
-        <p id="engine-setup-progress-label" class="hint engine-setup-progress-label"></p>
-        <p id="engine-setup-progress-hint" class="hint engine-setup-progress-hint" hidden></p>
-        <p id="engine-setup-progress-stalled" class="hint engine-setup-progress-stalled" hidden></p>
-        <button type="button" id="engine-setup-log-toggle" class="ghost" data-i18n="firstRun.engineShowLog">Показать лог</button>
-      </div>
-      <pre id="engine-setup-log" class="engine-setup-log" hidden></pre>
-      <p id="engine-setup-status" class="hint" hidden></p>
     </div>
   </div>
 
-  <div id="engine-packages-confirm-modal" class="modal engine-setup-modal" hidden>
+  <div id="engine-packages-confirm-modal" class="modal engine-setup-modal slysh-onboarding-modal" hidden>
     <div
-      class="modal-card"
+      class="modal-card slysh-modal-card"
       role="dialog"
       aria-labelledby="engine-packages-confirm-title"
       aria-describedby="engine-packages-confirm-copy"
     >
-      <h2 id="engine-packages-confirm-title" data-i18n="firstRun.engineConfirmTitle">
-        Установить программы для локальной расшифровки?
-      </h2>
-      <p id="engine-packages-confirm-copy" class="hint engine-setup-body" data-i18n="firstRun.engineConfirmIntro">
-        Скачаются библиотеки для локальной расшифровки на компьютере (PyTorch и связанные пакеты, NeMo, yt-dlp). Веса модели GigaAM или Whisper — отдельно, на следующем шаге.
-      </p>
-      <ul class="engine-confirm-list engine-setup-body">
-        <li data-i18n="firstRun.engineConfirmSize">Ориентир по объёму: около 3–5 ГБ.</li>
-        <li data-i18n="firstRun.engineConfirmLater">Можно отложить и установить позже в «Настройках» → «Скачать пакеты расшифровки».</li>
-        <li data-i18n="firstRun.engineConfirmVpn">Если включён VPN, на время установки лучше отключить — иначе загрузка может идти очень медленно или «зависнуть».</li>
-      </ul>
-      <div class="modal-actions modal-actions--stack">
-        <button type="button" id="engine-packages-confirm-start" class="btn-primary" data-i18n="firstRun.engineConfirmStart">
-          Начать загрузку
-        </button>
-        <button type="button" id="engine-packages-confirm-back" class="btn-outline" data-i18n="firstRun.engineConfirmBack">
-          Назад
-        </button>
-        <button type="button" id="engine-packages-confirm-later" class="ghost" data-i18n="firstRun.engineLater">
-          Напомнить позже
+      <div class="p-6 pb-4 space-y-2">
+        <div class="flex items-center justify-between">
+          <span class="onboarding-badge font-bold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200/80 font-mono" data-i18n="firstRun.engineStep2Badge">Локальный движок · Шаг 2 из 3</span>
+          <span class="onboarding-meta font-mono text-slate-400" data-i18n="firstRun.engineSizeBadge">~3–5 ГБ</span>
+        </div>
+        <h2 id="engine-packages-confirm-title" class="onboarding-title tracking-tight" data-i18n="firstRun.engineConfirmTitle">
+          Установить программы для локальной расшифровки?
+        </h2>
+        <p id="engine-packages-confirm-copy" class="onboarding-lead text-slate-600" data-i18n="firstRun.engineConfirmIntro">
+          Скачаются библиотеки для локальной расшифровки на компьютере (PyTorch и связанные пакеты, NeMo, yt-dlp). Веса модели GigaAM или Whisper — отдельно, на следующем шаге.
+        </p>
+      </div>
+      <div class="px-6 space-y-2.5 pb-6 engine-setup-body">
+        <div class="p-3 rounded-2xl bg-slate-50 border border-slate-200 flex items-start gap-3">
+          <div class="w-7 h-7 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center flex-shrink-0 mt-0.5" aria-hidden="true">
+            <svg class="w-4 h-4 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 6c0 1.66 3.58 3 8 3s8-1.34 8-3-3.58-3-8-3-8 1.34-8 3z"/>
+              <path d="M4 10c0 1.66 3.58 3 8 3s8-1.34 8-3"/>
+              <path d="M4 14c0 1.66 3.58 3 8 3s8-1.34 8-3"/>
+              <path d="M4 18c0 1.66 3.58 3 8 3s8-1.34 8-3"/>
+            </svg>
+          </div>
+          <p class="onboarding-callout text-slate-700 pt-0.5" data-i18n="firstRun.engineConfirmSize">Ориентир по объёму: около 3–5 ГБ.</p>
+        </div>
+        <div class="p-3 rounded-2xl bg-slate-50 border border-slate-200 flex items-start gap-3">
+          <div class="w-7 h-7 rounded-xl bg-slate-200/80 text-slate-600 flex items-center justify-center flex-shrink-0 mt-0.5" aria-hidden="true">
+            <svg class="w-4 h-4 text-slate-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
+          </div>
+          <p class="onboarding-callout text-slate-700 pt-0.5" data-i18n="firstRun.engineConfirmLater">Можно отложить и установить позже в «Настройках» → «Скачать пакеты расшифровки».</p>
+        </div>
+        <div class="p-3 rounded-2xl bg-amber-50 border border-amber-200 flex items-start gap-3">
+          <div class="w-7 h-7 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center flex-shrink-0 mt-0.5" aria-hidden="true">
+            <svg class="w-4 h-4 text-amber-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
+              <line x1="12" y1="9" x2="12" y2="13"/>
+              <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+          </div>
+          <p class="onboarding-callout text-amber-900 font-medium pt-0.5" data-i18n="firstRun.engineConfirmVpn">Если включён VPN, на время установки лучше отключить — иначе загрузка может идти очень медленно или «зависнуть».</p>
+        </div>
+      </div>
+      <div class="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-3">
+        <div class="flex items-center gap-2">
+          <button type="button" id="engine-packages-confirm-back" class="onboarding-btn-ghost rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 transition flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+            <span data-i18n="firstRun.engineConfirmBack">Назад</span>
+          </button>
+          <button type="button" id="engine-packages-confirm-later" class="onboarding-btn-ghost rounded-xl text-slate-500 hover:text-slate-800 transition" data-i18n="firstRun.engineLater">Напомнить позже</button>
+        </div>
+        <button type="button" id="engine-packages-confirm-start" class="onboarding-btn-primary rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition active:scale-[0.98] flex items-center gap-2">
+          <svg class="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <span data-i18n="firstRun.engineConfirmStart">Начать загрузку</span>
         </button>
       </div>
     </div>
   </div>
 
-  <div id="model-setup-modal" class="modal model-setup-modal" hidden>
-    <div class="modal-card" role="dialog" aria-labelledby="model-setup-title">
-      <h2 id="model-setup-title" data-i18n="modelSetup.title">Модель для распознавания</h2>
-      <p class="hint" data-i18n="modelSetup.copy">Пакеты установлены. Выберите модель и нажмите «Скачать», или сделайте это позже в «Настройках».</p>
-      <label class="model-setup-field">
-        <span data-i18n="modelSetup.modelLabel">Модель</span>
-        <select id="model-setup-select"></select>
-      </label>
-      <p
-        id="model-setup-gigaam-vpn-hint"
-        class="hint model-setup-vpn-hint"
-        hidden
-        data-i18n="modelSetup.gigaamVpn"
-      >
-        При скачивании GigaAM на время загрузки лучше отключить VPN — иначе файл может повредиться или загрузка «зависнет».
-      </p>
-      <div id="model-setup-download-progress-wrap" class="settings-model-download-progress-wrap" hidden>
-        <div class="settings-bento-progress-head">
-          <span id="model-setup-download-progress-label" class="settings-bento-progress-label"></span>
-          <span id="model-setup-download-progress-pct" class="settings-bento-progress-pct"></span>
+  <div id="model-setup-modal" class="modal model-setup-modal slysh-onboarding-modal" hidden>
+    <div class="modal-card slysh-modal-card" role="dialog" aria-labelledby="model-setup-title">
+      <div class="p-6 space-y-4">
+        <div>
+          <div class="flex items-center justify-between mb-2.5">
+            <span class="onboarding-badge font-bold px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 font-mono flex items-center gap-1.5">
+              <svg class="w-4 h-4 text-emerald-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+              <span data-i18n="modelSetup.packagesReady">Пакеты установлены</span>
+            </span>
+            <span class="onboarding-meta font-mono text-slate-400" data-i18n="modelSetup.stepBadge">Шаг 3 из 3</span>
+          </div>
+          <h2 id="model-setup-title" class="onboarding-title tracking-tight" data-i18n="modelSetup.title">Модель для распознавания</h2>
+          <p class="onboarding-lead text-slate-600" data-i18n="modelSetup.copy">Пакеты установлены. Выберите модель и нажмите «Скачать», или сделайте это позже в «Настройках».</p>
         </div>
-        <div class="settings-bento-progress-track" aria-hidden="true">
-          <div id="model-setup-download-progress-fill" class="settings-bento-progress-fill"></div>
+        <div class="space-y-2">
+          <label for="model-setup-select" class="onboarding-label block" data-i18n="modelSetup.modelLabel">Модель</label>
+          <div class="relative">
+            <select id="model-setup-select" class="model-setup-select w-full appearance-none py-3.5 px-4 pr-11 rounded-2xl bg-slate-50 border border-slate-300 hover:border-blue-500 focus:border-blue-600 focus:bg-white text-base font-semibold text-slate-900 outline-none transition cursor-pointer shadow-sm"></select>
+            <div class="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400" aria-hidden="true">
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+            </div>
+          </div>
         </div>
-        <progress
-          id="model-setup-progress"
-          class="settings-model-download-progress settings-bento-progress-native"
-          max="100"
-        ></progress>
-        <p id="model-setup-progress-summary" class="hint settings-model-download-summary" hidden></p>
+        <div id="model-setup-gigaam-vpn-hint" class="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 flex items-start gap-3" hidden>
+          <div class="w-6 h-6 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center flex-shrink-0 mt-0.5" aria-hidden="true">
+            <svg class="w-4 h-4 text-amber-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
+              <line x1="12" y1="9" x2="12" y2="13"/>
+              <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+          </div>
+          <p class="onboarding-callout text-amber-900 font-medium pt-0.5" data-i18n="modelSetup.gigaamVpn">При скачивании GigaAM на время загрузки лучше отключить VPN — иначе файл может повредиться или загрузка «зависнет».</p>
+        </div>
+        <div id="model-setup-download-progress-wrap" class="settings-model-download-progress-wrap" hidden>
+          <div class="settings-bento-progress-head">
+            <span id="model-setup-download-progress-label" class="settings-bento-progress-label"></span>
+            <span id="model-setup-download-progress-pct" class="settings-bento-progress-pct"></span>
+          </div>
+          <div class="settings-bento-progress-track" aria-hidden="true">
+            <div id="model-setup-download-progress-fill" class="settings-bento-progress-fill"></div>
+          </div>
+          <progress
+            id="model-setup-progress"
+            class="settings-model-download-progress settings-bento-progress-native"
+            max="100"
+          ></progress>
+          <p id="model-setup-progress-summary" class="hint settings-model-download-summary" hidden></p>
+          <p
+            id="model-setup-progress-stalled"
+            class="hint settings-model-download-stalled"
+            hidden
+            data-i18n="settings.modelDownloadStalled"
+          ></p>
+        </div>
+        <p id="model-setup-status" class="hint" hidden></p>
         <p
-          id="model-setup-progress-stalled"
-          class="hint settings-model-download-stalled"
+          id="model-setup-download-wait-hint"
+          class="hint model-setup-download-wait-hint text-slate-500"
           hidden
-          data-i18n="settings.modelDownloadStalled"
+          data-i18n="modelSetup.downloadWaitHint"
         ></p>
-      </div>
-      <p id="model-setup-status" class="hint" hidden></p>
-      <p
-        id="model-setup-download-wait-hint"
-        class="hint model-setup-download-wait-hint"
-        hidden
-        data-i18n="modelSetup.downloadWaitHint"
-      ></p>
-      <div class="modal-actions">
-        <button type="button" id="model-setup-download" class="btn-primary" data-i18n="modelSetup.download">Скачать</button>
-        <button type="button" id="model-setup-later" class="ghost" data-i18n="modelSetup.later">Позже</button>
+        <div class="pt-2 flex items-center justify-end gap-2.5 border-t border-slate-100">
+          <button type="button" id="model-setup-later" class="onboarding-btn-secondary rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-700 transition" data-i18n="modelSetup.later">Позже</button>
+          <button type="button" id="model-setup-download" class="onboarding-btn-primary rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition active:scale-[0.98] flex items-center gap-2">
+            <svg class="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <span data-i18n="modelSetup.download">Скачать</span>
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -1483,6 +1610,32 @@
     </div>
   </div>
 
+  <div id="app-exit-modal" class="modal" hidden>
+    <div class="modal-card" role="dialog" aria-labelledby="app-exit-title">
+      <h2 id="app-exit-title" data-i18n="appExit.title">Закрыть Slysh?</h2>
+      <p id="app-exit-body" class="hint" data-i18n="appExit.body">Вы уверены, что хотите закрыть программу?</p>
+      <label class="modal-check">
+        <input type="checkbox" id="app-exit-remember">
+        <span data-i18n="appExit.remember">Больше не спрашивать</span>
+      </label>
+      <div class="modal-actions">
+        <button type="button" id="app-exit-confirm" class="btn-primary" data-i18n="appExit.confirm">Выйти</button>
+        <button type="button" id="app-exit-cancel" class="ghost" data-i18n="appExit.cancel">Отмена</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="intake-followup-modal" class="modal" hidden>
+    <div class="modal-card" role="dialog" aria-labelledby="intake-followup-title">
+      <h2 id="intake-followup-title" data-i18n="intake.followup.title">Файлы загружены</h2>
+      <p id="intake-followup-body" class="hint"></p>
+      <div class="modal-actions">
+        <button type="button" id="intake-followup-now" class="btn-primary" data-i18n="intake.followup.now">Расшифровать сейчас</button>
+        <button type="button" id="intake-followup-later" class="ghost" data-i18n="intake.followup.later">Позже</button>
+      </div>
+    </div>
+  </div>
+
   <div id="upload-target-modal" class="modal" hidden>
     <div class="modal-card" role="dialog" aria-labelledby="upload-target-title">
       <h2 id="upload-target-title" data-i18n="page.d172188dc6a7">Куда добавить файлы?</h2>
@@ -1695,31 +1848,34 @@
   {
     "imports": {
       "/js/api.js": "/js/api.js?v=51",
+      "/js/app-exit.js": "/js/app-exit.js?v=3",
       "/js/ui-session.js": "/js/ui-session.js?v=2",
       "/js/archive.js": "/js/archive.js?v=46",
-      "/js/batch-panel.js": "/js/batch-panel.js?v=46",
+      "/js/batch-panel.js": "/js/batch-panel.js?v=47",
       "/js/batch-kind.js": "/js/batch-kind.js?v=45",
-      "/js/dashboard.js": "/js/dashboard.js?v=45",
+      "/js/dashboard.js": "/js/dashboard.js?v=46",
       "/js/editor.js": "/js/editor.js?v=57",
       "/js/errors.js": "/js/errors.js?v=45",
-      "/js/i18n.js": "/js/i18n.js?v=53",
+      "/js/i18n.js": "/js/i18n.js?v=56",
       "/js/icons.js": "/js/icons.js?v=45",
       "/js/intake-duplicate.js": "/js/intake-duplicate.js?v=45",
-      "/js/legacy.js": "/js/legacy.js?v=61",
+      "/js/intake-followup.js": "/js/intake-followup.js?v=1",
+      "/js/legacy.js": "/js/legacy.js?v=63",
       "/js/media-time.js": "/js/media-time.js?v=45",
-      "/js/library-store.js": "/js/library-store.js?v=46",
+      "/js/library-store.js": "/js/library-store.js?v=47",
       "/js/job-source.js": "/js/job-source.js?v=45",
       "/js/library-table-filters.js": "/js/library-table-filters.js?v=45",
       "/js/library-table.js": "/js/library-table.js?v=45",
       "/js/library-utils.js": "/js/library-utils.js?v=50",
       "/js/live.js": "/js/live.js?v=49",
       "/js/meeting.js": "/js/meeting.js?v=50",
-      "/js/main.js": "/js/main.js?v=58",
+      "/js/asr-context-bar.js": "/js/asr-context-bar.js?v=1",
+      "/js/main.js": "/js/main.js?v=60",
       "/js/secret-field.js": "/js/secret-field.js?v=46",
       "/js/orphan-files-table.js": "/js/orphan-files-table.js?v=46",
       "/js/queue.js": "/js/queue.js?v=46",
-      "/js/router.js": "/js/router.js?v=48",
-      "/js/shell.js": "/js/shell.js?v=84",
+      "/js/router.js": "/js/router.js?v=49",
+      "/js/shell.js": "/js/shell.js?v=87",
       "/js/state.js": "/js/state.js?v=45",
       "/js/transcripts.js": "/js/transcripts.js?v=45",
       "/js/version.js": "/js/version.js?v=45",
@@ -1727,6 +1883,6 @@
     }
   }
   </script>
-  <script type="module" src="/js/main.js?v=58"></script>
+  <script type="module" src="/js/main.js?v=60"></script>
 </body>
 </html>

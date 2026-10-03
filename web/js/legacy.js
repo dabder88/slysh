@@ -19,6 +19,11 @@ import { msIcon } from "./icons.js";
 import { isYoutubeBatch } from "./batch-kind.js";
 import { reportError } from "./errors.js";
 import { ensureIntakeAllowed } from "./intake-duplicate.js";
+import {
+  batchIntakeResult,
+  openIntakeFollowup,
+  orphansIntakeResult,
+} from "./intake-followup.js";
 import { getLocale, localeDateTag, t } from "./i18n.js";
 import {
   SELECTED_BATCH_KEY,
@@ -520,6 +525,40 @@ function canStartJob(job) {
   return ["idle", "failed", "cancelled"].includes(job.status);
 }
 
+export function jobHasTranscriptContent(job) {
+  if (!job) {
+    return false;
+  }
+  if (Array.isArray(job.segments) && job.segments.length > 0) {
+    return true;
+  }
+  const text = job.transcript;
+  return Boolean(text && String(text).trim());
+}
+
+export function canExportJob(job) {
+  if (!job || isJobBusy(job)) {
+    return false;
+  }
+  if (job.status === "completed") {
+    return jobHasTranscriptContent(job);
+  }
+  if (job.status === "cancelled" || job.status === "failed") {
+    return jobHasTranscriptContent(job);
+  }
+  return false;
+}
+
+export function shouldShowContinueTranscribe(job) {
+  if (!job || isYoutubeJob(job)) {
+    return false;
+  }
+  if (!["cancelled", "failed"].includes(job.status)) {
+    return false;
+  }
+  return jobHasTranscriptContent(job);
+}
+
 function isJobBusy(job) {
   return (
     job.status === "queued" ||
@@ -1019,12 +1058,15 @@ function syncTranscribeUi(job) {
   const topTranscribe = document.getElementById("btn-topbar-transcribe");
   const topStop = document.getElementById("btn-topbar-stop");
 
+  const continueMode = shouldShowContinueTranscribe(job);
   if (transcribeBtn) {
     transcribeBtn.hidden = false;
     transcribeBtn.disabled = !canStart;
     transcribeBtn.textContent = youtube
       ? t("common.refreshTranscript")
-      : t("common.transcribe");
+      : continueMode
+        ? t("common.continueTranscribe")
+        : t("common.transcribe");
   }
   if (cancelBtn) {
     cancelBtn.hidden = !isActive;
@@ -1035,7 +1077,10 @@ function syncTranscribeUi(job) {
   }
   if (retranscribeBtn) {
     const failed = job?.status === "failed";
-    const canRetranscribe = (completed || failed) && !youtube && !job?.capture_finalizing;
+    const canRetranscribe =
+      (completed || failed || (job?.status === "cancelled" && jobHasTranscriptContent(job))) &&
+      !youtube &&
+      !job?.capture_finalizing;
     retranscribeBtn.hidden = !canRetranscribe;
   }
   if (topTranscribe) {
@@ -1043,7 +1088,11 @@ function syncTranscribeUi(job) {
     topTranscribe.disabled = !canStart;
     const topLabel = topTranscribe.querySelector("span:last-child");
     if (topLabel) {
-      topLabel.textContent = youtube && completed ? t("common.refreshTranscript") : t("common.transcribe");
+      topLabel.textContent = youtube && completed
+        ? t("common.refreshTranscript")
+        : continueMode
+          ? t("common.continueTranscribe")
+          : t("common.transcribe");
     }
   }
   if (topStop) {
@@ -1353,7 +1402,7 @@ function pathsFromDrop(event) {
 async function addOrphanFiles(paths) {
   const unique = [...new Set((paths || []).filter(Boolean))];
   if (!unique.length) {
-    return;
+    return null;
   }
   const scan = await api("/api/batches/scan", {
     method: "POST",
@@ -1364,18 +1413,27 @@ async function addOrphanFiles(paths) {
   if (pathsToAdd.length) {
     const allowed = await ensureIntakeAllowed({ paths: pathsToAdd });
     if (!allowed) {
-      return;
+      return null;
     }
   }
+  const jobs = [];
   for (const path of pathsToAdd) {
-    await api("/api/jobs", {
+    const job = await api("/api/jobs", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ path }),
     });
+    jobs.push(job);
   }
   await refreshLibrary();
-  showToast(t("legacy.filesAdded", { count: pathsToAdd.length }));
+  return orphansIntakeResult(jobs);
+}
+
+async function afterIntakeResult(result) {
+  if (!result) {
+    return;
+  }
+  await openIntakeFollowup(result);
 }
 
 async function addFilesToSelectedBatch(paths, batchId = selectedBatchId) {
@@ -1398,9 +1456,13 @@ async function addFilesToSelectedBatch(paths, batchId = selectedBatchId) {
     return;
   }
   try {
-    await addToBatch(batchId, unique, false);
+    const batch = await addToBatch(batchId, unique, false);
     await refreshLibrary();
-    showToast(t("legacy.addedToBatch", { name: selectedBatchLabel(batchId) }));
+    if (batch) {
+      await afterIntakeResult(batchIntakeResult(batch, unique.length));
+    } else {
+      showToast(t("legacy.addedToBatch", { name: selectedBatchLabel(batchId) }));
+    }
   } catch (err) {
     showToast(err.message || String(err));
     await refreshLibrary();
@@ -1434,7 +1496,7 @@ async function addPathsForCurrentTab(paths) {
     await addFilesToSelectedBatch(unique);
   } else {
     try {
-      await addOrphanFiles(unique);
+      await resolveUploadTarget(unique);
     } catch (err) {
       showToast(err.message || String(err));
       await refreshLibrary();
@@ -1623,13 +1685,18 @@ export async function createBatchNamed(name, paths = null) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name: batchName }),
   });
+  let updated = batch;
   if (paths?.length) {
-    await addToBatch(batch.id, paths, false);
+    updated = (await addToBatch(batch.id, paths, false)) || batch;
   }
   setSelectedBatch(batch.id);
   await refreshLibrary();
-  showToast(t("legacy.batchCreatedNamed", { name: batchName }));
-  return batch;
+  if (paths?.length) {
+    await afterIntakeResult(batchIntakeResult(updated, paths.length));
+  } else {
+    showToast(t("legacy.batchCreatedNamed", { name: batchName }));
+  }
+  return updated;
 }
 
 async function confirmNewBatchModal() {
@@ -1829,10 +1896,13 @@ async function confirmUploadAsOrphans() {
     closeUploadTargetModal();
     return;
   }
+  closeUploadTargetModal();
   try {
-    await addOrphanFiles(paths);
-  } finally {
-    closeUploadTargetModal();
+    const result = await addOrphanFiles(paths);
+    await afterIntakeResult(result);
+  } catch (err) {
+    showToast(err.message || String(err));
+    await refreshLibrary();
   }
 }
 
@@ -1850,11 +1920,12 @@ async function confirmUploadAsBatch() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name, rules: pendingUploadRules || undefined }),
     });
-    await addToBatch(batch.id, paths, false);
+    const updated = await addToBatch(batch.id, paths, false);
     setSelectedBatch(batch.id);
     await refreshLibrary();
-    showToast(t("legacy.batchCreatedNamed", { name }));
-    navigate("legacy", { batchId: batch.id, tab: "batches" });
+    await afterIntakeResult(
+      batchIntakeResult(updated || batch, paths.length)
+    );
   } catch (err) {
     showToast(err.message || String(err));
     await refreshLibrary();
@@ -1867,14 +1938,16 @@ export async function resolveUploadTarget(paths) {
     return;
   }
   if (unique.length === 1) {
-    await addOrphanFiles(unique);
+    const result = await addOrphanFiles(unique);
+    await afterIntakeResult(result);
     return;
   }
   const modal = document.getElementById("upload-target-modal");
   const countEl = document.getElementById("upload-target-count");
   const nameEl = document.getElementById("upload-target-batch-name");
   if (!modal) {
-    await addOrphanFiles(unique);
+    const result = await addOrphanFiles(unique);
+    await afterIntakeResult(result);
     return;
   }
   pendingUploadPaths = unique;
@@ -2166,7 +2239,7 @@ function openJobExportModal(job) {
     showToast("legacy.k8638182");
     return;
   }
-  if (job.status !== "completed") {
+  if (!canExportJob(job)) {
     showToast("legacy.k9486817");
     return;
   }
@@ -2188,8 +2261,8 @@ function openJobExportModal(job) {
 }
 
 function openBatchExportModal(jobsToExport) {
-  const completed = (jobsToExport || []).filter((job) => job.status === "completed");
-  if (!completed.length) {
+  const exportable = (jobsToExport || []).filter((job) => canExportJob(job));
+  if (!exportable.length) {
     showToast("legacy.k1604307");
     return;
   }
@@ -2198,10 +2271,10 @@ function openBatchExportModal(jobsToExport) {
     return;
   }
   exportTargetJobId = null;
-  pendingExportJobs = completed;
-  setExportModalMode("batch", completed.length);
+  pendingExportJobs = exportable;
+  setExportModalMode("batch", exportable.length);
   exportFmtEl.value = "srt";
-  resetExportDirs(sourceDir(completed[0].source_path));
+  resetExportDirs(sourceDir(exportable[0].source_path));
   exportModal.hidden = false;
 }
 
@@ -2610,8 +2683,14 @@ function openContextMenu(event, job, batchId) {
   ctxMenu.querySelector('[data-act="batch-open-export"]').hidden = true;
   ctxMenu.querySelector('[data-act="batch-open-export-folder"]').hidden = true;
   ctxMenu.querySelector('[data-act="remove-from-batch"]').hidden = batchId == null;
-  ctxMenu.querySelector('[data-act="transcribe"]').hidden = !canStart;
-  ctxMenu.querySelector('[data-act="export"]').hidden = !completed;
+  const transcribeAct = ctxMenu.querySelector('[data-act="transcribe"]');
+  transcribeAct.hidden = !canStart;
+  if (!transcribeAct.hidden) {
+    transcribeAct.textContent = shouldShowContinueTranscribe(job)
+      ? t("common.continueTranscribe")
+      : t("common.transcribe");
+  }
+  ctxMenu.querySelector('[data-act="export"]').hidden = !canExportJob(job);
   ctxMenu.querySelector('[data-act="open-export"]').hidden = !job.last_export_path;
   ctxMenu.querySelector('[data-act="open-export-folder"]').hidden = !job.last_export_path;
   ctxMenu.querySelector('[data-act="open-source-folder"]').hidden = !job.source_path || isYoutubeJob(job);
@@ -3004,10 +3083,7 @@ export async function addPathsForDashboard(target, paths) {
   if (target === "batch") {
     const targetId = fileBatchTargetId();
     if (targetId == null) {
-      const batch = await createBatchNamed(defaultBatchName(unique), unique);
-      if (batch?.id != null) {
-        navigate("legacy", { batchId: batch.id, tab: "batches" });
-      }
+      await createBatchNamed(defaultBatchName(unique), unique);
       return;
     }
     await addFilesToSelectedBatch(unique, targetId);

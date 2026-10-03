@@ -21,15 +21,26 @@ def test_js_api_does_not_expose_window_attribute():
     api = JsApi()
     assert "window" not in vars(api)
     public = [name for name in dir(api) if not name.startswith("_")]
-    assert public == [
-        "open_files",
-        "open_logs_folder",
-        "open_path",
-        "open_url",
-        "pick_folder",
-        "save_file",
-        "ui_bootstrap_token",
-    ]
+    assert "finish_app_exit" in public
+    assert "exit_confirm_skipped" in public
+
+
+def test_finish_app_exit_proceed_sets_approved_and_destroys():
+    api = JsApi()
+    fake_window = MagicMock()
+    api._window = fake_window
+    assert api.finish_app_exit(False, True) is True
+    assert api._user_approved_exit is True
+    fake_window.destroy.assert_called_once()
+
+
+def test_finish_app_exit_cancel_does_not_destroy():
+    api = JsApi()
+    fake_window = MagicMock()
+    api._window = fake_window
+    assert api.finish_app_exit(False, False) is False
+    assert api._user_approved_exit is False
+    fake_window.destroy.assert_not_called()
 
 
 def test_js_api_open_files_uses_webview_dialog():

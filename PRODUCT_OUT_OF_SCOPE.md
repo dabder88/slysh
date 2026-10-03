@@ -6,7 +6,7 @@
 |------|-------------------------|
 | Подпись Setup / SmartScreen | Установщик без code signing; в [`installer/КАК-ЗАПУСТИТЬ.txt`](installer/КАК-ЗАПУСТИТЬ.txt) — подсказка пользователю «Подробнее → Выполнить в любом случае». |
 | Автообновление в фоне | Только **ручная** проверка обновлений (GitHub Releases) и SHA-256 перед запуском Setup — см. E.4 / `updates.py`. |
-| Юридический due diligence | Справочник [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) в payload (`licenses\`); отдельная legal-работа **не планируется**. |
+| Юридический due diligence | Справочник сторонних компонентов + **проприетарная** [`LICENSE`](LICENSE) / EULA в Setup; полный legal-аудит с юристом **не планируется**. |
 | Обязательное скачивание всех весов в `models/` | Модели и engine по выбору пользователя (Настройки, облако); `models/` не обязателен при клоне/первом запуске. |
 
 Актуальный план работ: [`implementation-order.md`](implementation-order.md), статус: [`implementation-status.md`](implementation-status.md).

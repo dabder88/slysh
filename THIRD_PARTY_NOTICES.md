@@ -2,7 +2,7 @@
 
 Краткий перечень основных зависимостей **Slysh** для установленной копии. **Лицензию всего продукта выбирает владелец.** Отдельная юридическая due diligence **не входит в план продукта** — см. [`PRODUCT_OUT_OF_SCOPE.md`](PRODUCT_OUT_OF_SCOPE.md). Точные версии пакетов — в `uv.lock`.
 
-Копия для пользователя Setup: `licenses\THIRD-PARTY-NOTICES.md` в каталоге программы (копируется при сборке payload из этого файла).
+Копия для пользователя Setup: `licenses\` в каталоге программы — `THIRD-PARTY-NOTICES.md`, `Slysh-EULA-RU.txt`, `Slysh-EULA-EN.txt`, `Slysh-LICENSE.txt`, `ffmpeg-LGPL.txt`. Лицензия **на саму программу Slysh** — см. [`LICENSE`](LICENSE), [`installer/LICENSE-RU.txt`](installer/LICENSE-RU.txt), [`installer/LICENSE-EN.txt`](installer/LICENSE-EN.txt), не этот файл.
 
 ## Как обновлять
 

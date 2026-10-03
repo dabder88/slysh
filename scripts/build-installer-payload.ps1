@@ -169,7 +169,10 @@ if (Test-Path -LiteralPath $gitkeep) {
 
 $howToDir = Join-Path $Root "installer"
 $howTo = Get-ChildItem -LiteralPath $howToDir -Filter "*.txt" |
-    Where-Object { $_.Name -ne "ffmpeg-LGPL.txt" } |
+    Where-Object {
+        $_.Name -ne "ffmpeg-LGPL.txt" -and
+        $_.Name -notlike "LICENSE-*.txt"
+    } |
     Select-Object -First 1
 if (-not $howTo) {
     throw "Missing user readme .txt in installer\"
@@ -186,6 +189,18 @@ if (Test-Path -LiteralPath $rootNotices) {
     Copy-Item -LiteralPath $rootNotices -Destination (Join-Path $Payload "licenses\THIRD-PARTY-NOTICES.md") -Force
 } elseif (Test-Path -LiteralPath $notices) {
     Copy-Item -LiteralPath $notices -Destination (Join-Path $Payload "licenses\THIRD-PARTY-NOTICES.md") -Force
+}
+$eulaRu = Join-Path $Root "installer\LICENSE-RU.txt"
+$eulaEn = Join-Path $Root "installer\LICENSE-EN.txt"
+$licenseEn = Join-Path $Root "LICENSE"
+if (Test-Path -LiteralPath $eulaRu) {
+    Copy-Item -LiteralPath $eulaRu -Destination (Join-Path $Payload "licenses\Slysh-EULA-RU.txt") -Force
+}
+if (Test-Path -LiteralPath $eulaEn) {
+    Copy-Item -LiteralPath $eulaEn -Destination (Join-Path $Payload "licenses\Slysh-EULA-EN.txt") -Force
+}
+if (Test-Path -LiteralPath $licenseEn) {
+    Copy-Item -LiteralPath $licenseEn -Destination (Join-Path $Payload "licenses\Slysh-LICENSE.txt") -Force
 }
 
 $ffmpegSrc = Resolve-FfmpegSource

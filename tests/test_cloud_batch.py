@@ -51,7 +51,7 @@ def test_run_file_asr_job_remote_skips_engine_in_cloud_only(
 
     completed: list[int] = []
 
-    def fake_remote(_app, db, job_id, _path):
+    def fake_remote(_app, db, job_id, _path, **_kwargs):
         completed.append(job_id)
         db.set_status(job_id, JobStatus.COMPLETED)
 
@@ -101,7 +101,7 @@ def test_batch_thread_completes_via_remote_runner(
     monkeypatch.setattr(api_mod, "is_cloud_only", lambda: True)
     monkeypatch.setattr(api_mod, "_selected_model", lambda: remote_model)
 
-    def fake_remote(_app, db, job_id, _path):
+    def fake_remote(_app, db, job_id, _path, **_kwargs):
         db.set_status(job_id, JobStatus.COMPLETED)
         db.set_progress(job_id, 1.0)
 

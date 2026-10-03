@@ -1,5 +1,6 @@
 ﻿import { t } from "./i18n.js";
 import { openSettingsModal } from "./shell.js";
+import { setAsrContextBarRouteVisible } from "./asr-context-bar.js";
 const routes = {
   dashboard: { view: "view-dashboard", nav: "nav-dashboard", topbar: "dashboard" },
   queue: { view: "view-queue", nav: "nav-queue", topbar: "queue" },
@@ -122,6 +123,7 @@ function setTopbar(mode, params = {}) {
   if (!tabsEl || !actionsEl) {
     return;
   }
+  setAsrContextBarRouteVisible(mode);
   tabsEl.hidden = mode !== "dashboard";
   actionsEl.hidden = mode !== "queue" && mode !== "editor";
   if (backBtn) {

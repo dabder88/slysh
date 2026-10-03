@@ -60,6 +60,9 @@ def test_inno_script_has_uninstall_cleanup():
     assert r"{app}\.venv" in text
     assert r"{app}\runtime" in text
     assert "launch-last-error.txt" in text
+    assert "venv-check.log" in text
+    assert "RemoveEngineVenvSlots" in text
+    assert ".venv-engine-*" in text
     assert "uninsneveruninstall" not in text
 
 

@@ -53,13 +53,22 @@ $VersionInfo = ($versionParts[0..3] -join ".")
 
 $Iscc = Resolve-Iscc
 Write-Host "Using $Iscc (AppVersion=$AppVersion)"
-& $Iscc "/DAppVersion=$AppVersion" "/DVersionInfoVersion=$VersionInfo" $Iss
-if ($LASTEXITCODE -ne 0) {
-    throw "ISCC failed with exit code $LASTEXITCODE"
+
+foreach ($segment in @("ru", "en")) {
+    Write-Host "ISCC SetupSegment=$segment ..."
+    & $Iscc "/DAppVersion=$AppVersion" "/DVersionInfoVersion=$VersionInfo" "/DSetupSegment=$segment" $Iss
+    if ($LASTEXITCODE -ne 0) {
+        throw "ISCC failed (SetupSegment=$segment) with exit code $LASTEXITCODE"
+    }
 }
 
-$Out = Join-Path $Root "dist\Slysh-Setup.exe"
-if (-not (Test-Path -LiteralPath $Out)) {
-    throw "Expected output missing: $Out"
+$OutRu = Join-Path $Root "dist\Slysh-Setup.exe"
+$OutEn = Join-Path $Root "dist\Slysh-Setup-en.exe"
+if (-not (Test-Path -LiteralPath $OutRu)) {
+    throw "Expected output missing: $OutRu"
 }
-Write-Host "Setup OK: $Out"
+if (-not (Test-Path -LiteralPath $OutEn)) {
+    throw "Expected output missing: $OutEn"
+}
+Write-Host "Setup OK: $OutRu"
+Write-Host "Setup OK: $OutEn"

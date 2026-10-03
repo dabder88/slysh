@@ -2,9 +2,21 @@
 
 Windows-приложение для расшифровки аудио и видео (GigaAM, Whisper, облачные API). Интерфейс — FastAPI + pywebview; распознавание в отдельном процессе.
 
+## Лицензия
+
+Программа **Slysh** — **проприетарная** (не open source). Публичный репозиторий на GitHub не даёт права перепродавать или распространять сборки.
+
+| Документ | Назначение |
+|----------|------------|
+| [`LICENSE`](LICENSE) | Условия для репозитория (просмотр, личная сборка без распространения) |
+| [`installer/LICENSE-RU.txt`](installer/LICENSE-RU.txt) | EULA (RU) — установщик `Slysh-Setup.exe` |
+| [`installer/LICENSE-EN.txt`](installer/LICENSE-EN.txt) | EULA (EN) — установщик `Slysh-Setup-en.exe` |
+| [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) | Сторонние библиотеки и бинарники |
+| [`COPYRIGHT-HOLDER.md`](COPYRIGHT-HOLDER.md) | Правообладатель и смена на ИП/ООО при необходимости |
+
 ## Установка
 
-Готовый установщик: [Releases](https://github.com/dabder88/slysh/releases/latest) → **Slysh-Setup.exe**. Данные приложения: `%LOCALAPPDATA%\Slysh`.
+Готовые установщики: [Releases](https://github.com/dabder88/slysh/releases/latest) — **Slysh-Setup.exe** (мастер и EULA на русском, язык интерфейса по умолчанию русский) и **Slysh-Setup-en.exe** (английский мастер и EULA, по умолчанию English). На шаге установки и в «Настройках» язык можно сменить. Данные приложения: `%LOCALAPPDATA%\Slysh`.
 
 ## Запуск из исходников (Windows)
 
@@ -46,7 +58,7 @@ powershell -File scripts\build-installer-payload.ps1
 powershell -File scripts\build-slysh-setup.ps1
 ```
 
-Результат: `dist\Slysh-Setup.exe` (папка `dist/` в git не входит).
+Результат: `dist\Slysh-Setup.exe` и `dist\Slysh-Setup-en.exe` (папка `dist/` в git не входит).
 
 Пересборка лаунчера `Slysh.exe` (опционально, нужен MSVC `cl.exe`): `scripts\build-slysh-launcher.ps1` — см. `launcher/README.md`.
 

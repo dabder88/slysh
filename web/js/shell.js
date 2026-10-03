@@ -3,6 +3,7 @@ import { reportError } from "./errors.js";
 import { SELECTED_BATCH_KEY } from "./library-store.js";
 import { getLocale, setLocale, t, onLocaleChange } from "./i18n.js";
 import { bindSecretInput, readSecretForSave } from "./secret-field.js";
+import { updateAsrContextBar } from "./asr-context-bar.js";
 
 function applyProviderSecretField(input, provider) {
   if (!input) {
@@ -1267,6 +1268,7 @@ function initAsrModelSettings() {
     } else {
       refreshDownloadState().catch((err) => reportError(t("settings.modelStatus"), err));
     }
+    updateAsrContextBar(data);
   }
 
   async function loadModels() {
@@ -2052,12 +2054,42 @@ export function openEngineSetupModalIfNeeded(status) {
   }
   modal.hidden = false;
   const focusTarget =
-    document.getElementById("engine-setup-install") ||
-    document.getElementById("engine-setup-cloud");
+    document.getElementById("engine-setup-continue") ||
+    document.getElementById("engine-setup-opt-local");
   if (focusTarget && typeof focusTarget.focus === "function") {
     focusTarget.focus();
   }
   return true;
+}
+
+function setEngineChoiceUi(choice, optLocal, optCloud) {
+  if (!optLocal || !optCloud) {
+    return;
+  }
+  const pickLocal = choice === "local";
+  optLocal.classList.toggle("is-active", pickLocal);
+  optCloud.classList.toggle("is-active", !pickLocal);
+  if (pickLocal) {
+    optLocal.classList.add("border-2", "border-blue-600", "bg-blue-50/40");
+    optLocal.classList.remove("border", "border-slate-200", "bg-slate-50/60");
+    optCloud.classList.remove("is-active", "border-2", "border-blue-600", "bg-blue-50/40");
+    optCloud.classList.add("border", "border-slate-200", "bg-slate-50/60");
+  } else {
+    optCloud.classList.add("border-2", "border-blue-600", "bg-blue-50/40");
+    optCloud.classList.remove("border", "border-slate-200", "bg-slate-50/60");
+    optLocal.classList.remove("is-active", "border-2", "border-blue-600", "bg-blue-50/40");
+    optLocal.classList.add("border", "border-slate-200", "bg-slate-50/60");
+  }
+  const localDot = optLocal.querySelector(".slysh-radio-dot");
+  const cloudDot = optCloud.querySelector(".slysh-radio-dot");
+  if (localDot) {
+    localDot.classList.toggle("bg-blue-600", pickLocal);
+    localDot.classList.toggle("bg-transparent", !pickLocal);
+  }
+  if (cloudDot) {
+    cloudDot.classList.toggle("bg-blue-600", !pickLocal);
+    cloudDot.classList.toggle("bg-transparent", pickLocal);
+  }
 }
 
 function initEngineSetup() {
@@ -2065,8 +2097,10 @@ function initEngineSetup() {
   const confirmModal = document.getElementById("engine-packages-confirm-modal");
   const stepChoose = document.getElementById("engine-setup-step-choose");
   const stepInstall = document.getElementById("engine-setup-step-install");
-  const installBtn = document.getElementById("engine-setup-install");
-  const cloudBtn = document.getElementById("engine-setup-cloud");
+  const optLocal = document.getElementById("engine-setup-opt-local");
+  const optCloud = document.getElementById("engine-setup-opt-cloud");
+  const continueBtn = document.getElementById("engine-setup-continue");
+  const dismissBtn = document.getElementById("engine-setup-dismiss");
   const laterBtn = document.getElementById("engine-setup-later");
   const confirmStartBtn = document.getElementById("engine-packages-confirm-start");
   const confirmBackBtn = document.getElementById("engine-packages-confirm-back");
@@ -2075,12 +2109,17 @@ function initEngineSetup() {
   const statusEl = document.getElementById("engine-setup-status");
   const progressWrap = document.getElementById("engine-setup-progress-wrap");
   const progressEl = document.getElementById("engine-setup-progress");
+  const progressFill = document.getElementById("engine-setup-progress-fill");
+  const progressPct = document.getElementById("engine-setup-progress-pct");
   const progressSummary = document.getElementById("engine-setup-progress-summary");
   const progressLabel = document.getElementById("engine-setup-progress-label");
   const progressHint = document.getElementById("engine-setup-progress-hint");
   const progressStalled = document.getElementById("engine-setup-progress-stalled");
   const logToggle = document.getElementById("engine-setup-log-toggle");
+  const logToggleLabel = document.getElementById("engine-setup-log-toggle-label");
+  const logChevron = document.getElementById("engine-setup-log-chevron");
   const choicesEl = document.querySelector(".engine-setup-choices");
+  let engineChoice = "local";
   const settingsBlock = document.getElementById("engine-setup-settings");
   const resyncBlock = document.getElementById("engine-resync-settings");
   const settingsBtn = document.getElementById("btn-install-engine");
@@ -2112,6 +2151,12 @@ function initEngineSetup() {
     if (progressEl) {
       progressEl.indeterminate = false;
       progressEl.value = 100;
+    }
+    if (progressFill) {
+      progressFill.style.width = "100%";
+    }
+    if (progressPct) {
+      progressPct.textContent = "100%";
     }
     if (progressSummary) {
       progressSummary.hidden = false;
@@ -2270,6 +2315,25 @@ function initEngineSetup() {
         progressEl.indeterminate = false;
       }
     }
+    if (progressFill && showProgress) {
+      if (status.installing && ip.fraction != null && ip.indeterminate === false) {
+        const pct = Math.round(Number(ip.fraction) * 100);
+        progressFill.style.width = `${pct}%`;
+        if (progressPct) {
+          progressPct.textContent = `${pct}%`;
+        }
+      } else {
+        progressFill.style.width = "35%";
+        if (progressPct) {
+          progressPct.textContent = "";
+        }
+      }
+    } else if (progressFill && !showProgress) {
+      progressFill.style.width = "0%";
+      if (progressPct) {
+        progressPct.textContent = "";
+      }
+    }
     if (progressSummary) {
       const summary = formatProgressSummary(ip);
       progressSummary.hidden = !status.installing || !summary;
@@ -2297,9 +2361,15 @@ function initEngineSetup() {
     }
     if (logToggle) {
       logToggle.hidden = !status.installing;
-      logToggle.textContent = logExpanded
-        ? t("firstRun.engineHideLog")
-        : t("firstRun.engineShowLog");
+      const logLabel = logExpanded ? t("firstRun.engineHideLog") : t("firstRun.engineShowLog");
+      if (logToggleLabel) {
+        logToggleLabel.textContent = logLabel;
+      } else {
+        logToggle.textContent = logLabel;
+      }
+      if (logChevron) {
+        logChevron.classList.toggle("rotate-180", logExpanded);
+      }
     }
   }
 
@@ -2368,8 +2438,14 @@ function initEngineSetup() {
       }
     }
     const busy = Boolean(status.installing);
-    if (installBtn) {
-      installBtn.disabled = busy || Boolean(status.engine_packages);
+    if (continueBtn) {
+      continueBtn.disabled = busy || Boolean(status.engine_packages);
+    }
+    if (optLocal) {
+      optLocal.setAttribute("aria-disabled", busy ? "true" : "false");
+    }
+    if (optCloud) {
+      optCloud.setAttribute("aria-disabled", busy ? "true" : "false");
     }
     if (settingsBtn) {
       settingsBtn.disabled = busy || Boolean(status.engine_packages);
@@ -2461,17 +2537,35 @@ function initEngineSetup() {
     }
   }
 
-  async function dismiss() {
-    try {
-      await api("/api/setup/later", { method: "POST" });
-    } catch (err) {
-      reportError(t("settings.engineSetup"), err);
+  let dismissInFlight = false;
+
+  function dismiss() {
+    if (dismissInFlight) {
+      return;
+    }
+    dismissInFlight = true;
+    if (laterBtn) {
+      laterBtn.disabled = true;
+    }
+    if (confirmLaterBtn) {
+      confirmLaterBtn.disabled = true;
     }
     closeConfirmModal();
     if (modal) {
       modal.hidden = true;
     }
     setEngineSetupPhase("choose");
+    api("/api/setup/later", { method: "POST" })
+      .catch((err) => reportError(t("settings.engineSetup"), err))
+      .finally(() => {
+        dismissInFlight = false;
+        if (laterBtn) {
+          laterBtn.disabled = false;
+        }
+        if (confirmLaterBtn) {
+          confirmLaterBtn.disabled = false;
+        }
+      });
   }
 
   async function chooseCloudOnly() {
@@ -2495,8 +2589,44 @@ function initEngineSetup() {
     }
   }
 
-  installBtn?.addEventListener("click", () => openConfirmModal(true));
-  cloudBtn?.addEventListener("click", () => chooseCloudOnly());
+  setEngineChoiceUi(engineChoice, optLocal, optCloud);
+
+  function onEngineOptActivate(choice) {
+    if (wasInstalling) {
+      return;
+    }
+    engineChoice = choice;
+    setEngineChoiceUi(engineChoice, optLocal, optCloud);
+  }
+
+  optLocal?.addEventListener("click", () => onEngineOptActivate("local"));
+  optCloud?.addEventListener("click", () => onEngineOptActivate("cloud"));
+  optLocal?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      onEngineOptActivate("local");
+    }
+  });
+  optCloud?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      onEngineOptActivate("cloud");
+    }
+  });
+
+  continueBtn?.addEventListener("click", () => {
+    if (engineChoice === "cloud") {
+      chooseCloudOnly();
+    } else {
+      openConfirmModal(true);
+    }
+  });
+  dismissBtn?.addEventListener("click", () => {
+    if (wasInstalling) {
+      return;
+    }
+    dismiss();
+  });
   settingsBtn?.addEventListener("click", () => openConfirmModal(false));
   repairBtn?.addEventListener("click", () => {
     startEngineRepair().catch((err) => reportError(t("settings.engineSetup"), err));
@@ -2510,7 +2640,7 @@ function initEngineSetup() {
     if (wasInstalling) {
       return;
     }
-    dismiss().catch((err) => reportError(t("settings.engineSetup"), err));
+    dismiss();
   });
 
   confirmStartBtn?.addEventListener("click", () => {
@@ -2528,6 +2658,9 @@ function initEngineSetup() {
 
   logToggle?.addEventListener("click", () => {
     logExpanded = !logExpanded;
+    if (logChevron) {
+      logChevron.classList.toggle("rotate-180", logExpanded);
+    }
     refresh().catch((err) => reportError(t("settings.engineSetup"), err));
   });
 
@@ -2761,14 +2894,26 @@ function initModelSetup() {
     }
   }
 
-  async function dismissModelStep() {
-    try {
-      await api("/api/setup/model-later", { method: "POST" });
-    } catch (err) {
-      reportError(t("modelSetup.title"), err);
+  let modelDismissInFlight = false;
+
+  function dismissModelStep() {
+    if (modelDismissInFlight) {
+      return;
+    }
+    modelDismissInFlight = true;
+    if (laterBtn) {
+      laterBtn.disabled = true;
     }
     modal.hidden = true;
     stopPoll();
+    api("/api/setup/model-later", { method: "POST" })
+      .catch((err) => reportError(t("modelSetup.title"), err))
+      .finally(() => {
+        modelDismissInFlight = false;
+        if (laterBtn) {
+          laterBtn.disabled = false;
+        }
+      });
   }
 
   downloadBtn?.addEventListener("click", () => downloadSelected());

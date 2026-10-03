@@ -1,0 +1,32 @@
+Copyright (c) 2026 Сергачев Антон Константинович. All rights reserved.
+
+PROPRIETARY SOFTWARE — NOT OPEN SOURCE
+
+The Slysh application, its source code in this repository, documentation,
+branding, and official installers are proprietary. Publishing this
+repository on GitHub does not grant any license to use the software
+except as stated below.
+
+Permitted without a separate written agreement:
+
+  • Viewing the source code in this repository.
+  • Cloning and building Slysh solely for your own private, non-commercial
+    use on computers you control, without distributing binaries or source
+    to third parties.
+
+Not permitted without explicit written permission from the copyright holder:
+
+  • Redistributing, selling, or sublicensing Slysh or any derivative work.
+  • Using the name, logos, or branding "Slysh" for another product.
+  • Removing or altering copyright or license notices.
+
+End users who install official builds (e.g. Slysh-Setup.exe from GitHub
+Releases) are governed by the End User License Agreement shown during
+setup (installer/LICENSE-RU.txt or LICENSE-EN.txt depending on the installer;
+both texts are installed under licenses\).
+
+Third-party libraries and binaries included with Slysh are licensed
+separately. See THIRD_PARTY_NOTICES.md and files under licenses\ in the
+installed application.
+
+Copyright holder: Сергачев Антон Константинович (see COPYRIGHT-HOLDER.md).

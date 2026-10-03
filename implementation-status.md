@@ -100,7 +100,8 @@ D.1–D.6 закрыты (таблица D). Волна **F** закрыта п�
 | F.1 | Windows CI без torch | ✅ | `.github/workflows/pytest.yml` + smokes |
 | F.2 | `test_ui_imports` в CI | ✅ | `ci/check_ui_imports.py` |
 | F.3 | JS + CSS в CI | ✅ | `check-web-js.ps1`, `npm run build:css` |
-| F.4 | Сторонние лицензии (справочник) | ✅ | `THIRD_PARTY_NOTICES.md` → `licenses\`; legal due diligence **вне плана** |
+| F.4 | Сторонние лицензии (справочник) | ✅ | `THIRD_PARTY_NOTICES.md` → `licenses\` |
+| F.6 | Лицензия Slysh (вариант A) | ✅ | `LICENSE`, EULA RU/EN, `Slysh-Setup.exe` + `Slysh-Setup-en.exe`; публичный repo ≠ OSS |
 | F.5 | Аудит секретов в git | ✅ | `audit_git_secrets.ps1` в CI + `ci_mandatory_checks` |
 
 `powershell -File scripts\ci_mandatory_checks.ps1` — smokes + полный `pytest tests`.

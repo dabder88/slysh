@@ -178,8 +178,25 @@ def test_post_setup_later_sets_dismissed_flag(tmp_path, monkeypatch):
     client = TestClient(create_ui_app(db=db, engine=None))
     response = client.post("/api/setup/later")
     assert response.status_code == 200
-    assert response.json()["dismissed"] is True
+    body = response.json()
+    assert body["dismissed"] is True
+    assert body["show_engine_setup_modal"] is False
     assert (tmp_path / "gigaam-home" / "setup-engine-later").is_file()
+
+
+def test_post_setup_later_skips_engine_packages_probe(tmp_path, monkeypatch):
+    probe_calls: list[int] = []
+
+    def probe(*_args, **_kwargs):
+        probe_calls.append(1)
+        return False
+
+    monkeypatch.setattr("slysh.runtime_setup.engine_packages_ok", probe)
+    db = Database(tmp_path / "app.db")
+    client = TestClient(create_ui_app(db=db, engine=None))
+    response = client.post("/api/setup/later")
+    assert response.status_code == 200
+    assert probe_calls == []
 
 
 def test_uv_sync_engine_argv_no_cache(monkeypatch):
@@ -255,8 +272,29 @@ def test_post_setup_engine_mark_pending_model(tmp_path, monkeypatch):
     assert is_pending_model_setup()
     later = client.post("/api/setup/model-later")
     assert later.status_code == 200
-    assert later.json()["pending_model_setup"] is False
+    body = later.json()
+    assert body["pending_model_setup"] is False
+    assert body["show_engine_setup_modal"] is False
     assert not pending_model_setup_path().is_file()
+    reset_install_state_for_tests()
+
+
+def test_post_setup_model_later_skips_engine_packages_probe(tmp_path, monkeypatch):
+    probe_calls: list[int] = []
+
+    def probe(python=None, runner=None):
+        probe_calls.append(1)
+        return False
+
+    monkeypatch.setattr("slysh.runtime_setup.engine_packages_ok", probe)
+    monkeypatch.setattr("slysh.runtime_setup._spawn_install_thread", lambda: None)
+    db = Database(tmp_path / "app.db")
+    client = TestClient(create_ui_app(db=db, engine=None))
+    client.post("/api/setup/engine", json={"mark_pending_model": True})
+    probe_calls.clear()
+    response = client.post("/api/setup/model-later")
+    assert response.status_code == 200
+    assert probe_calls == []
     reset_install_state_for_tests()
 
 

@@ -136,6 +136,19 @@ def dismiss_engine_setup() -> None:
     clear_prompt_engine_setup()
 
 
+def setup_status_after_dismiss(*, engine: bool = False, model: bool = False) -> dict:
+    """Lightweight setup payload after «later» — no engine_packages_ok probe."""
+    if engine:
+        dismiss_engine_setup()
+    if model:
+        dismiss_model_setup()
+    return {
+        "dismissed": is_later_dismissed(),
+        "pending_model_setup": is_pending_model_setup(),
+        "show_engine_setup_modal": False,
+    }
+
+
 def invalidate_engine_packages_cache() -> None:
     global _engine_packages_cache
     _engine_packages_cache = None

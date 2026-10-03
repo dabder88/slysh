@@ -271,10 +271,17 @@ export function renderBatchPanel(batch, containerEl, options = {}) {
       if (!paths.length) {
         return;
       }
-      await addToBatch(batchId, paths, false);
+      const batch = await addToBatch(batchId, paths, false);
       await refreshLibrary();
       refresh();
-      showToast(t("batch_panel.filesAdded", { count: paths.length }));
+      if (batch) {
+        const { batchIntakeResult, openIntakeFollowup } = await import(
+          "./intake-followup.js"
+        );
+        await openIntakeFollowup(batchIntakeResult(batch, paths.length));
+      } else {
+        showToast(t("batch_panel.filesAdded", { count: paths.length }));
+      }
     });
 
   const addFolderHandler =

@@ -558,17 +558,28 @@ class Database:
         self._conn.commit()
 
     @_locked
-    def begin_transcription(self, job_id: int) -> None:
+    def begin_transcription(self, job_id: int, *, reset_progress: bool = True) -> None:
         now = _utc_now_iso()
-        self._conn.execute(
-            """
-            UPDATE jobs
-            SET status = ?, started_at = ?, finished_at = NULL, progress = 0,
-                error_text = NULL, run_id = run_id + 1
-            WHERE id = ?
-            """,
-            (JobStatus.QUEUED.value, now, job_id),
-        )
+        if reset_progress:
+            self._conn.execute(
+                """
+                UPDATE jobs
+                SET status = ?, started_at = ?, finished_at = NULL, progress = 0,
+                    error_text = NULL, run_id = run_id + 1
+                WHERE id = ?
+                """,
+                (JobStatus.QUEUED.value, now, job_id),
+            )
+        else:
+            self._conn.execute(
+                """
+                UPDATE jobs
+                SET status = ?, started_at = ?, finished_at = NULL,
+                    error_text = NULL, run_id = run_id + 1
+                WHERE id = ?
+                """,
+                (JobStatus.QUEUED.value, now, job_id),
+            )
         self._conn.commit()
 
     @_locked

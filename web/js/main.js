@@ -1,6 +1,7 @@
 ﻿import { initI18n, applyI18n, onLocaleChange } from "./i18n.js";
 import { initRouter, onRouteChange, navigate, notifyCurrentRoute } from "./router.js";
-import { initShell } from "./shell.js";
+import { initShell, openSettingsModal } from "./shell.js";
+import { initAsrContextBar } from "./asr-context-bar.js";
 import { initSecretFields } from "./secret-field.js?v=46";
 import { initDashboard, onDashboardShow } from "./dashboard.js";
 import { initLive, onLiveShow } from "./live.js";
@@ -12,6 +13,7 @@ import { initArchive, onArchiveShow } from "./archive.js";
 import { initTranscripts, onTranscriptsShow } from "./transcripts.js";
 import { initLegacyWorkspace, onLegacyShow } from "./legacy.js";
 import { establishUiSession } from "./ui-session.js?v=2";
+import { initAppExit } from "./app-exit.js";
 
 function hideBootSplash() {
   document.body?.classList.remove("is-booting");
@@ -91,6 +93,7 @@ function wireAppShell() {
   initYoutube();
   initEditor();
   initLegacyWorkspace();
+  initAppExit();
 
   document.querySelector("[data-go-legacy]")?.addEventListener("click", () => navigate("legacy"));
 
@@ -115,6 +118,11 @@ async function bootstrap() {
     }
     try {
       initShell();
+    } catch (err) {
+      console.error(err);
+    }
+    try {
+      initAsrContextBar({ onOpenSettings: () => openSettingsModal() });
     } catch (err) {
       console.error(err);
     }

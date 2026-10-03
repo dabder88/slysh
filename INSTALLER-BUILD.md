@@ -33,6 +33,7 @@ powershell -File scripts\build-slysh-setup.ps1
 | E.4 | Обновления + SHA-256 | `updates.py`, `smoke_updates_sha256.py`; без digest — нет auto-install |
 | E.5 | Upgrade vs first-run | `IsAppUpgrade` в `Slysh.iss` — `.fresh-install` только для новой установки |
 | E.6 | Чистые Win10/11 | [`installer/E6-OFFLINE-VM.md`](installer/E6-OFFLINE-VM.md) + `e6-offline-vm-verify.ps1` |
+| — | EULA при установке | RU: `LICENSE-RU.txt` → `Slysh-Setup.exe`; EN: `LICENSE-EN.txt` → `Slysh-Setup-en.exe`; в payload обе копии в `licenses\` |
 
 ## E.6 — чистая VM offline
 
@@ -57,6 +58,10 @@ powershell -File scripts\e6-offline-vm-verify.ps1 -InstallRoot dist\payload -Req
 ## E.7 — UI / engine (fingerprint slots)
 
 Установленная копия: лёгкий `.venv` (UI) + engine в `.venv-engine-<lock-sha256[:16]>`, активный слот в `runtime-env.json` (`active_engine_venv`, `previous_engine_venv`). После успешной установки engine удаляются прочие `.venv-engine-*`, кроме active/previous/целевого fingerprint и legacy `.venv-engine`. При смене `uv.lock` после обновления — `engine_resync_recommended` и `POST /api/setup/engine-repair`. Smokes: `smoke_runtime_env_slots.py`, `smoke_engine_slot_resync.py`.
+
+## Деинсталляция
+
+В каталоге `{app}` uninstaller снимает манифест установки, `[UninstallDelete]` (`.venv`, legacy `.venv-engine`, `runtime\`, логи лаунчера) и **`RemoveEngineVenvSlots`** — все папки `.venv-engine-*`. Отдельно спрашивается, удалять ли `models` в `{app}`. **`%LOCALAPPDATA%\Slysh`** (база, настройки, логи приложения) не удаляется.
 
 ## Smokes после сборки
 

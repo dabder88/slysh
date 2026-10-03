@@ -3,6 +3,13 @@
     "http405": "The server does not support this request. Close Slysh and run Slysh.bat again (refreshing HTML/JS does not reload Python).",
     "restartPython": "Close Slysh and run Slysh.bat again (refreshing the page does not reload Python)."
   },
+  "appExit": {
+    "body": "Are you sure you want to close the app?",
+    "cancel": "Cancel",
+    "confirm": "Exit",
+    "remember": "Don't ask again",
+    "title": "Close Slysh?"
+  },
   "archive": {
     "emptyBatches": "No archived batches yet. Move a completed batch here via the context menu in Transcripts.",
     "emptyFiles": "No archived single files yet. Move completed transcripts here via the context menu in Transcripts.",
@@ -114,6 +121,7 @@
     "saved": "Saved",
     "stop": "Stop",
     "transcribe": "Transcribe",
+    "continueTranscribe": "Continue",
     "transcribing": "Transcribing…",
     "transcribingProgress": "Transcribing…",
     "transcribingSegments": "Transcribing… {n} segments ({pct}%)",
@@ -187,6 +195,13 @@
     "engineCloudHint": "You need your own Groq, OpenAI, Gladia, or other key. Audio goes to the provider; nothing is downloaded to this PC.",
     "engineCloudTitle": "Via cloud (no neural nets on PC)",
     "engineCopy": "Choose how to transcribe. You can change this later in Settings.",
+    "engineStepBadge": "First run · Step 1 of 3",
+    "engineStep2Badge": "Local engine · Step 2 of 3",
+    "engineSizeBadge": "~3–5 GB",
+    "engineBadgeGpu": "GPU / CPU",
+    "engineBadgeApi": "API Keys",
+    "engineContinue": "Continue →",
+    "engineInstallingBadge": "Installing packages",
     "engineLater": "Remind me later",
     "engineLocalHint": "A download of about 3 GB starts right away: the recognition packages. An NVIDIA GPU is faster; CPU works but is slower. Next you can download a speech model.",
     "engineLocalTitle": "On this computer",
@@ -217,6 +232,8 @@
   },
   "modelSetup": {
     "title": "Speech model",
+    "packagesReady": "Packages installed",
+    "stepBadge": "Step 3 of 3",
     "copy": "Packages are installed. Pick a model and download, or do it later in Settings.",
     "modelLabel": "Model",
     "download": "Download",
@@ -229,6 +246,15 @@
   },
   "intake": {
     "cancelled": "Cancelled",
+    "followup": {
+      "bodyBatch": "{count} file(s) added to a batch in Files & batches. Transcribe now?",
+      "bodyMany": "{count} file(s) added to Files & batches. Transcribe now?",
+      "bodyOne": "File added to Files & batches. Transcribe now?",
+      "bodyOneNamed": "“{name}” added to Files & batches. Transcribe now?",
+      "later": "Later",
+      "now": "Transcribe now",
+      "title": "Files uploaded"
+    },
     "reingestMany": "{count} items already in transcripts (e.g. {sample}{suffix}). Upload again?",
     "reingestOne": "A transcript for “{title}” already exists. Upload again?"
   },
@@ -333,7 +359,7 @@
     "k8638182": "Record not found.",
     "k878494": "Rules saved for new package",
     "k9064548": "First, select an entry.",
-    "k9486817": "Export is only available for completed transcripts.",
+    "k9486817": "Nothing to export (complete or partial transcript required).",
     "k9779480": "Failed to export.",
     "k9791863": "Provide a file name.",
     "k988828": "Add a folder to a package",
@@ -937,7 +963,12 @@
     "meeting": "Meeting capture",
     "queue": "Queue",
     "transcripts": "Transcripts",
-    "youtube": "YouTube"
+    "youtube": "YouTube",
+    "asrLocal": "Local",
+    "asrCloud": "Cloud",
+    "asrNotConfigured": "not selected",
+    "asrNotReady": "not ready",
+    "asrOpenSettings": "Change transcription mode in Settings"
   },
   "updates": {
     "available": "Version {version} is available",

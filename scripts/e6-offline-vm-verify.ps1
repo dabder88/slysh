@@ -16,6 +16,8 @@ $Exe = Join-Path $Root "Slysh.exe"
 $Wheelhouse = Join-Path $Root "wheelhouse"
 $PyvenvCfg = Join-Path $Root ".venv\pyvenv.cfg"
 $Notices = Join-Path $Root "licenses\THIRD-PARTY-NOTICES.md"
+$EulaRu = Join-Path $Root "licenses\Slysh-EULA-RU.txt"
+$EulaEn = Join-Path $Root "licenses\Slysh-EULA-EN.txt"
 
 $checks = [ordered]@{}
 
@@ -85,7 +87,15 @@ if ($whCount -lt 10) {
 if (-not (Test-Path -LiteralPath $Notices)) {
     Fail "missing licenses\THIRD-PARTY-NOTICES.md (rebuild payload after THIRD_PARTY_NOTICES.md update)"
 }
+if (-not (Test-Path -LiteralPath $EulaRu)) {
+    Fail "missing licenses\Slysh-EULA-RU.txt (rebuild payload; see installer/LICENSE-RU.txt)"
+}
+if (-not (Test-Path -LiteralPath $EulaEn)) {
+    Fail "missing licenses\Slysh-EULA-EN.txt (rebuild payload; see installer/LICENSE-EN.txt)"
+}
 $checks["third_party_notices"] = "present"
+$checks["slysh_eula_ru"] = "present"
+$checks["slysh_eula_en"] = "present"
 
 if (-not (Test-Path -LiteralPath $PyvenvCfg)) {
     Fail "missing .venv\pyvenv.cfg"

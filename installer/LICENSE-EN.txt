@@ -1,0 +1,84 @@
+﻿END USER LICENSE AGREEMENT
+FOR THE SLYSH SOFTWARE
+
+Text version: 2026-10-03
+
+By installing, copying, or using Slysh (the "Software"), you agree to
+this agreement. If you do not agree, do not install or use the Software.
+
+1. Copyright holder
+
+   The Software and related materials are protected by copyright law.
+   Copyright holder: Anton Konstantinovich Sergachev (Sergachev Anton Konstantinovich).
+
+2. Granted rights
+
+   You receive a limited, non-exclusive, non-transferable right to install
+   and use one copy of the Software on Microsoft Windows computers that
+   you own or control, solely for personal or internal business purposes
+   (transcription of audio and video, recording, exporting results).
+
+3. Restrictions
+
+   Without written permission from the copyright holder, you may not:
+
+   • distribute, sell, rent, or transfer copies of the Software or the
+     installer to third parties;
+   • decompile, disassemble, or otherwise attempt to derive source code,
+     except where expressly permitted by applicable law;
+   • remove or alter copyright or license notices;
+   • use the name, logos, or designation "Slysh" in a way that misleads
+     others about the origin of the product.
+
+4. Source code in a public repository
+
+   Source code may be available in a public GitHub repository for review
+   and for building solely for your private, non-commercial use on your
+   devices. Public access does not mean an open-source license (MIT, GPL,
+   etc.) and does not permit distribution of your builds or derivative
+   products. Official distribution is through releases published by the
+   copyright holder (for example, Slysh-Setup.exe).
+
+5. Third-party components and cloud services
+
+   The Software includes or may download third-party components (including
+   ffmpeg, the Python runtime, and libraries). Their licenses are described
+   in the licenses\ folder of the installation (including
+   THIRD-PARTY-NOTICES.md and ffmpeg-LGPL.txt).
+
+   When you use cloud speech recognition (Groq, OpenAI, Gladia, etc.), you
+   are responsible for complying with those providers' terms; you control API
+   keys and data you send.
+
+6. User data
+
+   Recordings, transcripts, settings, and stored keys (if any) are kept
+   locally on your computer in the application data folder, unless your
+   chosen cloud provider states otherwise.
+
+7. Disclaimer of warranties
+
+   THE SOFTWARE IS PROVIDED "AS IS". THE COPYRIGHT HOLDER DOES NOT WARRANT
+   ERROR-FREE OPERATION, TRANSCRIPTION ACCURACY, FITNESS FOR A PARTICULAR
+   PURPOSE, OR UNINTERRUPTED AVAILABILITY. YOU ASSUME ALL RISK OF SELECTION
+   AND USE.
+
+8. Limitation of liability
+
+   TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THE COPYRIGHT HOLDER
+   SHALL NOT BE LIABLE FOR INDIRECT, INCIDENTAL, OR CONSEQUENTIAL DAMAGES,
+   LOSS OF DATA, LOST PROFITS, OR DAMAGES ARISING FROM USE OR INABILITY TO
+   USE THE SOFTWARE.
+
+9. Termination
+
+   If you breach this agreement, your right to use the Software ends
+   automatically. You must uninstall the Software from your devices.
+
+10. Governing law
+
+    Disputes shall be governed by the laws of the country where the
+    copyright holder resides, unless otherwise agreed in writing.
+
+Russian text for the RU installer: installer/LICENSE-RU.txt (also installed
+as licenses\Slysh-EULA-RU.txt). Repository license summary: LICENSE.

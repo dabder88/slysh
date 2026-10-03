@@ -48,6 +48,19 @@ def test_stale_done_progress_is_not_applied_to_new_job():
     assert engine_progress_fraction({"progress": 0.01, "phase": "decode"}) == 0.01
 
 
+def test_export_cancelled_partial(tmp_path):
+    db = Database(tmp_path / "app.db")
+    job_id = db.create_job(JobKind.FILE, str(tmp_path / "talk.wav"))
+    db.replace_segments(job_id, [Segment(0, 1000, "часть")])
+    db.set_status(job_id, JobStatus.CANCELLED)
+    app = create_ui_app(db=db, engine=None)
+    client = TestClient(app)
+    out = tmp_path / "partial.srt"
+    r = client.post(f"/api/jobs/{job_id}/export", json={"fmt": "srt", "path": str(out)})
+    assert r.status_code == 200
+    assert "часть" in out.read_text(encoding="utf-8")
+
+
 def test_export_and_edit(tmp_path):
     db = Database(tmp_path / "app.db")
     job_id = db.create_job(JobKind.FILE, str(tmp_path / "talk.wav"))
@@ -111,7 +124,7 @@ def test_job_stays_idle_until_start(tmp_path, monkeypatch):
     monkeypatch.setattr(
         api_mod,
         "_start_asr_job",
-        lambda _app, _db, _job_id, _path: None,
+        lambda _app, _db, _job_id, _path, **_kwargs: None,
     )
     wav = tmp_path / "talk.wav"
     wav.write_bytes(b"RIFF")

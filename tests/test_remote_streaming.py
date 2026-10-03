@@ -95,17 +95,15 @@ def test_remote_file_job_appends_segments_before_complete(tmp_path, monkeypatch)
     job_id = db.create_job(JobKind.FILE, str(wav))
     client = TestClient(create_ui_app(db, engine=None, auto_start_engine=True))
     client.post(f"/api/jobs/{job_id}/start")
-    mid_count = 0
-    for _ in range(60):
+    final = None
+    for _ in range(100):
         payload = client.get(f"/api/jobs/{job_id}").json()
-        if payload["status"] == "running" and len(payload.get("segments") or []) >= 1:
-            mid_count = len(payload["segments"])
-            break
         if payload["status"] in {"completed", "failed", "cancelled"}:
+            final = payload
             break
-        time.sleep(0.02)
-    final = client.get(f"/api/jobs/{job_id}").json()
+        time.sleep(0.05)
+    if final is None:
+        final = client.get(f"/api/jobs/{job_id}").json()
     assert 1 in observed and 2 in observed
-    assert mid_count >= 1 or len(final.get("segments") or []) == 2
     assert final["status"] == "completed"
     assert len(final["segments"]) == 2
