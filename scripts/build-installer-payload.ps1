@@ -242,17 +242,7 @@ try {
     Write-Host "uv sync --no-editable (light UI venv)..."
     & $BundledUv sync --no-editable
     if ($LASTEXITCODE -ne 0) {
-        $prevVenv = Join-Path $PayloadFinal ".venv"
-        if (Test-Path -LiteralPath $prevVenv) {
-            Write-Host "uv sync failed; reusing .venv from previous payload..."
-            $destVenv = Join-Path $Payload ".venv"
-            if (Test-Path -LiteralPath $destVenv) {
-                Remove-Item -LiteralPath $destVenv -Recurse -Force
-            }
-            Copy-Item -LiteralPath $prevVenv -Destination $destVenv -Recurse -Force
-        } else {
-            throw "uv sync failed with exit code $LASTEXITCODE"
-        }
+        throw "uv sync failed with exit code $LASTEXITCODE (staging kept at $Payload)"
     }
 }
 finally {
@@ -304,6 +294,25 @@ foreach ($needle in @("btn-download-model", "engine-setup-settings", "btn-instal
     }
 }
 
+$Smoke = Join-Path $Root "scripts\smoke_installer_layout.py"
+$SmokePy = Join-Path $Root ".venv\Scripts\python.exe"
+if (-not (Test-Path -LiteralPath $SmokePy)) {
+    $SmokePy = "python"
+}
+$env:SLYSH_PAYLOAD_DIR = $PayloadStaging
+& $SmokePy $Smoke
+if ($LASTEXITCODE -ne 0) {
+    Remove-Item Env:SLYSH_PAYLOAD_DIR -ErrorAction SilentlyContinue
+    throw "smoke_installer_layout.py failed on staging (previous payload unchanged)"
+}
+
+$Sanity = Join-Path $Root "scripts\check_payload_sanity.py"
+& $SmokePy $Sanity
+Remove-Item Env:SLYSH_PAYLOAD_DIR -ErrorAction SilentlyContinue
+if ($LASTEXITCODE -ne 0) {
+    throw "check_payload_sanity.py failed on staging (previous payload unchanged)"
+}
+
 if (Test-Path -LiteralPath $PayloadFinal) {
     if (Test-Path -LiteralPath $PayloadPrev) {
         Remove-Item -LiteralPath $PayloadPrev -Recurse -Force
@@ -333,22 +342,6 @@ if (Test-Path -LiteralPath $sitePackages) {
             [System.IO.File]::WriteAllText($_.FullName, $pthFixed, $utf8NoBom)
         }
     }
-}
-
-$Smoke = Join-Path $Root "scripts\smoke_installer_layout.py"
-$SmokePy = Join-Path $Root ".venv\Scripts\python.exe"
-if (-not (Test-Path -LiteralPath $SmokePy)) {
-    $SmokePy = "python"
-}
-& $SmokePy $Smoke
-if ($LASTEXITCODE -ne 0) {
-    throw "smoke_installer_layout.py failed"
-}
-
-$Sanity = Join-Path $Root "scripts\check_payload_sanity.py"
-& $SmokePy $Sanity
-if ($LASTEXITCODE -ne 0) {
-    throw "check_payload_sanity.py failed"
 }
 
 Write-Host "Payload OK: $Payload"

@@ -11,6 +11,7 @@ import threading
 import time
 import urllib.error
 import urllib.request
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -41,6 +42,7 @@ _state: dict[str, Any] = {
     "path": None,
     "sha256": None,
     "pending": None,
+    "operation_id": None,
 }
 
 
@@ -191,11 +193,19 @@ def check_for_updates() -> dict[str, Any]:
     }
     with _lock:
         _state["pending"] = pending
-        _state["phase"] = "idle"
-        _state["error"] = None
-        _state["path"] = None
-        _state["bytes_done"] = 0
-        _state["bytes_total"] = pending["size"]
+        phase = str(_state.get("phase") or "idle")
+        if phase == "downloading":
+            pass
+        elif phase == "ready":
+            pass
+        else:
+            _state["phase"] = "idle"
+            _state["error"] = None
+            _state["path"] = None
+            _state["sha256"] = None
+            _state["operation_id"] = None
+            _state["bytes_done"] = 0
+            _state["bytes_total"] = pending["size"]
     _save_last_check()
     has_update = version_greater(latest, current)
     newer_than_installed = version_greater(current, latest)
@@ -240,6 +250,17 @@ def _validate_download_url(url: str) -> None:
         raise ValueError("Недопустимый URL загрузки")
 
 
+def _sha256_file(path: Path) -> str:
+    hasher = hashlib.sha256()
+    with path.open("rb") as fh:
+        while True:
+            chunk = fh.read(1024 * 256)
+            if not chunk:
+                break
+            hasher.update(chunk)
+    return hasher.hexdigest().lower()
+
+
 def _require_expected_sha256(pending: dict[str, Any]) -> str:
     expected = str(pending.get("expected_sha256") or "").strip().lower()
     if not re.fullmatch(r"[a-f0-9]{64}", expected):
@@ -253,6 +274,7 @@ def _require_expected_sha256(pending: dict[str, Any]) -> str:
 def start_download() -> dict[str, Any]:
     if not updates_enabled():
         raise ValueError("Загрузка обновлений доступна только в установленной копии")
+    operation_id: str | None = None
     with _lock:
         pending = _state.get("pending")
         if not pending:
@@ -264,21 +286,30 @@ def start_download() -> dict[str, Any]:
             already = True
         else:
             already = False
+            operation_id = uuid.uuid4().hex
+            _state["operation_id"] = operation_id
             _state["phase"] = "downloading"
             _state["error"] = None
+            _state["path"] = None
+            _state["sha256"] = None
             _state["bytes_done"] = 0
             _state["bytes_total"] = int(pending.get("size") or 0)
-    if not already:
-        threading.Thread(target=_run_download, args=(dict(pending),), daemon=True).start()
+    if not already and operation_id:
+        threading.Thread(
+            target=_run_download,
+            args=(dict(pending), operation_id),
+            daemon=True,
+        ).start()
     return download_status()
 
 
-def _run_download(pending: dict[str, Any]) -> None:
+def _run_download(pending: dict[str, Any], operation_id: str) -> None:
     url = str(pending.get("download_url") or "")
     version = str(pending.get("version") or "unknown")
+    dest: Path | None = None
     try:
         _validate_download_url(url)
-        dest = _download_dir() / f"Slysh-Setup-{version}.exe"
+        dest = _download_dir() / f"Slysh-Setup-{version}-{operation_id[:8]}.exe"
         if dest.is_file():
             dest.unlink()
         req = urllib.request.Request(url, headers=_github_headers(), method="GET")
@@ -295,6 +326,8 @@ def _run_download(pending: dict[str, Any]) -> None:
                     hasher.update(chunk)
                     done += len(chunk)
                     with _lock:
+                        if _state.get("operation_id") != operation_id:
+                            return
                         _state["bytes_done"] = done
                         if total > 0:
                             _state["bytes_total"] = total
@@ -304,6 +337,9 @@ def _run_download(pending: dict[str, Any]) -> None:
             dest.unlink(missing_ok=True)
             raise ValueError("Контрольная сумма установщика не совпала")
         with _lock:
+            if _state.get("operation_id") != operation_id:
+                dest.unlink(missing_ok=True)
+                return
             _state["phase"] = "ready"
             _state["path"] = str(dest)
             _state["sha256"] = digest
@@ -311,9 +347,14 @@ def _run_download(pending: dict[str, Any]) -> None:
     except Exception as exc:
         logging.exception("update download failed")
         with _lock:
+            if _state.get("operation_id") != operation_id:
+                if dest and dest.is_file():
+                    dest.unlink(missing_ok=True)
+                return
             _state["phase"] = "error"
             _state["error"] = str(exc) or "Не удалось скачать обновление"
             _state["path"] = None
+            _state["sha256"] = None
 
 
 def apply_update() -> dict[str, Any]:
@@ -330,6 +371,9 @@ def apply_update() -> dict[str, Any]:
         installer = Path(str(_state["path"]))
     if not installer.is_file():
         raise ValueError("Файл установщика не найден")
+    on_disk = _sha256_file(installer)
+    if on_disk != expected or (digest and on_disk != digest):
+        raise ValueError("Контрольная сумма установщика не совпала")
     args = [
         str(installer),
         "/CURRENTUSER",

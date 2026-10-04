@@ -7,7 +7,9 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-PAYLOAD = ROOT / "dist" / "payload"
+PAYLOAD = Path(os.environ.get("SLYSH_PAYLOAD_DIR", "")).resolve() if os.environ.get(
+    "SLYSH_PAYLOAD_DIR"
+) else ROOT / "dist" / "payload"
 
 FORBIDDEN_NAMES = frozenset(
     {

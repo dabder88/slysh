@@ -17,6 +17,7 @@ def _reset_state() -> None:
                 "path": None,
                 "sha256": None,
                 "pending": None,
+                "operation_id": None,
             }
         )
 

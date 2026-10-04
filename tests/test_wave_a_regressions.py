@@ -47,7 +47,7 @@ def test_updates_repeat_download_does_not_deadlock(monkeypatch):
                 "path": None,
             }
         )
-    monkeypatch.setattr(updates, "_run_download", lambda _p: None)
+    monkeypatch.setattr(updates, "_run_download", lambda _p, _op: None)
     updates.start_download()
     done = threading.Event()
 

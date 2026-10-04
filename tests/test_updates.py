@@ -135,7 +135,7 @@ def test_start_download_repeat_no_deadlock(monkeypatch, tmp_path: Path):
         updates._state["error"] = None
         updates._state["path"] = None
 
-    def slow_download(_pending: dict) -> None:
+    def slow_download(_pending: dict, _operation_id: str) -> None:
         time.sleep(0.5)
         with updates._lock:
             updates._state["phase"] = "ready"
