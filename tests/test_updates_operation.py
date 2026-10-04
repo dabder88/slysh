@@ -55,7 +55,7 @@ def test_stale_download_thread_does_not_mark_ready(monkeypatch, tmp_path):
         def __exit__(self, *args) -> None:
             return None
 
-    monkeypatch.setattr(updates.urllib.request, "urlopen", lambda *a, **k: FakeResp())
+    monkeypatch.setattr(updates, "_open_download", lambda *a, **k: FakeResp())
     _reset_state()
     with updates._lock:
         updates._state["pending"] = pending

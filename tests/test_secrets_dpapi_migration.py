@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import threading
 
 from slysh.compute import mutate_settings
 from slysh.http_proxy import load_proxy_config, migrate_proxy_secret, public_proxy_config
@@ -54,3 +55,36 @@ def test_migrate_proxy_password_out_of_settings(tmp_path, monkeypatch):
     assert pub["password"] == ""
     settings = json.loads((tmp_path / "settings.json").read_text(encoding="utf-8"))
     assert "password" not in (settings.get("proxy") or {})
+
+
+def test_concurrent_set_nested_keeps_both_keys(tmp_path, monkeypatch):
+    monkeypatch.setenv("GIGAAM_DESKTOP_HOME", str(tmp_path))
+    from slysh.secrets_dpapi import get_nested, set_nested
+
+    barrier = threading.Barrier(2)
+    errors: list[BaseException] = []
+
+    def worker(path: tuple[str, ...], value: str) -> None:
+        try:
+            barrier.wait(timeout=3.0)
+            set_nested(path, value)
+        except BaseException as exc:
+            errors.append(exc)
+
+    paths = (
+        (("providers", "openrouter", "api_key"), "sk-one"),
+        (("providers", "groq", "api_key"), "sk-two"),
+    )
+    threads = [
+        threading.Thread(target=worker, args=paths[0], daemon=True),
+        threading.Thread(target=worker, args=paths[1], daemon=True),
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=5.0)
+        assert not thread.is_alive()
+
+    assert not errors
+    assert get_nested(("providers", "openrouter", "api_key")) == "sk-one"
+    assert get_nested(("providers", "groq", "api_key")) == "sk-two"

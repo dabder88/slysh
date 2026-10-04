@@ -24,6 +24,7 @@ $PyTests = @(
     "tests/test_engine_watchdog.py",
     "tests/test_engine_cancel.py",
     "tests/test_updates_operation.py",
+    "tests/test_updates_redirect.py",
     "tests/test_updates_sha.py",
     "tests/test_offline_bootstrap.py",
     "tests/test_decode_cancel.py",

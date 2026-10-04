@@ -4,7 +4,7 @@
 
 **Легенда:** ✅ готово · 🟡 частично · 🔵 в работе · ⬜ не начато · ⏭️ отложено / вне scope
 
-**Baseline аудита:** `2f19be8`. **Последнее обновление:** 2026-10-04 (H1 watchdog, chunk timeout).
+**Baseline аудита:** `2f19be8`. **Последнее обновление:** 2026-10-04 (§5 secrets lock, R13 redirect validate).
 
 ---
 
@@ -39,7 +39,8 @@
 |----|-----|--------|
 | H1 | R11 | ✅ `engine_watchdog`, `SLYSH_ENGINE_PROGRESS_STALL_S` (default 600s); chunk HTTP timeout = transcribe |
 | H4 | R09 | 🟡 UI venv/wheelhouse ✅; WebView2 standalone в Setup ⏭️ владелец |
-| H2 | R13–R14 | ✅ `a418af3` |
+| H2 | R13–R14 | ✅ + redirect allowlist, download без Bearer |
+| §5.2 | secrets_dpapi | ✅ file lock + `mutate_secrets`, concurrent pytest |
 | H3 | R10 | ✅ |
 | H5 | R15 (полная) | 🔵 subset: `run_plan_fix2_targeted_tests.ps1`, `smoke_cloud_batch` в CI |
 

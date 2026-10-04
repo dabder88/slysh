@@ -250,6 +250,31 @@ def _validate_download_url(url: str) -> None:
         raise ValueError("Недопустимый URL загрузки")
 
 
+class _ValidatingRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Reject redirects to hosts outside the GitHub asset allowlist."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        _validate_download_url(newurl)
+        redirected = super().redirect_request(req, fp, code, msg, headers, newurl)
+        if redirected is not None:
+            redirected.headers.pop("Authorization", None)
+        return redirected
+
+
+def _download_request_headers() -> dict[str, str]:
+    return {
+        "User-Agent": "Slysh-Desktop-Updater",
+        "Accept": "application/octet-stream",
+    }
+
+
+def _open_download(url: str, timeout: float = 120.0):
+    _validate_download_url(url)
+    opener = urllib.request.build_opener(_ValidatingRedirectHandler())
+    req = urllib.request.Request(url, headers=_download_request_headers(), method="GET")
+    return opener.open(req, timeout=timeout)
+
+
 def _sha256_file(path: Path) -> str:
     hasher = hashlib.sha256()
     with path.open("rb") as fh:
@@ -312,10 +337,9 @@ def _run_download(pending: dict[str, Any], operation_id: str) -> None:
         dest = _download_dir() / f"Slysh-Setup-{version}-{operation_id[:8]}.exe"
         if dest.is_file():
             dest.unlink()
-        req = urllib.request.Request(url, headers=_github_headers(), method="GET")
         hasher = hashlib.sha256()
         done = 0
-        with urllib.request.urlopen(req, timeout=120.0) as resp:
+        with _open_download(url, timeout=120.0) as resp:
             total = int(resp.headers.get("Content-Length") or pending.get("size") or 0)
             with dest.open("wb") as out:
                 while True:
