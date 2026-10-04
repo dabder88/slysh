@@ -34,6 +34,19 @@ def test_model_for_job_prefers_pinned_snapshot(tmp_path, monkeypatch):
     assert job_uses_remote_asr(job)
 
 
+def test_begin_file_transcription_writes_asr_columns(tmp_path, monkeypatch):
+    monkeypatch.setenv("GIGAAM_DESKTOP_HOME", str(tmp_path))
+    db = Database(tmp_path / "app.db")
+    job_id = db.create_job(JobKind.FILE, str(tmp_path / "c.wav"))
+    item = SimpleNamespace(id="openrouter:whisper", backend="openrouter")
+    monkeypatch.setattr("slysh.job_asr_snapshot.current_asr_model", lambda: item)
+    begin_file_transcription(db, job_id)
+    job = db.get_job(job_id) or {}
+    assert job["asr_model_id"] == "openrouter:whisper"
+    assert job["asr_backend"] == "openrouter"
+    assert job["status"] == "queued"
+
+
 def test_begin_file_transcription_pins_only_on_fresh_start(tmp_path, monkeypatch):
     monkeypatch.setenv("GIGAAM_DESKTOP_HOME", str(tmp_path))
     db = Database(tmp_path / "app.db")
