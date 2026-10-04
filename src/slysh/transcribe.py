@@ -5,7 +5,29 @@ from typing import Protocol
 
 import numpy as np
 
-from slysh.chunking import offset_segments, slice_chunks, slice_pcm_range
+from slysh.chunking import (
+    SAMPLE_RATE,
+    offset_segments,
+    slice_chunks,
+    slice_pcm_range,
+)
+from slysh.decode import DecodeCancelledError
+
+
+def _pcm_exceeds_requested_range(
+    pcm: np.ndarray,
+    start_ms: int | None,
+    end_ms: int | None,
+    *,
+    sample_rate: int = SAMPLE_RATE,
+) -> bool:
+    if start_ms is None and end_ms is None:
+        return False
+    total_ms = int(len(pcm) * 1000 / sample_rate)
+    begin = 0 if start_ms is None else max(0, int(start_ms))
+    end = total_ms if end_ms is None else max(0, int(end_ms))
+    expected_ms = max(0, end - begin)
+    return total_ms > expected_ms + 1000
 from slysh.models import Segment
 
 
@@ -71,8 +93,27 @@ class FilePipeline:
         decode_fn = decode or self.decode
         if decode_fn is None:
             raise RuntimeError("decode callable is not set")
-        pcm = decode_fn(path)
-        pcm, offset_ms = slice_pcm_range(pcm, start_ms, end_ms)
+        ranged_decode = False
+        try:
+            pcm = decode_fn(
+                path,
+                cancelled=cancelled,
+                start_ms=start_ms,
+                end_ms=end_ms,
+            )
+            ranged_decode = True
+        except TypeError:
+            pcm = decode_fn(path)
+        except DecodeCancelledError:
+            return ("cancelled", [])
+        if ranged_decode:
+            offset_ms = max(0, int(start_ms)) if start_ms is not None else 0
+            if _pcm_exceeds_requested_range(pcm, start_ms, end_ms):
+                pcm, offset_ms = slice_pcm_range(pcm, start_ms, end_ms)
+        else:
+            pcm, offset_ms = slice_pcm_range(pcm, start_ms, end_ms)
+        if cancelled():
+            return ("cancelled", [])
         transcribe_file = getattr(self.backend, "transcribe_file", None)
         if callable(transcribe_file):
             segs = transcribe_file(pcm, cancelled, on_progress)

@@ -1561,7 +1561,13 @@ def _ensure_live_ingest(state: dict) -> None:
         session = state.get("session")
         if session is None:
             return
-        session.push(pcm)
+        from slysh.live_buffer import LiveBufferOverflowError
+
+        try:
+            session.push(pcm)
+        except LiveBufferOverflowError:
+            notify_capture_overflow(state)
+            return
         if len(pcm):
             state["rms"] = float(np.sqrt(np.mean(np.square(pcm))))
 

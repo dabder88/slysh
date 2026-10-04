@@ -120,9 +120,23 @@ def create_app(backend, decode) -> FastAPI:
         is_cancelled = operation_cancel.start()
         set_progress(0.0, "starting")
 
-        def tracked_decode(path: str):
+        def tracked_decode(
+            path: str,
+            *,
+            cancelled=None,
+            start_ms=None,
+            end_ms=None,
+        ):
             set_progress(0.01, "decode")
-            pcm = decode(path)
+            try:
+                pcm = decode(
+                    path,
+                    cancelled=cancelled,
+                    start_ms=start_ms,
+                    end_ms=end_ms,
+                )
+            except TypeError:
+                pcm = decode(path)
             set_progress(0.05, "asr")
             return pcm
 
@@ -215,10 +229,10 @@ def create_app(backend, decode) -> FastAPI:
     return app
 
 
-def _decode_pcm(path: str) -> np.ndarray:
+def _decode_pcm(path: str, **kwargs) -> np.ndarray:
     from slysh.decode import decode_pcm_16k_mono
 
-    pcm, _sr = decode_pcm_16k_mono(path)
+    pcm, _sr = decode_pcm_16k_mono(path, **kwargs)
     return pcm
 
 

@@ -5,6 +5,8 @@ import re
 import shutil
 import subprocess
 import tempfile
+import time
+from collections.abc import Callable
 from pathlib import Path
 
 import numpy as np
@@ -23,6 +25,10 @@ DECODE_ERROR_MESSAGE = FILE_UNREADABLE_MESSAGE
 
 class DecodeError(Exception):
     """Raised when ffmpeg is missing or the media file cannot be decoded."""
+
+
+class DecodeCancelledError(DecodeError):
+    """Raised when decode is stopped via cancelled()."""
 
 
 def find_ffmpeg() -> str | None:
@@ -47,11 +53,56 @@ def _ffmpeg_kwargs() -> dict:
     return subprocess_no_console_kwargs()
 
 
-def decode_pcm_16k_mono(path: str) -> tuple[np.ndarray, int]:
+def _wait_ffmpeg(
+    proc: subprocess.Popen[bytes],
+    *,
+    cancelled: Callable[[], bool] | None,
+    poll_s: float = 0.05,
+) -> None:
+    while proc.poll() is None:
+        if cancelled and cancelled():
+            proc.terminate()
+            try:
+                proc.wait(timeout=5.0)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.wait(timeout=5.0)
+            raise DecodeCancelledError("Декодирование отменено")
+        time.sleep(poll_s)
+
+
+def _ffmpeg_pcm_cmd(
+    ffmpeg: str,
+    input_path: str,
+    output_path: str,
+    *,
+    start_ms: int | None = None,
+    end_ms: int | None = None,
+) -> list[str]:
+    cmd = [ffmpeg, "-hide_banner", "-nostdin", "-loglevel", "error", "-y"]
+    if start_ms is not None and start_ms > 0:
+        cmd.extend(["-ss", f"{start_ms / 1000:.3f}"])
+    cmd.extend(["-i", input_path])
+    if end_ms is not None:
+        begin = 0 if start_ms is None else max(0, int(start_ms))
+        duration_ms = max(0, int(end_ms) - begin)
+        cmd.extend(["-t", f"{duration_ms / 1000:.3f}"])
+    cmd.extend(["-vn", "-ac", "1", "-ar", "16000", "-f", "f32le", output_path])
+    return cmd
+
+
+def decode_pcm_16k_mono(
+    path: str,
+    *,
+    start_ms: int | None = None,
+    end_ms: int | None = None,
+    cancelled: Callable[[], bool] | None = None,
+) -> tuple[np.ndarray, int]:
     """Decode audio/video to 16 kHz mono float32 PCM via ffmpeg.
 
     Copies the source to a short ASCII temp path first so Windows ffmpeg can
     both open Cyrillic filenames and seek inside webm/mp4 containers.
+    Writes PCM to a temp file (not capture_output) so cancel can stop ffmpeg.
     """
     source = Path(path)
     if not source.is_file():
@@ -64,43 +115,44 @@ def decode_pcm_16k_mono(path: str) -> tuple[np.ndarray, int]:
     suffix = source.suffix if source.suffix else ".bin"
     fd, tmp = tempfile.mkstemp(prefix="gigaam_", suffix=suffix)
     os.close(fd)
+    fd_pcm, pcm_path = tempfile.mkstemp(prefix="gigaam_pcm_", suffix=".f32le")
+    os.close(fd_pcm)
     try:
         shutil.copyfile(source, tmp)
-        result = subprocess.run(
-            [
-                ffmpeg,
-                "-hide_banner",
-                "-nostdin",
-                "-loglevel",
-                "error",
-                "-i",
-                tmp,
-                "-vn",
-                "-ac",
-                "1",
-                "-ar",
-                "16000",
-                "-f",
-                "f32le",
-                "pipe:1",
-            ],
-            capture_output=True,
-            check=False,
-            **_ffmpeg_kwargs(),
+        cmd = _ffmpeg_pcm_cmd(
+            ffmpeg,
+            tmp,
+            pcm_path,
+            start_ms=start_ms,
+            end_ms=end_ms,
         )
-    except FileNotFoundError as exc:
-        raise DecodeError(FFMPEG_MISSING_MESSAGE) from exc
-    finally:
         try:
-            os.remove(tmp)
-        except OSError:
-            pass
-
-    if result.returncode != 0 or not result.stdout:
-        raise DecodeError(DECODE_FAILED_MESSAGE)
-
-    pcm = np.frombuffer(result.stdout, dtype=np.float32).copy()
-    return pcm, 16000
+            proc = subprocess.Popen(
+                cmd,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
+                **_ffmpeg_kwargs(),
+            )
+        except FileNotFoundError as exc:
+            raise DecodeError(FFMPEG_MISSING_MESSAGE) from exc
+        _wait_ffmpeg(proc, cancelled=cancelled)
+        if proc.stderr:
+            proc.stderr.read()
+        if proc.returncode != 0:
+            raise DecodeError(DECODE_FAILED_MESSAGE)
+        pcm_file = Path(pcm_path)
+        if not pcm_file.is_file() or pcm_file.stat().st_size == 0:
+            raise DecodeError(DECODE_FAILED_MESSAGE)
+        pcm = np.fromfile(pcm_path, dtype=np.float32)
+        if pcm.size == 0:
+            raise DecodeError(DECODE_FAILED_MESSAGE)
+        return pcm, 16000
+    finally:
+        for p in (tmp, pcm_path):
+            try:
+                os.remove(p)
+            except OSError:
+                pass
 
 
 _DURATION_RE = re.compile(

@@ -2,6 +2,7 @@ import threading
 import time
 
 import numpy as np
+import pytest
 from fastapi.testclient import TestClient
 from pathlib import Path
 
@@ -9,7 +10,7 @@ from slysh import api as api_mod
 from slysh.api import create_ui_app
 from slysh.chunking import LIVE_CHUNK_SAMPLES, SAMPLE_RATE
 from slysh.db import Database
-from slysh.live_buffer import LiveSession
+from slysh.live_buffer import LIVE_MAX_PENDING_SAMPLES, LiveBufferOverflowError, LiveSession
 from slysh.models import JobKind, JobStatus, Segment
 
 
@@ -24,6 +25,18 @@ def test_emits_one_chunk_after_live_window_and_flush_tail(tmp_path):
     assert tail is not None
     assert len(tail) == SAMPLE_RATE * 2
     assert (tmp_path / "rec.wav").exists()
+
+def test_push_overflow_preserves_wav_on_disk(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "slysh.live_buffer.LIVE_MAX_PENDING_SAMPLES",
+        LIVE_CHUNK_SAMPLES + 100,
+    )
+    session = LiveSession(wav_path=tmp_path / "rec.wav")
+    session.push(np.zeros(LIVE_CHUNK_SAMPLES, np.float32))
+    with pytest.raises(LiveBufferOverflowError):
+        session.push(np.zeros(200, np.float32))
+    assert (tmp_path / "rec.wav").stat().st_size > 0
+
 
 def test_flush_short_tail_returns_none(tmp_path):
     session = LiveSession(wav_path=tmp_path / "rec.wav")

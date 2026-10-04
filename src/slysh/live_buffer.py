@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import threading
 from pathlib import Path
 
@@ -7,6 +8,15 @@ import numpy as np
 import soundfile as sf
 
 from slysh.chunking import LIVE_CHUNK_SAMPLES, MIN_CHUNK_SAMPLES, SAMPLE_RATE
+
+_DEFAULT_MAX_PENDING = 3 * LIVE_CHUNK_SAMPLES
+LIVE_MAX_PENDING_SAMPLES = int(
+    os.environ.get("SLYSH_LIVE_PENDING_MAX_SAMPLES", str(_DEFAULT_MAX_PENDING))
+)
+
+
+class LiveBufferOverflowError(RuntimeError):
+    """RAM pending cap exceeded; full audio remains in the session WAV on disk."""
 
 
 class LiveSession:
@@ -40,6 +50,11 @@ class LiveSession:
                 return
             self._file.write(pcm)
             self._file.flush()
+            next_len = len(self._pending) + len(pcm)
+            if next_len > LIVE_MAX_PENDING_SAMPLES:
+                raise LiveBufferOverflowError(
+                    "Буфер распознавания переполнен; запись на диск сохранена."
+                )
             self._pending = np.concatenate([self._pending, pcm])
 
     def take_ready_chunks(self) -> list[np.ndarray]:

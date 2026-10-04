@@ -97,6 +97,11 @@
 
 Порядок: **H1 (R11)** → **H2 (R13–R14)** → **H3 (R10)** → **H4 (R09)** → **H5 (R15)**.
 
+### H3 — R10: decode cancel + bounded live pending
+
+- **Файлы:** `decode.py` (Popen → temp PCM, `-ss`/`-t`, `DecodeCancelledError`), `transcribe.py`, `engine_server.py`, `live_buffer.py`, `api.py`.
+- **Тесты:** `test_decode_cancel.py`, `test_live_buffer.py` overflow.
+
 ### H1 — R11: таймауты UI/engine (коммит `3bede01`)
 
 - **Файлы:** `app.py` (ожидание uvicorn ≤30 с), `engine_client.py` (connect 5 с, control 10 с, transcribe отдельно).

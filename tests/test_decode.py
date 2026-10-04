@@ -2,6 +2,7 @@
 import shutil
 import subprocess as sp
 import sys
+from pathlib import Path
 
 import pytest
 from slysh.decode import (
@@ -24,11 +25,23 @@ def test_decode_ffmpeg_subprocess_hides_console(monkeypatch, tmp_path):
 
     seen: list[dict] = []
 
-    def fake_run(cmd, **kwargs):
-        seen.append(kwargs)
-        return _Proc()
+    class _FakeProc:
+        returncode = 0
 
-    monkeypatch.setattr("slysh.decode.subprocess.run", fake_run)
+        def poll(self):
+            return 0
+
+        @property
+        def stderr(self):
+            return None
+
+    def fake_popen(cmd, **kwargs):
+        seen.append(kwargs)
+        out = Path(cmd[-1])
+        out.write_bytes(b"\x00" * (16000 * 4))
+        return _FakeProc()
+
+    monkeypatch.setattr("slysh.decode.subprocess.Popen", fake_popen)
     fake = tmp_path / "ffmpeg.exe"
     fake.write_bytes(b"x")
     monkeypatch.setenv("FFMPEG_BINARY", str(fake))
