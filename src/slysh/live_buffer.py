@@ -24,7 +24,10 @@ class LiveSession:
         self.wav_path = Path(wav_path)
         self.wav_path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
-        self._pending = np.zeros(0, dtype=np.float32)
+        cap = max(LIVE_MAX_PENDING_SAMPLES, LIVE_CHUNK_SAMPLES)
+        self._pending_cap = cap
+        self._pending = np.zeros(cap, dtype=np.float32)
+        self._pending_len = 0
         self._file = sf.SoundFile(
             str(self.wav_path),
             mode="w",
@@ -35,7 +38,7 @@ class LiveSession:
 
     def buffered_samples(self) -> int:
         with self._lock:
-            return int(len(self._pending))
+            return int(self._pending_len)
 
     def remaining_s(self) -> float:
         used = self.buffered_samples() % LIVE_CHUNK_SAMPLES
@@ -50,19 +53,26 @@ class LiveSession:
                 return
             self._file.write(pcm)
             self._file.flush()
-            next_len = len(self._pending) + len(pcm)
-            if next_len > LIVE_MAX_PENDING_SAMPLES:
+            next_len = self._pending_len + len(pcm)
+            if next_len > self._pending_cap:
                 raise LiveBufferOverflowError(
                     "Буфер распознавания переполнен; запись на диск сохранена."
                 )
-            self._pending = np.concatenate([self._pending, pcm])
+            end = self._pending_len + len(pcm)
+            self._pending[self._pending_len:end] = pcm
+            self._pending_len = end
 
     def take_ready_chunks(self) -> list[np.ndarray]:
         chunks: list[np.ndarray] = []
         with self._lock:
-            while len(self._pending) >= LIVE_CHUNK_SAMPLES:
+            while self._pending_len >= LIVE_CHUNK_SAMPLES:
                 chunks.append(self._pending[:LIVE_CHUNK_SAMPLES].copy())
-                self._pending = self._pending[LIVE_CHUNK_SAMPLES:]
+                remain = self._pending_len - LIVE_CHUNK_SAMPLES
+                if remain > 0:
+                    self._pending[:remain] = self._pending[
+                        LIVE_CHUNK_SAMPLES : self._pending_len
+                    ]
+                self._pending_len = remain
         return chunks
 
     def take_pending_tail(self) -> np.ndarray | None:
@@ -70,18 +80,16 @@ class LiveSession:
         with self._lock:
             if self._file.closed:
                 return None
-            if len(self._pending) < MIN_CHUNK_SAMPLES:
+            if self._pending_len < MIN_CHUNK_SAMPLES:
                 return None
-            tail = self._pending.copy()
-            self._pending = np.zeros(0, dtype=np.float32)
+            tail = self._pending[: self._pending_len].copy()
+            self._pending_len = 0
             return tail
 
     def flush(self) -> np.ndarray | None:
         with self._lock:
             if not self._file.closed:
                 self._file.close()
-            tail = self._pending
-            self._pending = np.zeros(0, dtype=np.float32)
-            if len(tail) >= MIN_CHUNK_SAMPLES:
-                return tail
+            if self._pending_len >= MIN_CHUNK_SAMPLES:
+                return self._pending[: self._pending_len].copy()
             return None
