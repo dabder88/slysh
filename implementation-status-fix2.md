@@ -4,7 +4,7 @@
 
 **Легенда:** ✅ готово · 🟡 частично · 🔵 в работе · ⬜ не начато · ⏭️ отложено / вне scope
 
-**Baseline аудита:** `2f19be8`. **Последнее обновление:** 2026-10-04 (R10 ffmpeg -ss/-t before -i).
+**Baseline аудита:** `2f19be8`. **Последнее обновление:** 2026-10-04 (R10 STT mp3 + duration in-place ASCII).
 
 ---
 
@@ -44,7 +44,7 @@
 | §5.1 | Gemini CLI | 🟡 cwd isolate + block yolo/tools/abs `@path`; pytest |
 | H5 | R15 (Setup) | 🟡 subset tests; локальный `dist\Slysh-Setup.exe` 2026-10-04 22:19 |
 | §5.3 | ASR snapshot | ✅ DB pin + `test_job_start_pins_asr_snapshot_in_api` |
-| H3 | R10 | 🟡 memmap, cancel, live ring; ASCII in-place; pytest `-ss`/`-t` до `-i` |
+| H3 | R10 | 🟡 memmap, cancel, live ring; ASCII in-place + STT/duration pytest |
 | §5.4 | COM pytest | 🟡 `conftest` sessionfinish + WASAPI `_ComApartment` |
 | H5 | R15 (полная) | 🔵 subset: `run_plan_fix2_targeted_tests.ps1`, `smoke_cloud_batch` в CI |
 
