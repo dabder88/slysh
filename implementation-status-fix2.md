@@ -4,7 +4,7 @@
 
 **Легенда:** ✅ готово · 🟡 частично · 🔵 в работе · ⬜ не начато · ⏭️ отложено / вне scope
 
-**Baseline аудита:** `2f19be8`. **Последнее обновление:** 2026-10-04 (R10 decode paths; §5.3 job row test).
+**Baseline аудита:** `2f19be8`. **Последнее обновление:** 2026-10-04 (§5.3 API GET/POST start + ASR snapshot).
 
 ---
 
@@ -42,8 +42,8 @@
 | H2 | R13–R14 | ✅ + redirect allowlist, download без Bearer |
 | §5.2 | secrets_dpapi | ✅ lock + concurrent pytest; corrupt read → `SecretsStoreReadError` |
 | §5.1 | Gemini CLI | 🟡 cwd isolate + block yolo/tools/abs `@path`; pytest |
-| H5 | R15 (Setup) | 🟡 subset tests; локальный `dist\Slysh-Setup.exe` 2026-10-04 22:06 |
-| §5.3 | ASR snapshot | ✅ `asr_model_id` / `job_asr_snapshot`, resume |
+| H5 | R15 (Setup) | 🟡 subset tests; локальный `dist\Slysh-Setup.exe` 2026-10-04 22:19 |
+| §5.3 | ASR snapshot | ✅ DB pin + `test_job_start_pins_asr_snapshot_in_api` |
 | H3 | R10 | 🟡 memmap, cancel, live ring buffer; ASCII path — decode без копии источника |
 | §5.4 | COM pytest | 🟡 `conftest` sessionfinish + WASAPI `_ComApartment` |
 | H5 | R15 (полная) | 🔵 subset: `run_plan_fix2_targeted_tests.ps1`, `smoke_cloud_batch` в CI |

@@ -2,6 +2,11 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+from fastapi.testclient import TestClient
+
+from slysh import api as api_mod
+from slysh.api import create_ui_app
+from slysh.catalog import ModelItem
 from slysh.db import Database
 from slysh.job_asr_snapshot import (
     begin_file_transcription,
@@ -65,3 +70,39 @@ def test_begin_file_transcription_pins_only_on_fresh_start(tmp_path, monkeypatch
     begin_file_transcription(db, job_id, reset_progress=True)
     job = db.get_job(job_id) or {}
     assert job["asr_model_id"] == "local:gigaam"
+
+
+def test_job_start_pins_asr_snapshot_in_api(tmp_path, monkeypatch):
+    monkeypatch.setenv("GIGAAM_DESKTOP_HOME", str(tmp_path))
+    remote = ModelItem(
+        id="openrouter:whisper",
+        label="OpenRouter Whisper",
+        backend="openrouter",
+        path="",
+        ready=True,
+        kind="remote",
+    )
+    monkeypatch.setattr(api_mod, "_selected_model", lambda: remote)
+    monkeypatch.setattr("slysh.job_asr_snapshot.current_asr_model", lambda: remote)
+    monkeypatch.setattr(
+        api_mod,
+        "_start_asr_job",
+        lambda _app, _db, _job_id, _path, **_kwargs: None,
+    )
+
+    wav = tmp_path / "talk.wav"
+    wav.write_bytes(b"RIFF")
+    db = Database(tmp_path / "app.db")
+    client = TestClient(create_ui_app(db=db, engine=None))
+    job_id = client.post("/api/jobs", json={"path": str(wav)}).json()["id"]
+    idle = client.get(f"/api/jobs/{job_id}").json()
+    assert not idle.get("asr_model_id")
+
+    started = client.post(f"/api/jobs/{job_id}/start")
+    assert started.status_code == 200
+    assert started.json()["asr_model_id"] == "openrouter:whisper"
+    assert started.json()["asr_backend"] == "openrouter"
+
+    job = client.get(f"/api/jobs/{job_id}").json()
+    assert job["asr_model_id"] == "openrouter:whisper"
+    assert job["asr_backend"] == "openrouter"
