@@ -617,6 +617,8 @@ def any_remote_ready(which: Callable[[str], str | None] | None = None) -> bool:
 
 def migrate_legacy_provider_secrets() -> None:
     """Move plaintext provider keys from settings.json into DPAPI (idempotent)."""
+    from slysh.settings_store import sync_settings_backup_from_primary
+
     openrouter_api_key()
     apify_api_key()
     for preset in HTTP_PRESETS:
@@ -625,6 +627,7 @@ def migrate_legacy_provider_secrets() -> None:
         cid = str(item.get("id") or "").strip()
         if cid:
             custom_api_key(cid)
+    sync_settings_backup_from_primary()
 
 
 def public_providers(which: Callable[[str], str | None] | None = None) -> dict:

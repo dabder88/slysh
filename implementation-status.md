@@ -24,10 +24,13 @@
 
 ## Следующий крупный этап (план агента)
 
+**Активно:** волна **G** plan-fix-2 — [`implementation-order-fix2.md`](implementation-order-fix2.md) · [`implementation-status-fix2.md`](implementation-status-fix2.md) (R01–R07, R12, R05; R08 вне scope; R09+ → волна H).
+
 | Блок | ID | Содержание |
 |------|-----|------------|
-| **1** | E | E.6 прогон матрицы на реальной VM (журнал в `installer/E6-OFFLINE-VM.md`) |
-| **2** | — | Опционально: B.4.4 (10+ мин live manual), push + зелёный GitHub CI |
+| **1** | G | Критический минимум plan-fix-2 (данные, хвост, coordinator, auth/secrets) |
+| **2** | E / H | E.6 VM offline; R09–R14 после G |
+| **3** | — | Опционально: B.4.4 (10+ мин live manual) |
 
 D.1–D.6 закрыты (таблица D). Волна **F** закрыта по пунктам F.1–F.5.
 

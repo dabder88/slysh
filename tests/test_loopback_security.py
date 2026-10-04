@@ -114,6 +114,19 @@ def test_ui_session_cookie(monkeypatch, tmp_path):
     assert ok.status_code == 200
 
 
+def test_api_json_suffix_requires_ui_auth(monkeypatch, tmp_path):
+    monkeypatch.setenv("GIGAAM_UI_AUTH", "1")
+    monkeypatch.setenv("GIGAAM_LOOPBACK_STRICT", "0")
+    db = Database(tmp_path / "app.db")
+    app = create_ui_app(db, engine=None)
+    client = TestClient(app, raise_server_exceptions=False)
+    denied = client.put(
+        "/api/providers/custom/provider.json",
+        json={"label": "x", "protocol": "openai"},
+    )
+    assert denied.status_code == 401
+
+
 def test_index_without_html_bootstrap_when_disabled(monkeypatch, tmp_path):
     monkeypatch.setenv("GIGAAM_UI_AUTH", "1")
     monkeypatch.setenv("GIGAAM_UI_BOOTSTRAP_HTML", "0")

@@ -2014,11 +2014,26 @@ function refreshLibraryViews() {
   }
 }
 
+function saveResponseAppliesToEditor(saveJobId, draftGenAtStart) {
+  if (saveJobId == null) {
+    return false;
+  }
+  if (getRoute() !== "editor") {
+    return selectedId === saveJobId;
+  }
+  if (window.__editorCurrentJobId?.() !== saveJobId) {
+    return false;
+  }
+  return (window.__editorDraftGeneration?.() ?? 0) === draftGenAtStart;
+}
+
 async function saveSegments() {
   const jobId = getRoute() === "editor" ? window.__editorCurrentJobId?.() ?? selectedId : selectedId;
   if (jobId == null) {
     return;
   }
+  const saveJobId = jobId;
+  const draftGenAtStart = window.__editorDraftGeneration?.() ?? 0;
   const payload = {
     transcript: transcriptEl.value,
     expected_revision: segmentsRevision,
@@ -2036,16 +2051,18 @@ async function saveSegments() {
     } else {
       segmentsRevision = Number(job.segments_revision) || segmentsRevision;
     }
-    renderTranscript(job.transcript || "");
-    window.__editorMarkDraftSaved?.();
-    window.__editorRefreshJob?.(job);
+    if (saveResponseAppliesToEditor(saveJobId, draftGenAtStart)) {
+      renderTranscript(job.transcript || "");
+      window.__editorMarkDraftSaved?.();
+      window.__editorRefreshJob?.(job);
+    }
     showToast("common.saved");
   } catch (err) {
     if (err.status === 409) {
       showToast(err.message || String(err));
       const job = await api(`/api/jobs/${jobId}`);
       segmentsRevision = Number(job.segments_revision) || segmentsRevision;
-      if (!isEditingTranscript()) {
+      if (saveResponseAppliesToEditor(saveJobId, draftGenAtStart) && !isEditingTranscript()) {
         renderTranscript(job.transcript || "");
       }
       return;

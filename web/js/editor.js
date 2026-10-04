@@ -31,6 +31,7 @@ let renderedSegmentCount = 0;
 let renderedSegmentJobId = null;
 let editorPollTimer = null;
 let editorDraftDirty = false;
+let editorDraftGeneration = 0;
 const editorDrafts = new Map();
 let editorPollFetchId = 0;
 let transcriptFollowTail = true;
@@ -963,6 +964,15 @@ export function editorIsDraftDirty() {
   return editorDraftDirty;
 }
 
+export function editorDraftGenerationValue() {
+  return editorDraftGeneration;
+}
+
+function bumpEditorDraftGeneration() {
+  editorDraftGeneration += 1;
+  return editorDraftGeneration;
+}
+
 export function markEditorDraftSaved() {
   editorDraftDirty = false;
   if (currentJobId != null && editorDrafts.has(currentJobId)) {
@@ -976,6 +986,7 @@ if (typeof window !== "undefined") {
   window.__editorMarkDraftSaved = markEditorDraftSaved;
   window.__editorIsDraftDirty = editorIsDraftDirty;
   window.__editorRefreshJob = refreshEditorJob;
+  window.__editorDraftGeneration = editorDraftGenerationValue;
 }
 
 function stashEditorDraft(jobId) {
@@ -1373,6 +1384,7 @@ export function initEditor() {
   const textarea = document.getElementById("transcript-edit");
   textarea?.addEventListener("input", () => {
     editorDraftDirty = true;
+    bumpEditorDraftGeneration();
   });
   textarea?.addEventListener("click", () => {
     const pos = textarea.selectionStart;

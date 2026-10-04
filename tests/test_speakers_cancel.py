@@ -61,6 +61,26 @@ def test_assign_speakers_restores_segments_when_cancelled_after_label(tmp_path):
     assert segs[0].speaker is None
 
 
+def test_assign_speakers_keeps_user_edit_on_backend_error(tmp_path):
+    db = Database(tmp_path / "app.db")
+    job_id = db.create_job(JobKind.FILE, r"C:\audio.wav")
+    db.replace_segments(job_id, [Segment(0, 1000, "OLD", speaker=None)])
+
+    class FailAfterUserEdit:
+        def label(self, source_path, segments, *, cancelled=None):
+            db.replace_segments(job_id, [Segment(0, 1000, "USER EDIT", speaker=None)])
+            raise RuntimeError("diarization failed")
+
+    try:
+        assign_speakers(db, job_id, FailAfterUserEdit())
+        raise AssertionError("expected RuntimeError")
+    except RuntimeError:
+        pass
+    segs = db.list_segments(job_id)
+    assert len(segs) == 1
+    assert segs[0].text == "USER EDIT"
+
+
 def test_assign_speakers_fake_respects_cancel_before_label(tmp_path):
     db = Database(tmp_path / "app.db")
     job_id = db.create_job(JobKind.FILE, r"C:\audio.wav")

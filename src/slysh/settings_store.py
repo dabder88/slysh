@@ -54,6 +54,22 @@ def save_json(path: Path, data: dict[str, Any]) -> None:
         _atomic_write(Path(path), data)
 
 
+def sync_settings_backup_from_primary(path: Path | None = None) -> None:
+    """Overwrite settings.json.bak with current primary file (no plaintext secret drift)."""
+    if path is None:
+        from slysh.compute import settings_path
+
+        path = settings_path()
+    path = Path(path)
+    if not path.is_file():
+        return
+    backup = path.with_suffix(path.suffix + ".bak")
+    try:
+        backup.write_text(path.read_text(encoding="utf-8"), encoding="utf-8")
+    except OSError:
+        logging.warning("settings backup sync failed for %s", backup, exc_info=True)
+
+
 def mutate_json(
     path: Path,
     mutator: Callable[[dict[str, Any]], None],

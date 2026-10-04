@@ -3,13 +3,14 @@ from slysh.chunking import SAMPLE_RATE, slice_chunks, offset_segments
 from slysh.models import Segment
 
 
-def test_skips_tail_shorter_than_one_second():
+def test_keeps_tail_shorter_than_one_second():
     audio = np.zeros(int(SAMPLE_RATE * 20.5), dtype=np.float32)
     chunks = list(slice_chunks(audio))
-    assert len(chunks) == 1
-    start, pcm = chunks[0]
-    assert start == 0
-    assert len(pcm) == SAMPLE_RATE * 20
+    assert len(chunks) == 2
+    assert chunks[0][0] == 0
+    assert len(chunks[0][1]) == SAMPLE_RATE * 20
+    assert chunks[1][0] == 20
+    assert len(chunks[1][1]) == int(SAMPLE_RATE * 0.5)
 
 
 def test_two_full_chunks():

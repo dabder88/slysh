@@ -48,7 +48,7 @@ def main() -> int:
     def fail_engine(*_a, **_k):
         raise RuntimeError("engine must not run")
 
-    def complete(_app, _db, jid, _path):
+    def complete(_app, _db, jid, _path, *, reset_segments=True, **_kwargs):
         _db.set_status(jid, JobStatus.COMPLETED)
 
     from unittest.mock import patch

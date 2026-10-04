@@ -1,6 +1,7 @@
 """Single-instance lock tied to the app data directory."""
 from __future__ import annotations
 
+import hashlib
 import os
 import sys
 from pathlib import Path
@@ -28,7 +29,10 @@ class SingleInstanceLock:
 
     def acquire(self) -> None:
         if sys.platform == "win32" and ctypes is not None:
-            self._mutex = _kernel32.CreateMutexW(None, True, "Local\\SlyshDesktopSingleInstance")
+            normalized = os.path.normcase(str(self._path.parent.resolve()))
+            digest = hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:24]
+            mutex_name = f"Local\\SlyshDesktopSingleInstance_{digest}"
+            self._mutex = _kernel32.CreateMutexW(None, True, mutex_name)
             if _kernel32.GetLastError() == _ERROR_ALREADY_EXISTS:
                 if self._mutex:
                     _kernel32.CloseHandle(self._mutex)

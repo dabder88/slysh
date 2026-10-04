@@ -25,6 +25,10 @@ def test_migrate_openrouter_key_out_of_settings(tmp_path, monkeypatch):
     settings = json.loads((tmp_path / "settings.json").read_text(encoding="utf-8"))
     or_block = settings.get("providers", {}).get("openrouter", {})
     assert "api_key" not in or_block
+    bak_path = tmp_path / "settings.json.bak"
+    assert bak_path.is_file()
+    bak = json.loads(bak_path.read_text(encoding="utf-8"))
+    assert "api_key" not in (bak.get("providers", {}).get("openrouter", {}) or {})
 
 
 def test_migrate_proxy_password_out_of_settings(tmp_path, monkeypatch):

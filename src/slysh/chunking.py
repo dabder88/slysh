@@ -17,7 +17,7 @@ def slice_chunks(audio: np.ndarray) -> list[tuple[int, np.ndarray]]:
     out: list[tuple[int, np.ndarray]] = []
     for start in range(0, len(audio), CHUNK_SAMPLES):
         piece = audio[start : start + CHUNK_SAMPLES]
-        if len(piece) < MIN_CHUNK_SAMPLES:
+        if len(piece) == 0:
             continue
         out.append((start // SAMPLE_RATE, piece))
     return out

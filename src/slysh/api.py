@@ -2595,7 +2595,7 @@ def create_ui_app(
             speaker_cancel = app.state.speaker_cancels.get(job_id)
             if speaker_cancel is not None:
                 speaker_cancel.set()
-            if url:
+            if url and coord.local_job_id() == job_id:
                 try:
                     engine_cancel(url)
                 except Exception:
@@ -2644,6 +2644,15 @@ def create_ui_app(
             return cancel_event.is_set()
 
         def work() -> None:
+            coord: AsrCoordinator = app.state.asr_coordinator
+            if not coord.begin_local_wait(job_id, timeout_s=7200.0):
+                app.state.speaker_errors[job_id] = (
+                    "Локальный движок занят другой задачей. Повторите позже."
+                )
+                app.state.speaker_cancels.pop(job_id, None)
+                app.state.speaker_jobs.pop(job_id, None)
+                app.state.speaker_started.pop(job_id, None)
+                return
             try:
                 engine_url = _ensure_engine_url(app)
                 from slysh.speakers_engine import EngineSpeakersBackend
@@ -2669,6 +2678,7 @@ def create_ui_app(
                 logging.exception("speakers failed for job %s", job_id)
                 app.state.speaker_errors[job_id] = str(exc).strip() or "диаризация не удалась"
             finally:
+                coord.end_local(job_id)
                 app.state.speaker_cancels.pop(job_id, None)
                 app.state.speaker_ytdlp_procs.pop(job_id, None)
                 app.state.speaker_jobs.pop(job_id, None)

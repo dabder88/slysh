@@ -65,8 +65,9 @@ def install_ui_auth(app: FastAPI) -> str:
             return await call_next(request)
         if path in _PUBLIC_PATHS:
             return await call_next(request)
-        if path.endswith((".css", ".js", ".ico", ".png", ".svg", ".woff2", ".json")):
-            return await call_next(request)
+        if request.method in ("GET", "HEAD") and not path.startswith("/api/"):
+            if path.endswith((".css", ".js", ".ico", ".png", ".svg", ".woff2")):
+                return await call_next(request)
         cookie = request.cookies.get(ui_cookie_name(app))
         header = request.headers.get("x-slysh-ui-token")
         expected = getattr(app.state, "ui_auth_token", None)

@@ -351,6 +351,7 @@ def start_batch(
                         return
                     continue
 
+                post_stages_ok = True
                 if rules.get("speakers"):
                     if is_cloud_only():
                         logger.info(
@@ -358,26 +359,34 @@ def start_batch(
                             job_id,
                         )
                     else:
-                        try:
-                            engine_url = None
-                            if ensure_engine is not None:
-                                engine_url = ensure_engine(app)
-                            else:
-                                engine_url = getattr(app.state, "engine_url", None)
-                            if not engine_url:
-                                raise RuntimeError("Движок не запущен.")
-                            from slysh.speakers_engine import EngineSpeakersBackend
+                        coord = app.state.asr_coordinator
+                        if not coord.begin_local_wait(job_id, timeout_s=7200.0):
+                            post_stages_ok = False
+                            db.set_error(job_id, "Локальный движок занят другой задачей.")
+                        else:
+                            try:
+                                engine_url = None
+                                if ensure_engine is not None:
+                                    engine_url = ensure_engine(app)
+                                else:
+                                    engine_url = getattr(app.state, "engine_url", None)
+                                if not engine_url:
+                                    raise RuntimeError("Движок не запущен.")
+                                from slysh.speakers_engine import EngineSpeakersBackend
 
-                            assign_speakers(
-                                db,
-                                job_id,
-                                EngineSpeakersBackend(engine_url),
-                            )
-                        except Exception as exc:
-                            logging.exception("batch speakers failed for job %s", job_id)
-                            db.set_error(job_id, str(exc))
+                                assign_speakers(
+                                    db,
+                                    job_id,
+                                    EngineSpeakersBackend(engine_url),
+                                )
+                            except Exception as exc:
+                                logging.exception("batch speakers failed for job %s", job_id)
+                                db.set_error(job_id, str(exc))
+                                post_stages_ok = False
+                            finally:
+                                coord.end_local(job_id)
 
-                if rules.get("export"):
+                if post_stages_ok and rules.get("export"):
                     try:
                         _export_batch_job(
                             db,
@@ -389,6 +398,21 @@ def start_batch(
                     except Exception as exc:
                         logging.exception("batch export failed for job %s", job_id)
                         db.set_error(job_id, str(exc))
+                        post_stages_ok = False
+
+                if not post_stages_ok:
+                    failed += 1
+                    if rules.get("on_error") == "stop":
+                        _batch_pause_on_error(
+                            runner,
+                            db,
+                            batch_id,
+                            done=done,
+                            failed=failed,
+                            skipped=skipped,
+                        )
+                        return
+                    continue
 
                 done += 1
 
