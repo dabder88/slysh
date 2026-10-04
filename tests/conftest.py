@@ -82,3 +82,19 @@ def pytest_configure(config):
         "markers",
         "network: tests that require external network access",
     )
+
+
+def pytest_sessionfinish(session, exitstatus):
+    """§5.4: best-effort COM teardown on Windows after tests (IUnknown noise).
+
+    Real WASAPI loopback uses _ComApartment in wasapi_loopback.py (CoUninitialize
+    on thread exit). Residual messages at process exit are usually benign for the app.
+    """
+    if sys.platform != "win32":
+        return
+    try:
+        import ctypes
+
+        ctypes.windll.ole32.CoUninitialize()
+    except Exception:
+        pass

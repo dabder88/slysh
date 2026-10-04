@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import tempfile
 import time
+import weakref
 from collections.abc import Callable
 from pathlib import Path
 
@@ -51,6 +52,38 @@ def find_ffmpeg() -> str | None:
 
 def _ffmpeg_kwargs() -> dict:
     return subprocess_no_console_kwargs()
+
+
+def _safe_unlink(path: str | Path) -> None:
+    try:
+        os.remove(path)
+    except OSError:
+        pass
+
+
+def decode_memmap_threshold_bytes() -> int:
+    raw = (os.environ.get("SLYSH_DECODE_MEMMAP_BYTES") or "").strip()
+    if raw:
+        try:
+            return max(4, int(raw))
+        except ValueError:
+            pass
+    return 32 * 1024 * 1024
+
+
+def _load_pcm_f32le(pcm_path: str) -> np.ndarray:
+    path = Path(pcm_path)
+    nbytes = path.stat().st_size
+    if nbytes == 0 or nbytes % 4 != 0:
+        raise DecodeError(DECODE_FAILED_MESSAGE)
+    count = nbytes // 4
+    if nbytes > decode_memmap_threshold_bytes():
+        mm = np.memmap(pcm_path, dtype=np.float32, mode="r", shape=(count,))
+        weakref.finalize(mm, _safe_unlink, pcm_path)
+        return mm
+    pcm = np.fromfile(pcm_path, dtype=np.float32)
+    _safe_unlink(pcm_path)
+    return pcm
 
 
 def _wait_ffmpeg(
@@ -143,16 +176,12 @@ def decode_pcm_16k_mono(
         pcm_file = Path(pcm_path)
         if not pcm_file.is_file() or pcm_file.stat().st_size == 0:
             raise DecodeError(DECODE_FAILED_MESSAGE)
-        pcm = np.fromfile(pcm_path, dtype=np.float32)
+        pcm = _load_pcm_f32le(pcm_path)
         if pcm.size == 0:
             raise DecodeError(DECODE_FAILED_MESSAGE)
         return pcm, 16000
     finally:
-        for p in (tmp, pcm_path):
-            try:
-                os.remove(p)
-            except OSError:
-                pass
+        _safe_unlink(tmp)
 
 
 _DURATION_RE = re.compile(

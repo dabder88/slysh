@@ -30,6 +30,7 @@ $PyTests = @(
     "tests/test_job_asr_snapshot.py",
     "tests/test_gemini_cli.py",
     "tests/test_decode_cancel.py",
+    "tests/test_decode_memmap.py",
     "tests/test_webview2_redist.py"
 )
 
