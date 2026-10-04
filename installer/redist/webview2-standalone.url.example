@@ -1,0 +1,4 @@
+# Rename to webview2-standalone.url and put one https URL to
+# Microsoft Edge WebView2 Runtime Standalone Installer (x64).
+# Download page: https://developer.microsoft.com/microsoft-edge/webview2/
+# Target file name after fetch: MicrosoftEdgeWebView2RuntimeInstallerX64.exe

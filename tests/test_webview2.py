@@ -9,6 +9,7 @@ from slysh.app import (
     _show_webview2_dialog,
     _webview2_pv,
     install_webview2_bootstrapper,
+    install_webview2_runtime,
     webview2_runtime_installed,
 )
 
@@ -60,6 +61,31 @@ def test_webview2_pv_reads_string(monkeypatch):
     monkeypatch.setattr("winreg.OpenKey", _Winreg.OpenKey)
     monkeypatch.setattr("winreg.QueryValueEx", _Winreg.QueryValueEx)
     assert _webview2_pv(0, "ignored") == "120.0.1.0"
+
+
+def test_install_runtime_prefers_bundled_standalone(monkeypatch, tmp_path):
+    calls: list[tuple] = []
+
+    monkeypatch.setattr("slysh.paths.install_root", lambda: tmp_path)
+    monkeypatch.setattr(
+        "slysh.webview2_redist.is_standalone_installer",
+        lambda _p: True,
+    )
+    monkeypatch.setattr(
+        "slysh.app._shell_open",
+        lambda target, parameters=None, cwd=None: calls.append(
+            (target, parameters, cwd)
+        ),
+    )
+    monkeypatch.setattr(
+        "slysh.app.install_webview2_bootstrapper",
+        lambda: calls.append(("bootstrap", None, None)),
+    )
+
+    install_webview2_runtime()
+    assert calls
+    assert calls[0][1] == "/silent /install"
+    assert ("bootstrap", None, None) not in calls
 
 
 def test_bootstrapper_url_is_microsoft_evergreen():

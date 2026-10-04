@@ -29,7 +29,7 @@ powershell -File scripts\build-slysh-setup.ps1
 |----|------|------------|
 | E.1 | Воспроизводимый payload | staging `payload.build-*`, `payload.prev`, pin uv в `build-installer-payload.ps1` |
 | E.2 | Без vendored torch / portable venv | `uv sync --no-editable`, wheelhouse, smoke layout |
-| E.3 | WebView2 offline | `installer\redist\MicrosoftEdgeWebview2Setup.exe`, `[Run]` в `Slysh.iss` |
+| E.3 | WebView2 offline | `fetch-installer-redist.ps1`: bootstrapper + опционально `MicrosoftEdgeWebView2RuntimeInstallerX64.exe` (`webview2-standalone.url`); `[Run]` в `Slysh.iss` (`#ifexist` standalone) |
 | E.4 | Обновления + SHA-256 | `updates.py`, `smoke_updates_sha256.py`; без digest — нет auto-install |
 | E.5 | Upgrade vs first-run | `IsAppUpgrade` в `Slysh.iss` — `.fresh-install` только для новой установки |
 | E.6 | Чистые Win10/11 | [`installer/E6-OFFLINE-VM.md`](installer/E6-OFFLINE-VM.md) + `e6-offline-vm-verify.ps1` |

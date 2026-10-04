@@ -38,7 +38,7 @@
 | ID | Rxx | Статус |
 |----|-----|--------|
 | H1 | R11 | ✅ (watchdog/join — 🟡) |
-| H4 | R09 | 🟡 (launcher/bat offline; WebView2 full redist — ⬜) |
+| H4 | R09 | 🟡 (offline UI sync ✅; WebView2 standalone в Setup при `fetch` + url) |
 | H2 | R13–R14 | ✅ `a418af3` |
 | H3 | R10 | ✅ |
 | H5 | R15 (полная) | ⬜ |

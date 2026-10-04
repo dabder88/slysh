@@ -59,9 +59,15 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 ; models/ — отдельная строка; при удалении по умолчанию сносится (см. InitializeUninstall).
 Source: "{#Payload}\*"; DestDir: "{app}"; Excludes: "models,models\*,models\*"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#Payload}\models\*"; DestDir: "{app}\models"; Flags: ignoreversion recursesubdirs createallsubdirs
+#ifexist "redist\MicrosoftEdgeWebView2RuntimeInstallerX64.exe"
+Source: "redist\MicrosoftEdgeWebView2RuntimeInstallerX64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall; Check: not WebView2Installed
+Source: "redist\MicrosoftEdgeWebView2RuntimeInstallerX64.exe"; DestDir: "{app}\redist"; Flags: ignoreversion; Check: not WebView2Installed
+#else
 Source: "redist\MicrosoftEdgeWebview2Setup.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall; Check: not WebView2Installed
+#endif
 
 [Dirs]
+
 ; Явная папка «Slysh» в меню Пуск (между Skype и Steam в «Все приложения»).
 Name: "{group}";
 
@@ -71,7 +77,11 @@ Name: "{group}\{cm:UninstallProgram,Slysh}"; Filename: "{uninstallexe}"; IconFil
 Name: "{autodesktop}\Slysh"; Filename: "{app}\Slysh.exe"; IconFilename: "{app}\slysh.ico"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Run]
+#ifexist "redist\MicrosoftEdgeWebView2RuntimeInstallerX64.exe"
+Filename: "{tmp}\MicrosoftEdgeWebView2RuntimeInstallerX64.exe"; Parameters: "/silent /install"; StatusMsg: "Microsoft Edge WebView2 Runtime…"; Check: not WebView2Installed; Flags: waituntilterminated
+#else
 Filename: "{tmp}\MicrosoftEdgeWebview2Setup.exe"; Parameters: "/silent /install"; StatusMsg: "Microsoft Edge WebView2 Runtime…"; Check: not WebView2Installed; Flags: waituntilterminated
+#endif
 Filename: "{app}\Slysh.exe"; WorkingDir: "{app}"; Description: "{cm:LaunchProgram,Slysh}"; Flags: nowait postinstall skipifsilent runascurrentuser
 
 [UninstallDelete]

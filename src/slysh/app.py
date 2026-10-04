@@ -263,7 +263,7 @@ def _fetch_bootstrapper_bytes(url: str) -> bytes:
     return b"".join(chunks)
 
 
-def _shell_open(target: str) -> None:
+def _shell_open(target: str, parameters: str | None = None, cwd: str | None = None) -> None:
     import ctypes
 
     shell32 = ctypes.windll.shell32
@@ -276,10 +276,33 @@ def _shell_open(target: str) -> None:
         ctypes.c_int,
     ]
     shell32.ShellExecuteW.restype = ctypes.c_void_p
-    result = shell32.ShellExecuteW(None, "open", target, None, None, 1)
+    result = shell32.ShellExecuteW(
+        None,
+        "open",
+        target,
+        parameters,
+        cwd,
+        1,
+    )
     code = 0 if result is None else int(result)
     if code <= 32:
         raise OSError(code)
+
+
+def install_webview2_runtime() -> None:
+    """Prefer bundled offline standalone installer; else download bootstrapper."""
+    from slysh.paths import install_root
+    from slysh.webview2_redist import bundled_installer_candidates, is_standalone_installer
+
+    for candidate in bundled_installer_candidates(install_root()):
+        if is_standalone_installer(candidate):
+            _shell_open(
+                str(candidate),
+                "/silent /install",
+                str(candidate.parent),
+            )
+            return
+    install_webview2_bootstrapper()
 
 
 def install_webview2_bootstrapper() -> None:
@@ -298,9 +321,9 @@ def install_webview2_bootstrapper() -> None:
 def _run_webview2_download(set_status) -> None:
     set_status(WEBVIEW2_DOWNLOADING)
     try:
-        install_webview2_bootstrapper()
+        install_webview2_runtime()
     except Exception:
-        logging.exception("webview2 bootstrapper failed")
+        logging.exception("webview2 runtime install failed")
         try:
             _shell_open(WEBVIEW2_BOOTSTRAPPER_URL)
         except Exception:
