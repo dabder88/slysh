@@ -97,10 +97,17 @@
 
 Порядок: **H1 (R11)** → **H2 (R13–R14)** → **H3 (R10)** → **H4 (R09)** → **H5 (R15)**.
 
-### H4 — R09: offline UI bootstrap (в работе)
+### H5 — R15 (subset): автоматические регрессии plan-fix-2
 
-- **Сделано:** `Slysh.c` + `Slysh.bat` — `uv sync --no-editable --find-links wheelhouse --offline`; `offline_bootstrap.py`, `test_offline_bootstrap.py`.
-- **Осталось:** полный offline WebView2 fixed runtime в Setup; VM-матрица E6 с сетью off до Setup.
+- **Скрипт:** `scripts/run_plan_fix2_targeted_tests.ps1` (pytest G–H + `smoke_cloud_batch_route`).
+- **CI:** `smoke_cloud_batch_route.py` в `ci_mandatory_checks.ps1`; явные `$LASTEXITCODE` после npm/ci/python.
+- **Вне scope автоматики:** VM E6 с журналом, 10+ min mic/loopback, WebView E2E.
+
+### H4 — R09: offline UI bootstrap (🟡)
+
+- **Сделано:** `Slysh.c` + `Slysh.bat` — wheelhouse offline; опциональный standalone WebView2 в `Slysh.iss` (`#ifexist`) — **не используем**: владелец не увеличивает Setup на ~200 МБ.
+- **В Setup остаётся:** bootstrapper WebView2 (~2 МБ) + типичный runtime в Win10/11; без сети на чистой VM без WebView2 — вне целевого сценария.
+- **Осталось по R09 (без WebView2 bundle):** при необходимости — VM/E6 только для UI venv + wheelhouse.
 
 ### H3 — R10: decode cancel + bounded live pending
 
@@ -115,12 +122,12 @@
 
 | Rxx | Кратко |
 |-----|--------|
-| R09 | Offline bootstrap, wheelhouse, WebView2 full runtime (E.6) |
+| R09 | Offline UI venv/wheelhouse ✅; WebView2 standalone в Setup ⏭️ владелец |
 | R10 | Streaming decode, bounded RAM live |
 | R11 | Engine/UI timeouts — см. H1 |
 | R13 | Updates: operation id, re-hash перед apply — `updates.py`, `test_updates_operation.py` |
 | R14 | Payload staging smoke до promote, без fallback venv — `build-installer-payload.ps1` |
-| R15 | VM matrix, 10+ min devices, WebView E2E |
+| R15 | `run_plan_fix2_targeted_tests.ps1`; CI exit codes + `smoke_cloud_batch`; VM/10 min — вручную |
 
 ---
 

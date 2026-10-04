@@ -85,3 +85,4 @@ powershell -ExecutionPolicy Bypass -File .\e6-offline-vm-verify.ps1 `
 - Авто-скрипт **не** поднимает VM и **не** запускает Inno Setup.
 - SHA-256 релиза покрывается E.4 (ручное обновление в приложении). Подпись Setup — вне плана ([`PRODUCT_OUT_OF_SCOPE.md`](../PRODUCT_OUT_OF_SCOPE.md)).
 - Engine wheels **не** входят в базовый offline payload; тяжёлая установка требует сети или заранее заполненного engine venv.
+- **WebView2:** в Setup — bootstrapper (~2 МБ), не standalone (~200 МБ). Сценарий «чистая VM без WebView2 и без сети» для окна UI **не** в целевом приёмочном scope (решение владельца); E6 проверяет offline **UI venv / wheelhouse**, при наличии runtime — ручной запуск UI.

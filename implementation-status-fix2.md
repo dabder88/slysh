@@ -13,7 +13,7 @@
 | Блок | Статус | Комментарий |
 |------|--------|-------------|
 | **G** Критический минимум | ✅ | коммит `32ba4e8` |
-| **H** Offline / масштаб / приёмка | 🔵 | H4 R09: launcher offline sync 🟡 |
+| **H** Offline / масштаб / приёмка | 🔵 | H4: UI offline sync ✅; WebView2 ~200 МБ в Setup — ⏭️ |
 
 ---
 
@@ -38,10 +38,10 @@
 | ID | Rxx | Статус |
 |----|-----|--------|
 | H1 | R11 | ✅ (watchdog/join — 🟡) |
-| H4 | R09 | 🟡 (offline UI sync ✅; WebView2 standalone в Setup при `fetch` + url) |
+| H4 | R09 | 🟡 UI venv/wheelhouse ✅; WebView2 standalone в Setup ⏭️ владелец |
 | H2 | R13–R14 | ✅ `a418af3` |
 | H3 | R10 | ✅ |
-| H5 | R15 (полная) | ⬜ |
+| H5 | R15 (полная) | 🔵 subset: `run_plan_fix2_targeted_tests.ps1`, `smoke_cloud_batch` в CI |
 
 ---
 
@@ -53,14 +53,16 @@
 | Превью Правка/Просмотр | 2f19be8 ✅ | дополняет G2 |
 | Coordinator file ASR | C ✅ | G4 — диаризация в слот |
 | R08 reveal ключей | — | ⏭️ отказ владельца |
+| R09 WebView2 standalone (~200 МБ) | bootstrapper в Setup | ⏭️ не увеличиваем Setup; E6 offline WebView2 — N/A |
 
 ---
 
-## Smokes (G)
+## Smokes (G / H5)
 
-| Скрипт | Gx |
-|--------|-----|
-| `smoke_cloud_batch_route.py` | G9 ✅ |
+| Скрипт | Gx / H5 |
+|--------|---------|
+| `smoke_cloud_batch_route.py` | G9 ✅, CI mandatory |
+| `run_plan_fix2_targeted_tests.ps1` | H5 subset G–H |
 
 ---
 
