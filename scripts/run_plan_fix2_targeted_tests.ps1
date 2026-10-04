@@ -21,6 +21,7 @@ $PyTests = @(
     "tests/test_secrets_dpapi_migration.py",
     "tests/test_loopback_security.py",
     "tests/test_engine_client_timeout.py",
+    "tests/test_engine_watchdog.py",
     "tests/test_engine_cancel.py",
     "tests/test_updates_operation.py",
     "tests/test_updates_sha.py",

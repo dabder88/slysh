@@ -83,17 +83,23 @@ def transcribe_file(
     start_ms: int | None = None,
     end_ms: int | None = None,
 ) -> dict:
+    from slysh.engine_watchdog import run_with_progress_watch
+
     payload: dict = {"path": path}
     if start_ms is not None:
         payload["start_ms"] = start_ms
     if end_ms is not None:
         payload["end_ms"] = end_ms
-    return _post(
-        base_url,
-        "/transcribe_file",
-        payload,
-        timeout=ENGINE_TRANSCRIBE_TIMEOUT_S,
-    )
+
+    def _call() -> dict:
+        return _post(
+            base_url,
+            "/transcribe_file",
+            payload,
+            timeout=ENGINE_TRANSCRIBE_TIMEOUT_S,
+        )
+
+    return run_with_progress_watch(base_url, _call)
 
 
 def transcribe_chunk(base_url: str, samples: list[float]) -> dict:
@@ -101,7 +107,7 @@ def transcribe_chunk(base_url: str, samples: list[float]) -> dict:
         base_url,
         "/transcribe_chunk",
         {"samples": samples},
-        timeout=ENGINE_CONTROL_TIMEOUT_S,
+        timeout=ENGINE_TRANSCRIBE_TIMEOUT_S,
     )
 
 
@@ -126,5 +132,11 @@ def label_speakers(
             for s in segments
         ],
     }
+    from slysh.engine_watchdog import run_with_progress_watch
+
     speaker_timeout = float(os.environ.get("SLYSH_SPEAKER_HTTP_TIMEOUT", "7200"))
-    return _post(base_url, "/label_speakers", payload, timeout=speaker_timeout)
+
+    def _call() -> dict:
+        return _post(base_url, "/label_speakers", payload, timeout=speaker_timeout)
+
+    return run_with_progress_watch(base_url, _call)

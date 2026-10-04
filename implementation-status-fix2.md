@@ -4,7 +4,7 @@
 
 **Легенда:** ✅ готово · 🟡 частично · 🔵 в работе · ⬜ не начато · ⏭️ отложено / вне scope
 
-**Baseline аудита:** `2f19be8`. **Последнее обновление:** 2026-10-04 (H3 `b4d6bda`, H4 R09 🟡).
+**Baseline аудита:** `2f19be8`. **Последнее обновление:** 2026-10-04 (H1 watchdog, chunk timeout).
 
 ---
 
@@ -37,7 +37,7 @@
 
 | ID | Rxx | Статус |
 |----|-----|--------|
-| H1 | R11 | ✅ (watchdog/join — 🟡) |
+| H1 | R11 | ✅ `engine_watchdog`, `SLYSH_ENGINE_PROGRESS_STALL_S` (default 600s); chunk HTTP timeout = transcribe |
 | H4 | R09 | 🟡 UI venv/wheelhouse ✅; WebView2 standalone в Setup ⏭️ владелец |
 | H2 | R13–R14 | ✅ `a418af3` |
 | H3 | R10 | ✅ |
