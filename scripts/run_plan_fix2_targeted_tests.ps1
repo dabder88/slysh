@@ -33,7 +33,8 @@ $PyTests = @(
     "tests/test_decode_memmap.py",
     "tests/test_decode_input_path.py",
     "tests/test_live_buffer.py",
-    "tests/test_webview2_redist.py"
+    "tests/test_webview2_redist.py",
+    "tests/test_com_pytest_teardown.py"
 )
 
 Write-Host "=== smoke_cloud_batch_route ==="
