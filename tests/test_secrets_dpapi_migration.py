@@ -3,10 +3,12 @@ from __future__ import annotations
 import json
 import threading
 
+import pytest
+
 from slysh.compute import mutate_settings
 from slysh.http_proxy import load_proxy_config, migrate_proxy_secret, public_proxy_config
 from slysh.providers import migrate_legacy_provider_secrets, openrouter_api_key
-from slysh.secrets_dpapi import get_nested
+from slysh.secrets_dpapi import SecretsStoreReadError, get_nested, set_nested
 
 
 def test_migrate_openrouter_key_out_of_settings(tmp_path, monkeypatch):
@@ -55,6 +57,15 @@ def test_migrate_proxy_password_out_of_settings(tmp_path, monkeypatch):
     assert pub["password"] == ""
     settings = json.loads((tmp_path / "settings.json").read_text(encoding="utf-8"))
     assert "password" not in (settings.get("proxy") or {})
+
+
+def test_set_nested_fails_when_store_corrupt(tmp_path, monkeypatch):
+    monkeypatch.setenv("GIGAAM_DESKTOP_HOME", str(tmp_path))
+    store = tmp_path / "secrets.dpapi"
+    store.write_bytes(b"not-valid-json-or-dpapi")
+    with pytest.raises(SecretsStoreReadError):
+        set_nested(("providers", "openrouter", "api_key"), "sk-x")
+    assert get_nested(("providers", "openrouter", "api_key")) == ""
 
 
 def test_concurrent_set_nested_keeps_both_keys(tmp_path, monkeypatch):

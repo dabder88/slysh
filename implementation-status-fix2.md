@@ -40,7 +40,7 @@
 | H1 | R11 | ✅ `engine_watchdog`, `SLYSH_ENGINE_PROGRESS_STALL_S` (default 600s); chunk HTTP timeout = transcribe |
 | H4 | R09 | 🟡 UI venv/wheelhouse ✅; WebView2 standalone в Setup ⏭️ владелец |
 | H2 | R13–R14 | ✅ + redirect allowlist, download без Bearer |
-| §5.2 | secrets_dpapi | ✅ file lock + `mutate_secrets`, concurrent pytest |
+| §5.2 | secrets_dpapi | ✅ lock + concurrent pytest; corrupt read → `SecretsStoreReadError` |
 | §5.1 | Gemini CLI | 🟡 `_assert_safe_gemini_cmd` + pytest |
 | §5.3 | ASR snapshot | ✅ `asr_model_id` / `job_asr_snapshot`, resume |
 | H3 | R10 | 🟡 memmap, cancel decode, live pending ring buffer (`SLYSH_LIVE_PENDING_MAX_SAMPLES`) |

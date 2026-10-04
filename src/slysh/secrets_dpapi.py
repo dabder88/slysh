@@ -21,6 +21,10 @@ _LOCK_NAME = "secrets.dpapi.lock"
 _thread_lock = threading.Lock()
 
 
+class SecretsStoreReadError(OSError):
+    """Existing secrets blob exists but could not be read; write aborted."""
+
+
 def _store_path() -> Path:
     return app_dir() / _STORE_NAME
 
@@ -100,7 +104,7 @@ def _exclusive_store():
                 fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
 
 
-def _load_secrets_unlocked() -> dict[str, Any]:
+def _load_secrets_unlocked(*, for_write: bool = False) -> dict[str, Any]:
     path = _store_path()
     if not path.is_file():
         return {}
@@ -114,6 +118,10 @@ def _load_secrets_unlocked() -> dict[str, Any]:
         return data if isinstance(data, dict) else {}
     except (OSError, json.JSONDecodeError, ValueError) as exc:
         _LOG.warning("secrets store read failed: %s", exc)
+        if for_write:
+            raise SecretsStoreReadError(
+                "Не удалось прочитать хранилище секретов; сохранение отменено."
+            ) from exc
         return {}
 
 
@@ -132,7 +140,7 @@ def _save_secrets_unlocked(data: dict[str, Any]) -> None:
 
 def mutate_secrets(mutator: Callable[[dict[str, Any]], None]) -> None:
     with _exclusive_store():
-        data = _load_secrets_unlocked()
+        data = _load_secrets_unlocked(for_write=True)
         mutator(data)
         _save_secrets_unlocked(data)
 
