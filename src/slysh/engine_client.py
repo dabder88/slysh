@@ -7,6 +7,12 @@ from urllib.request import Request, urlopen
 
 from slysh.engine_auth import engine_auth_headers
 
+ENGINE_CONNECT_TIMEOUT_S = float(os.environ.get("SLYSH_ENGINE_CONNECT_TIMEOUT", "5"))
+ENGINE_CONTROL_TIMEOUT_S = float(os.environ.get("SLYSH_ENGINE_CONTROL_TIMEOUT", "10"))
+ENGINE_TRANSCRIBE_TIMEOUT_S = float(
+    os.environ.get("SLYSH_ENGINE_TRANSCRIBE_TIMEOUT", "7200")
+)
+
 
 class EngineError(Exception):
     """Raised when the engine HTTP API returns an error body."""
@@ -30,9 +36,10 @@ def _error_message(exc: HTTPError) -> str:
     return raw.strip() or str(exc)
 
 
-def _get(base_url: str, path: str) -> dict:
+def _get(base_url: str, path: str, *, timeout: float | None = None) -> dict:
     req = Request(_url(base_url, path), headers=engine_auth_headers())
-    with urlopen(req, timeout=30) as resp:
+    connect_timeout = timeout if timeout is not None else ENGINE_CONNECT_TIMEOUT_S
+    with urlopen(req, timeout=connect_timeout) as resp:
         return json.loads(resp.read().decode("utf-8"))
 
 
@@ -52,8 +59,9 @@ def _post(
         headers=headers,
         method="POST",
     )
+    effective = timeout if timeout is not None else ENGINE_CONTROL_TIMEOUT_S
     try:
-        with urlopen(req, timeout=timeout) as resp:
+        with urlopen(req, timeout=effective) as resp:
             return json.loads(resp.read().decode("utf-8"))
     except HTTPError as exc:
         raise EngineError(_error_message(exc)) from exc
@@ -80,15 +88,25 @@ def transcribe_file(
         payload["start_ms"] = start_ms
     if end_ms is not None:
         payload["end_ms"] = end_ms
-    return _post(base_url, "/transcribe_file", payload)
+    return _post(
+        base_url,
+        "/transcribe_file",
+        payload,
+        timeout=ENGINE_TRANSCRIBE_TIMEOUT_S,
+    )
 
 
 def transcribe_chunk(base_url: str, samples: list[float]) -> dict:
-    return _post(base_url, "/transcribe_chunk", {"samples": samples})
+    return _post(
+        base_url,
+        "/transcribe_chunk",
+        {"samples": samples},
+        timeout=ENGINE_CONTROL_TIMEOUT_S,
+    )
 
 
 def cancel(base_url: str) -> dict:
-    return _post(base_url, "/cancel")
+    return _post(base_url, "/cancel", timeout=ENGINE_CONTROL_TIMEOUT_S)
 
 
 def label_speakers(

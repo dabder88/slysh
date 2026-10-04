@@ -95,11 +95,19 @@
 
 ## Волна H (чеклист, детали в plan-fix-2 §4–8)
 
+Порядок: **H1 (R11)** → **H2 (R13–R14)** → **H3 (R10)** → **H4 (R09)** → **H5 (R15)**.
+
+### H1 — R11: таймауты UI/engine (в работе)
+
+- **Файлы:** `app.py` (ожидание uvicorn ≤30 с), `engine_client.py` (connect 5 с, control 10 с, transcribe отдельно).
+- **Тесты:** `test_engine_client_timeout.py`.
+- **Дальше:** watchdog прогресса ASR (env), join engine при выходе — отдельная итерация.
+
 | Rxx | Кратко |
 |-----|--------|
 | R09 | Offline bootstrap, wheelhouse, WebView2 full runtime (E.6) |
 | R10 | Streaming decode, bounded RAM live |
-| R11 | Engine/UI timeouts |
+| R11 | Engine/UI timeouts — см. H1 |
 | R13 | Updates: operation id, re-hash перед apply |
 | R14 | Payload staging, fail-safe сборка |
 | R15 | VM matrix, 10+ min devices, WebView E2E |

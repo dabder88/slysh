@@ -543,7 +543,12 @@ def main() -> None:
     server = uvicorn.Server(config)
     thread = threading.Thread(target=server.run, daemon=True)
     thread.start()
+    ui_start_deadline = time.monotonic() + 30.0
     while not server.started:
+        if not thread.is_alive():
+            raise RuntimeError("UI server thread exited before bind")
+        if time.monotonic() > ui_start_deadline:
+            raise RuntimeError("UI server start timed out after 30s")
         time.sleep(0.05)
     port = server.servers[0].sockets[0].getsockname()[1]
     api = JsApi()
