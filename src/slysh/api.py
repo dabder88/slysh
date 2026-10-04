@@ -57,7 +57,7 @@ from slysh.cuda_fallback import format_job_asr_error
 from slysh.engine_auth import ENGINE_TOKEN_ENV
 from slysh.loopback_security import install_loopback_guards, production_openapi_disabled
 from slysh.media_access import resolve_job_media_path
-from slysh.decode import decode_pcm_16k_mono
+from slysh.decode import DecodeCancelledError, decode_pcm_16k_mono
 from slysh.db import Database, SegmentsRevisionConflictError
 from slysh.engine_client import EngineError, cancel as engine_cancel
 from slysh.engine_client import health as engine_health
@@ -1133,10 +1133,30 @@ def _run_engine_job(
         run_id = job_run_id(db, job_id)
         if not job_run_active(db, job_id, run_id):
             return
-        pcm, _sr = decode_pcm_16k_mono(source_path)
-        pcm, offset_ms = slice_pcm_range(
-            pcm, job.get("range_start_ms"), job.get("range_end_ms")
-        )
+        range_start = job.get("range_start_ms")
+        range_end = job.get("range_end_ms")
+
+        def decode_cancelled() -> bool:
+            return not job_run_active(db, job_id, run_id) or _engine_job_cancelled(
+                db, job_id
+            )
+
+        try:
+            pcm, _sr = decode_pcm_16k_mono(
+                source_path,
+                start_ms=range_start,
+                end_ms=range_end,
+                cancelled=decode_cancelled,
+            )
+        except DecodeCancelledError:
+            if _engine_job_cancelled(db, job_id):
+                return
+            db.set_status(job_id, JobStatus.CANCELLED)
+            return
+        if range_start is not None or range_end is not None:
+            offset_ms = max(0, int(range_start or 0))
+        else:
+            pcm, offset_ms = slice_pcm_range(pcm, None, None)
         baseline = progress_baseline_fraction(
             len(pcm), int(offset_ms or 0), resume_ms
         )

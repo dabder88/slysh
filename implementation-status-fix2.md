@@ -4,7 +4,7 @@
 
 **Легенда:** ✅ готово · 🟡 частично · 🔵 в работе · ⬜ не начато · ⏭️ отложено / вне scope
 
-**Baseline аудита:** `2f19be8`. **Последнее обновление:** 2026-10-04 (§5 secrets lock, R13 redirect validate).
+**Baseline аудита:** `2f19be8`. **Последнее обновление:** 2026-10-04 (R10 memmap + engine decode cancel).
 
 ---
 
@@ -43,7 +43,7 @@
 | §5.2 | secrets_dpapi | ✅ file lock + `mutate_secrets`, concurrent pytest |
 | §5.1 | Gemini CLI | 🟡 `_assert_safe_gemini_cmd` + pytest |
 | §5.3 | ASR snapshot | ✅ `asr_model_id` / `job_asr_snapshot`, resume |
-| H3 | R10 | 🟡 cancel ✅; большие PCM → memmap (`SLYSH_DECODE_MEMMAP_BYTES`) |
+| H3 | R10 | 🟡 memmap + cancel decode в engine job; очередь → `cancelled` |
 | §5.4 | COM pytest | 🟡 `conftest` sessionfinish + WASAPI `_ComApartment` |
 | H5 | R15 (полная) | 🔵 subset: `run_plan_fix2_targeted_tests.ps1`, `smoke_cloud_batch` в CI |
 

@@ -4,7 +4,7 @@
 
 **Легенда:** ✅ готово · 🟡 частично · 🔵 в работе / не в git · ⬜ не начато · ⏭️ отложено
 
-**Последнее обновление:** 2026-10-02 — `PRODUCT_OUT_OF_SCOPE.md`; F ✅; план без подписи/автообнов/legal/models-mandatory.
+**Последнее обновление:** 2026-10-04 — волна **G** plan-fix-2 ✅; волна **H** в работе — см. [`implementation-status-fix2.md`](implementation-status-fix2.md).
 
 ---
 
@@ -24,13 +24,13 @@
 
 ## Следующий крупный этап (план агента)
 
-**Активно:** волна **G** plan-fix-2 — [`implementation-order-fix2.md`](implementation-order-fix2.md) · [`implementation-status-fix2.md`](implementation-status-fix2.md) (R01–R07, R12, R05; R08 вне scope; R09+ → волна H).
+**Активно:** волна **H** plan-fix-2 — [`implementation-order-fix2.md`](implementation-order-fix2.md) · [`implementation-status-fix2.md`](implementation-status-fix2.md) (G ✅ `32ba4e8`; H: R11, R10, R13–R14, R09, R15 subset).
 
 | Блок | ID | Содержание |
 |------|-----|------------|
-| **1** | G | Критический минимум plan-fix-2 (данные, хвост, coordinator, auth/secrets) |
-| **2** | E / H | E.6 VM offline; R09–R14 после G |
-| **3** | — | Опционально: B.4.4 (10+ мин live manual) |
+| **1** | G | ✅ Критический минимум plan-fix-2 |
+| **2** | H | Таймауты/watchdog, decode/memmap, updates, offline bootstrap, приёмка subset |
+| **3** | — | VM E6 журнал, B.4.4 (10+ мин live), WebView E2E — вручную |
 
 D.1–D.6 закрыты (таблица D). Волна **F** закрыта по пунктам F.1–F.5.
 

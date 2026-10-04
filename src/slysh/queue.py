@@ -22,8 +22,8 @@ def _error_message(exc: BaseException) -> str:
     return str(exc)
 
 
-def _default_decode(path: str):
-    pcm, _sr = decode_pcm_16k_mono(path)
+def _default_decode(path: str, **kwargs):
+    pcm, _sr = decode_pcm_16k_mono(path, **kwargs)
     return pcm
 
 

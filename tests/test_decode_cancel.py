@@ -48,6 +48,22 @@ def test_decode_cancel_stops_ffmpeg(monkeypatch, tmp_path):
     assert proc.terminated
 
 
+def test_queue_default_decode_forwards_cancel(monkeypatch):
+    from slysh.queue import _default_decode
+
+    seen: list[object] = []
+
+    def fake_decode(path, **kwargs):
+        seen.append(kwargs.get("cancelled"))
+        arr = __import__("numpy").zeros(8, dtype=__import__("numpy").float32)
+        return arr, 16000
+
+    monkeypatch.setattr("slysh.queue.decode_pcm_16k_mono", fake_decode)
+    flag = {"v": False}
+    _default_decode("p", cancelled=lambda: flag["v"], start_ms=0, end_ms=1000)
+    assert seen and callable(seen[0])
+
+
 def test_pipeline_cancel_during_decode(monkeypatch, tmp_path):
     wav = tmp_path / "f.wav"
     sf.write(wav, np.zeros(8000, dtype=np.float32), 16000)
