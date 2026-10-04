@@ -4,7 +4,15 @@ from __future__ import annotations
 import json
 from types import SimpleNamespace
 
-from slysh.gemini_cli import transcribe_gemini_file
+import pytest
+
+from slysh.gemini_cli import _assert_safe_gemini_cmd, transcribe_gemini_file
+from slysh.remote_asr import RemoteAsrError
+
+
+def test_assert_safe_gemini_cmd_rejects_yolo():
+    with pytest.raises(RemoteAsrError):
+        _assert_safe_gemini_cmd(["gemini", "--approval-mode", "yolo"])
 
 
 def test_gemini_cli_cmd_has_no_yolo(tmp_path):

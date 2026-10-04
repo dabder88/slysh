@@ -116,6 +116,11 @@ from slysh.providers import (
     upsert_custom_provider,
 )
 from slysh.http_proxy import public_proxy_config, save_proxy_config
+from slysh.job_asr_snapshot import (
+    begin_file_transcription,
+    job_uses_remote_asr,
+    model_for_job,
+)
 from slysh.remote_asr import (
     RemoteAsrError,
     fetch_openrouter_stt_models,
@@ -1315,12 +1320,13 @@ def _run_file_asr_job(
     *,
     reset_segments: bool = True,
 ) -> None:
-    if not _selected_asr_is_remote() and is_cloud_only():
+    job = db.get_job(job_id) or {}
+    if not job_uses_remote_asr(job) and is_cloud_only():
         message = _selected_asr_preflight_error() or CLOUD_ONLY_ENGINE_MSG
         db.set_error(job_id, message)
         db.set_status(job_id, JobStatus.FAILED)
         return
-    if _selected_asr_is_remote():
+    if job_uses_remote_asr(job):
         coord: AsrCoordinator = app.state.asr_coordinator
         if not coord.begin_remote_wait(job_id):
             db.set_error(job_id, "Не удалось дождаться облачного исполнителя.")
@@ -1371,7 +1377,8 @@ def _run_remote_job(
         if resume_ms is None:
             db.set_progress(job_id, 0)
             db.replace_segments(job_id, [])
-    selected = _selected_model()
+    job = db.get_job(job_id) or {}
+    selected = model_for_job(job)
     if selected is None or selected.backend not in REMOTE_BACKENDS:
         db.set_error(job_id, "Облачная модель не выбрана.")
         db.set_status(job_id, JobStatus.FAILED)
@@ -1440,7 +1447,8 @@ def _start_asr_job(
     *,
     reset_segments: bool = True,
 ) -> None:
-    if _selected_asr_is_remote():
+    job = db.get_job(job_id) or {}
+    if job_uses_remote_asr(job):
         _schedule_remote_job(
             app, db, job_id, source_path, reset_segments=reset_segments
         )
@@ -2528,7 +2536,7 @@ def create_ui_app(
             db.set_status(job_id, JobStatus.FAILED)
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         _require_asr_ready()
-        db.begin_transcription(job_id)
+        begin_file_transcription(db, job_id)
         _start_asr_job(app, db, job_id, str(source), reset_segments=True)
         return _decorate_job(app, _job_payload(_require_job(db, job_id)))
 
@@ -2553,7 +2561,7 @@ def create_ui_app(
         resume = should_resume_file_job(
             job.get("status"), db.list_segments(job_id)
         )
-        db.begin_transcription(job_id, reset_progress=not resume)
+        begin_file_transcription(db, job_id, reset_progress=not resume)
         _start_asr_job(
             app, db, job_id, str(source), reset_segments=not resume
         )

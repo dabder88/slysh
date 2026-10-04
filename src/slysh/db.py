@@ -122,6 +122,10 @@ class Database:
             self._conn.execute(
                 "ALTER TABLE jobs ADD COLUMN segments_revision INTEGER NOT NULL DEFAULT 0"
             )
+        if "asr_model_id" not in cols:
+            self._conn.execute("ALTER TABLE jobs ADD COLUMN asr_model_id TEXT")
+        if "asr_backend" not in cols:
+            self._conn.execute("ALTER TABLE jobs ADD COLUMN asr_backend TEXT")
         batch_cols = {row[1] for row in self._conn.execute("PRAGMA table_info(batches)")}
         if "archived" not in batch_cols:
             self._conn.execute(
@@ -555,6 +559,19 @@ class Database:
                 "UPDATE jobs SET status = ? WHERE id = ?",
                 (status.value, job_id),
             )
+        self._conn.commit()
+
+    @_locked
+    def set_job_asr_snapshot(
+        self, job_id: int, model_id: str, backend: str
+    ) -> None:
+        self._conn.execute(
+            """
+            UPDATE jobs SET asr_model_id = ?, asr_backend = ?
+            WHERE id = ?
+            """,
+            (str(model_id or "").strip(), str(backend or "").strip(), job_id),
+        )
         self._conn.commit()
 
     @_locked

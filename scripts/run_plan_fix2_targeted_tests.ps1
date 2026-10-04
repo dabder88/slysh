@@ -27,6 +27,8 @@ $PyTests = @(
     "tests/test_updates_redirect.py",
     "tests/test_updates_sha.py",
     "tests/test_offline_bootstrap.py",
+    "tests/test_job_asr_snapshot.py",
+    "tests/test_gemini_cli.py",
     "tests/test_decode_cancel.py",
     "tests/test_webview2_redist.py"
 )

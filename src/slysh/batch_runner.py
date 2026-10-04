@@ -310,7 +310,9 @@ def start_batch(
                         return
                     continue
 
-                db.begin_transcription(job_id)
+                from slysh.job_asr_snapshot import begin_file_transcription
+
+                begin_file_transcription(db, job_id)
                 try:
                     current = db.get_job(job_id) or {}
                     if current.get("status") == JobStatus.CANCELLED.value:

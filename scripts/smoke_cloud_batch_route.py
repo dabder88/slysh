@@ -53,14 +53,21 @@ def main() -> int:
 
     from unittest.mock import patch
 
-    db.begin_transcription(job_id)
+    from slysh.job_asr_snapshot import begin_file_transcription
+
     try:
         with (
             patch.object(api_mod, "is_cloud_only", lambda: True),
             patch.object(api_mod, "_selected_model", lambda: remote),
+            patch.object(api_mod, "job_uses_remote_asr", lambda _job: True),
             patch.object(api_mod, "_ensure_engine_url", fail_engine),
             patch.object(api_mod, "_run_remote_job", complete),
+            patch(
+                "slysh.job_asr_snapshot.current_asr_model",
+                lambda: remote,
+            ),
         ):
+            begin_file_transcription(db, job_id)
             _run_file_asr_job(app, db, job_id, str(wav))
     except Exception as exc:
         return _fail(str(exc))
