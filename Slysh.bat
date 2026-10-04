@@ -38,7 +38,7 @@ goto :start
 :ensure_venv
 if exist "%ROOT%\bin\uv.exe" (
     if exist "%ROOT%\wheelhouse\*.whl" (
-        "%ROOT%\bin\uv.exe" sync --find-links "%ROOT%\wheelhouse" --offline
+        "%ROOT%\bin\uv.exe" sync --no-editable --find-links "%ROOT%\wheelhouse" --offline
     ) else (
         "%ROOT%\bin\uv.exe" sync
     )

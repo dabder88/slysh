@@ -685,13 +685,43 @@ static int remove_venv_dir(const wchar_t *root) {
     return !path_is_directory(venv);
 }
 
+static int wheelhouse_has_wheels(const wchar_t *root) {
+    wchar_t dir[MAX_PATH * 2];
+    wchar_t pattern[MAX_PATH * 2];
+    WIN32_FIND_DATAW fd;
+    HANDLE h;
+
+    if (!PathCombineW(dir, root, L"wheelhouse"))
+        return 0;
+    if (!path_is_directory(dir))
+        return 0;
+    if (swprintf_s(pattern, sizeof(pattern) / sizeof(pattern[0]), L"%ls\\*.whl", dir) < 0)
+        return 0;
+    h = FindFirstFileW(pattern, &fd);
+    if (h == INVALID_HANDLE_VALUE)
+        return 0;
+    FindClose(h);
+    return 1;
+}
+
 static int run_uv_sync(const wchar_t *root, DWORD *exit_code) {
     wchar_t uv[MAX_PATH * 2];
-    wchar_t cmdline[512];
+    wchar_t wheelhouse[MAX_PATH * 2];
+    wchar_t cmdline[2048];
 
     if (!PathCombineW(uv, root, L"bin\\uv.exe") || !path_exists(uv))
         return 0;
-    swprintf_s(cmdline, sizeof(cmdline) / sizeof(cmdline[0]), L"\"%s\" sync", uv);
+    if (wheelhouse_has_wheels(root)) {
+        if (!PathCombineW(wheelhouse, root, L"wheelhouse"))
+            return 0;
+        swprintf_s(cmdline,
+                   sizeof(cmdline) / sizeof(cmdline[0]),
+                   L"\"%ls\" sync --no-editable --find-links \"%ls\" --offline",
+                   uv,
+                   wheelhouse);
+    } else {
+        swprintf_s(cmdline, sizeof(cmdline) / sizeof(cmdline[0]), L"\"%ls\" sync", uv);
+    }
     return run_process_wait(uv, cmdline, root, exit_code, 1);
 }
 
@@ -755,9 +785,15 @@ static int ensure_venv(const wchar_t *root) {
     if (!run_uv_sync(root, &code) || code != 0) {
         splash_hide();
         write_venv_repair_error(root, code, 0);
-        show_error(L"Slysh",
-                   L"Не удалось восстановить окружение (uv sync).\n"
-                   L"Проверьте интернет и переустановите Slysh.");
+        if (wheelhouse_has_wheels(root)) {
+            show_error(L"Slysh",
+                       L"Не удалось восстановить окружение из локального wheelhouse.\n"
+                       L"Переустановите Slysh или запустите Slysh.bat из папки программы.");
+        } else {
+            show_error(L"Slysh",
+                       L"Не удалось восстановить окружение (uv sync).\n"
+                       L"Проверьте интернет и переустановите Slysh.");
+        }
         return 0;
     }
 

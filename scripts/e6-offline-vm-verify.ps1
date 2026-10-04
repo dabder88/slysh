@@ -151,6 +151,7 @@ try {
         }
         $syncArgs = @(
             "sync",
+            "--no-editable",
             "--find-links", $Wheelhouse,
             "--offline",
             "--no-progress"

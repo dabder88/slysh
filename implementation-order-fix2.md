@@ -97,6 +97,11 @@
 
 Порядок: **H1 (R11)** → **H2 (R13–R14)** → **H3 (R10)** → **H4 (R09)** → **H5 (R15)**.
 
+### H4 — R09: offline UI bootstrap (в работе)
+
+- **Сделано:** `Slysh.c` + `Slysh.bat` — `uv sync --no-editable --find-links wheelhouse --offline`; `offline_bootstrap.py`, `test_offline_bootstrap.py`.
+- **Осталось:** полный offline WebView2 fixed runtime в Setup; VM-матрица E6 с сетью off до Setup.
+
 ### H3 — R10: decode cancel + bounded live pending
 
 - **Файлы:** `decode.py` (Popen → temp PCM, `-ss`/`-t`, `DecodeCancelledError`), `transcribe.py`, `engine_server.py`, `live_buffer.py`, `api.py`.
