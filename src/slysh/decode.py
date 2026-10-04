@@ -221,24 +221,24 @@ def remote_file_chunk_ms() -> int:
     return DEFAULT_REMOTE_FILE_CHUNK_MS
 
 
-def _copy_media_to_ascii_temp(source: Path) -> str:
-    suffix = source.suffix if source.suffix else ".bin"
-    fd, tmp = tempfile.mkstemp(prefix="gigaam_", suffix=suffix)
-    os.close(fd)
-    shutil.copyfile(source, tmp)
-    return tmp
-
-
 def media_duration_ms(path: str) -> int:
+    source = Path(path)
+    if not source.is_file():
+        raise DecodeError(f"{FILE_UNREADABLE_MESSAGE} {path}")
     ffmpeg = find_ffmpeg()
     if not ffmpeg:
         raise DecodeError(FFMPEG_MISSING_MESSAGE)
-    result = subprocess.run(
-        [ffmpeg, "-hide_banner", "-nostdin", "-i", path, "-f", "null", "-"],
-        capture_output=True,
-        check=False,
-        **_ffmpeg_kwargs(),
-    )
+    media_input, media_tmp = _prepare_media_input(source)
+    try:
+        result = subprocess.run(
+            [ffmpeg, "-hide_banner", "-nostdin", "-i", media_input, "-f", "null", "-"],
+            capture_output=True,
+            check=False,
+            **_ffmpeg_kwargs(),
+        )
+    finally:
+        if media_tmp:
+            _safe_unlink(media_tmp)
     text = (result.stderr or b"").decode("utf-8", errors="replace")
     match = _DURATION_RE.search(text)
     if not match:
@@ -264,30 +264,29 @@ def extract_stt_mp3(
     if not out:
         fd, out = tempfile.mkstemp(prefix="gigaam_stt_", suffix=".mp3")
         os.close(fd)
-    tmp = _copy_media_to_ascii_temp(source)
+    media_input, media_tmp = _prepare_media_input(source)
     cmd = [ffmpeg, "-hide_banner", "-nostdin", "-loglevel", "error", "-y"]
     if start_ms is not None and start_ms > 0:
         cmd.extend(["-ss", f"{start_ms / 1000:.3f}"])
-    cmd.extend(["-i", tmp])
+    cmd.extend(["-i", media_input])
     if end_ms is not None:
         begin = 0 if start_ms is None else max(0, start_ms)
         duration_ms = max(0, int(end_ms) - begin)
         cmd.extend(["-t", f"{duration_ms / 1000:.3f}"])
     cmd.extend(["-vn", "-ac", "1", "-ar", "16000", "-b:a", "48k", out])
     try:
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            check=False,
-            **_ffmpeg_kwargs(),
-        )
-    except FileNotFoundError as exc:
-        raise DecodeError(FFMPEG_MISSING_MESSAGE) from exc
-    finally:
         try:
-            os.remove(tmp)
-        except OSError:
-            pass
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                check=False,
+                **_ffmpeg_kwargs(),
+            )
+        except FileNotFoundError as exc:
+            raise DecodeError(FFMPEG_MISSING_MESSAGE) from exc
+    finally:
+        if media_tmp:
+            _safe_unlink(media_tmp)
     if result.returncode != 0 or not Path(out).is_file() or Path(out).stat().st_size == 0:
         try:
             os.remove(out)
