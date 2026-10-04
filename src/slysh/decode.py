@@ -104,6 +104,26 @@ def _wait_ffmpeg(
         time.sleep(poll_s)
 
 
+def _needs_media_temp_copy(source: Path) -> bool:
+    """Windows ffmpeg needs an ASCII path for some containers; Cyrillic → temp copy."""
+    try:
+        str(source).encode("ascii")
+    except UnicodeEncodeError:
+        return True
+    return False
+
+
+def _prepare_media_input(source: Path) -> tuple[str, str | None]:
+    """Return ffmpeg input path and optional temp file to delete after decode."""
+    if not _needs_media_temp_copy(source):
+        return str(source), None
+    suffix = source.suffix if source.suffix else ".bin"
+    fd, tmp = tempfile.mkstemp(prefix="gigaam_", suffix=suffix)
+    os.close(fd)
+    shutil.copyfile(source, tmp)
+    return tmp, tmp
+
+
 def _ffmpeg_pcm_cmd(
     ffmpeg: str,
     input_path: str,
@@ -133,9 +153,8 @@ def decode_pcm_16k_mono(
 ) -> tuple[np.ndarray, int]:
     """Decode audio/video to 16 kHz mono float32 PCM via ffmpeg.
 
-    Copies the source to a short ASCII temp path first so Windows ffmpeg can
-    both open Cyrillic filenames and seek inside webm/mp4 containers.
-    Writes PCM to a temp file (not capture_output) so cancel can stop ffmpeg.
+    Non-ASCII paths are copied to a temp file for Windows ffmpeg; ASCII paths
+    are read in place (range via -ss/-t). PCM goes to a temp file for cancel.
     """
     source = Path(path)
     if not source.is_file():
@@ -145,16 +164,14 @@ def decode_pcm_16k_mono(
     if not ffmpeg:
         raise DecodeError(FFMPEG_MISSING_MESSAGE)
 
-    suffix = source.suffix if source.suffix else ".bin"
-    fd, tmp = tempfile.mkstemp(prefix="gigaam_", suffix=suffix)
-    os.close(fd)
     fd_pcm, pcm_path = tempfile.mkstemp(prefix="gigaam_pcm_", suffix=".f32le")
     os.close(fd_pcm)
+    media_tmp: str | None = None
     try:
-        shutil.copyfile(source, tmp)
+        media_input, media_tmp = _prepare_media_input(source)
         cmd = _ffmpeg_pcm_cmd(
             ffmpeg,
-            tmp,
+            media_input,
             pcm_path,
             start_ms=start_ms,
             end_ms=end_ms,
@@ -181,7 +198,8 @@ def decode_pcm_16k_mono(
             raise DecodeError(DECODE_FAILED_MESSAGE)
         return pcm, 16000
     finally:
-        _safe_unlink(tmp)
+        if media_tmp:
+            _safe_unlink(media_tmp)
 
 
 _DURATION_RE = re.compile(
