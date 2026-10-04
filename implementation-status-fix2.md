@@ -41,7 +41,8 @@
 | H4 | R09 | 🟡 UI venv/wheelhouse ✅; WebView2 standalone в Setup ⏭️ владелец |
 | H2 | R13–R14 | ✅ + redirect allowlist, download без Bearer |
 | §5.2 | secrets_dpapi | ✅ lock + concurrent pytest; corrupt read → `SecretsStoreReadError` |
-| §5.1 | Gemini CLI | 🟡 `_assert_safe_gemini_cmd` + pytest |
+| §5.1 | Gemini CLI | 🟡 cwd isolate + block yolo/tools/abs `@path`; pytest |
+| H5 | R15 (Setup) | 🟡 subset tests; локальный `dist\Slysh-Setup.exe` 2026-10-04 22:06 |
 | §5.3 | ASR snapshot | ✅ `asr_model_id` / `job_asr_snapshot`, resume |
 | H3 | R10 | 🟡 memmap, cancel, live ring buffer; ASCII path — decode без копии источника |
 | §5.4 | COM pytest | 🟡 `conftest` sessionfinish + WASAPI `_ComApartment` |

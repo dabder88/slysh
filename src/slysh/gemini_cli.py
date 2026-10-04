@@ -32,10 +32,28 @@ def _ffmpeg_hidden_kwargs() -> dict:
     return kwargs
 
 
+_DISALLOWED_GEMINI_CMD_MARKERS = (
+    "yolo",
+    "--approval-mode",
+    "--allowed-tools",
+    "--include-directories",
+)
+
+
 def _assert_safe_gemini_cmd(cmd: list[str]) -> None:
     flat = " ".join(str(part) for part in cmd).lower()
-    if "yolo" in flat or "--approval-mode" in flat:
-        raise RemoteAsrError("Gemini CLI: недопустимый режим approval-mode.")
+    for marker in _DISALLOWED_GEMINI_CMD_MARKERS:
+        if marker in flat:
+            raise RemoteAsrError(
+                "Gemini CLI: недопустимый аргумент (ограниченный режим Slysh)."
+            )
+    for part in cmd:
+        text = str(part)
+        for ref in re.findall(r"@([^\s\"']+)", text):
+            if "/" in ref or "\\" in ref or ":" in ref or ref.startswith("."):
+                raise RemoteAsrError(
+                    "Gemini CLI: допускается только @имя_файла в рабочей папке."
+                )
 
 
 def parse_gemini_output(raw: str, duration_ms: int) -> list[Segment]:

@@ -15,6 +15,16 @@ def test_assert_safe_gemini_cmd_rejects_yolo():
         _assert_safe_gemini_cmd(["gemini", "--approval-mode", "yolo"])
 
 
+def test_assert_safe_gemini_cmd_rejects_allowed_tools():
+    with pytest.raises(RemoteAsrError):
+        _assert_safe_gemini_cmd(["gemini", "-p", "x", "--allowed-tools", "run_shell"])
+
+
+def test_assert_safe_gemini_cmd_rejects_absolute_at_path():
+    with pytest.raises(RemoteAsrError):
+        _assert_safe_gemini_cmd(["gemini", "-p", "transcribe @C:\\secret\\audio.wav"])
+
+
 def test_gemini_cli_cmd_has_no_yolo(tmp_path):
     audio = tmp_path / "a.wav"
     audio.write_bytes(b"x")
