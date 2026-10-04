@@ -49,3 +49,38 @@ def test_decode_ascii_path_skips_source_copy(monkeypatch, tmp_path):
     assert sr == 16000
     assert len(pcm) == 16000
     assert copied == []
+
+
+def test_decode_range_passes_ss_before_input(monkeypatch, tmp_path):
+    wav = tmp_path / "long.wav"
+    sf.write(wav, np.zeros(32000, dtype=np.float32), 16000)
+    fake = tmp_path / "ffmpeg.exe"
+    fake.write_bytes(b"x")
+    monkeypatch.setenv("FFMPEG_BINARY", str(fake))
+    monkeypatch.setattr("slysh.decode._needs_media_temp_copy", lambda _p: False)
+
+    commands: list[list[str]] = []
+
+    class _Proc:
+        returncode = 0
+
+        def poll(self):
+            return 0
+
+        @property
+        def stderr(self):
+            return None
+
+    def fake_popen(cmd, **kwargs):
+        commands.append(list(cmd))
+        Path(cmd[-1]).write_bytes(b"\x00" * (16000 * 4))
+        return _Proc()
+
+    monkeypatch.setattr("slysh.decode.subprocess.Popen", fake_popen)
+    decode_pcm_16k_mono(str(wav), start_ms=5000, end_ms=15000)
+    cmd = commands[0]
+    ss_at = cmd.index("-ss")
+    i_at = cmd.index("-i")
+    assert ss_at < i_at
+    assert cmd[ss_at + 1] == "5.000"
+    assert cmd[cmd.index("-t") + 1] == "10.000"
