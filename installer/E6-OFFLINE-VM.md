@@ -29,7 +29,7 @@ powershell -File scripts\e6-offline-vm-verify.ps1 -InstallRoot dist\payload -Req
 |-----|----------|
 | 1 | Снапшот «чистая» Win10 22H2 или Win11 23H2+, x64, обычный пользователь (не обязательно админ после Setup) |
 | 2 | Убедиться: нет Python в PATH, нет `uv`, нет `ffmpeg` в PATH |
-| 3 | Скопировать `dist\Slysh-Setup.exe` и `scripts\e6-offline-vm-verify.ps1` (USB / shared folder) |
+| 3 | На машине сборки: `powershell -File scripts\write_setup_acceptance_record.ps1` → JSON в `dist\acceptance\`; скопировать Setup, JSON и `scripts\e6-offline-vm-verify.ps1` на VM |
 | 4 | Установить Slysh (путь по сценарию — см. матрицу) |
 | 5 | **Отключить сеть** (адаптер VM или «Airplane mode») |
 | 6 | Запустить проверку (см. ниже) |
