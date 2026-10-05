@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from slysh.db import Database
+from slysh.job_media_duration import refresh_media_duration
 from slysh.decode import decode_pcm_16k_mono
 from slysh.models import JobStatus
 from slysh.transcribe import FilePipeline
@@ -63,3 +64,4 @@ class JobQueue:
                 continue
             self.db.replace_segments(job_id, segs)
             self.db.set_status(job_id, JobStatus.COMPLETED)
+            refresh_media_duration(self.db, job_id)

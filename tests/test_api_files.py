@@ -256,6 +256,31 @@ def test_job_runs_when_engine_url_set(tmp_path, monkeypatch):
     assert job.get("duration_s") is not None
 
 
+def test_job_api_duration_s_is_media_processing_s_is_wall_clock(tmp_path):
+    db = Database(tmp_path / "app.db")
+    job_id = db.create_job(JobKind.FILE, str(tmp_path / "talk.wav"))
+    db.replace_segments(job_id, [Segment(0, 120_000, "фраза")])
+    db._conn.execute(
+        """
+        UPDATE jobs
+        SET status = ?, started_at = ?, finished_at = ?
+        WHERE id = ?
+        """,
+        (
+            JobStatus.COMPLETED.value,
+            "2026-01-01T10:00:00+00:00",
+            "2026-01-01T10:00:30+00:00",
+            job_id,
+        ),
+    )
+    db._conn.commit()
+    app = create_ui_app(db=db, engine=None)
+    client = TestClient(app)
+    job = client.get(f"/api/jobs/{job_id}").json()
+    assert job["duration_s"] == 120.0
+    assert job["processing_s"] == 30.0
+
+
 def test_spawn_failure_marks_job_failed(tmp_path, monkeypatch):
     _use_local_engine_asr(monkeypatch)
 

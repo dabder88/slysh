@@ -143,20 +143,20 @@ export function jobStatusLabel(job) {
     }
     return t("jobStatus.runningSpeakers", { wait });
   }
+  const processingWait =
+    job.processing_s != null ? ` · ${formatDuration(job.processing_s)}` : "";
   if ((job.status === "queued" || job.status === "running") && job.engine_starting) {
-    const wait = job.duration_s != null ? ` · ${formatDuration(job.duration_s)}` : "";
-    return t("jobStatus.engineStarting", { wait });
+    return t("jobStatus.engineStarting", { wait: processingWait });
+  }
+  if (job.status === "queued") {
+    const base = baseJobStatusLabel(job.status);
+    return processingWait ? `${base}${processingWait}` : base;
   }
   if (job.status === "running") {
     const pct = Math.round(Number(job.progress || 0) * 100);
-    const wait = job.duration_s != null ? ` · ${formatDuration(job.duration_s)}` : "";
-    return t("jobStatus.runningPct", { pct, wait });
+    return t("jobStatus.runningPct", { pct, wait: processingWait });
   }
-  const base = baseJobStatusLabel(job.status);
-  if (job.status === "completed" && job.duration_s != null) {
-    return `${base} · ${formatDuration(job.duration_s)}`;
-  }
-  return base;
+  return baseJobStatusLabel(job.status);
 }
 
 export function hasActiveLibraryJobs(list) {

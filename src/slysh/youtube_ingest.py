@@ -466,3 +466,6 @@ def run_youtube_job(
     report(0.95)
     report(1.0)
     db.set_status(job_id, JobStatus.COMPLETED)
+    from slysh.job_media_duration import refresh_media_duration
+
+    refresh_media_duration(db, job_id)

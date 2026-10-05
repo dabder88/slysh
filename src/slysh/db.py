@@ -126,6 +126,8 @@ class Database:
             self._conn.execute("ALTER TABLE jobs ADD COLUMN asr_model_id TEXT")
         if "asr_backend" not in cols:
             self._conn.execute("ALTER TABLE jobs ADD COLUMN asr_backend TEXT")
+        if "media_duration_s" not in cols:
+            self._conn.execute("ALTER TABLE jobs ADD COLUMN media_duration_s REAL")
         batch_cols = {row[1] for row in self._conn.execute("PRAGMA table_info(batches)")}
         if "archived" not in batch_cols:
             self._conn.execute(
@@ -356,12 +358,39 @@ class Database:
         ).fetchall()
         return {int(row["job_id"]): int(row["speaker_count"]) for row in rows}
 
+    def _segment_max_end_ms_map(self, job_ids: list[int]) -> dict[int, int]:
+        if not job_ids:
+            return {}
+        placeholders = ",".join("?" * len(job_ids))
+        rows = self._conn.execute(
+            f"""
+            SELECT job_id, MAX(end_ms) AS max_end
+            FROM segments
+            WHERE job_id IN ({placeholders})
+            GROUP BY job_id
+            """,
+            job_ids,
+        ).fetchall()
+        out: dict[int, int] = {}
+        for row in rows:
+            if row["max_end"] is not None:
+                out[int(row["job_id"])] = int(row["max_end"])
+        return out
+
     def _with_speaker_stats(self, jobs: list[dict]) -> list[dict]:
-        counts = self._speaker_stats_map([int(job["id"]) for job in jobs])
+        if not jobs:
+            return jobs
+        job_ids = [int(job["id"]) for job in jobs]
+        counts = self._speaker_stats_map(job_ids)
+        max_ends = self._segment_max_end_ms_map(job_ids)
         for job in jobs:
-            n = counts.get(int(job["id"]), 0)
+            jid = int(job["id"])
+            n = counts.get(jid, 0)
             job["speaker_count"] = n
             job["has_speakers"] = n > 0
+            max_end = max_ends.get(jid)
+            if max_end is not None:
+                job["segment_max_end_ms"] = max_end
         return jobs
 
     @_locked
@@ -879,6 +908,14 @@ class Database:
         self._conn.execute(
             "UPDATE jobs SET progress = ? WHERE id = ?",
             (progress, job_id),
+        )
+        self._conn.commit()
+
+    @_locked
+    def set_media_duration_s(self, job_id: int, seconds: float) -> None:
+        self._conn.execute(
+            "UPDATE jobs SET media_duration_s = ? WHERE id = ?",
+            (float(seconds), job_id),
         )
         self._conn.commit()
 

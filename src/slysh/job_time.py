@@ -16,6 +16,7 @@ def _parse_iso(value: str | None) -> datetime | None:
 
 
 def job_duration_s(job: dict, now: datetime | None = None) -> float | None:
+    """Wall-clock transcribe/processing time (started_at → finished_at or now)."""
     start = _parse_iso(job.get("started_at"))
     if start is None:
         return None

@@ -79,6 +79,7 @@ from slysh.job_resume import (
     resume_ms_from_segments,
     should_resume_file_job,
 )
+from slysh.job_media_duration import job_media_duration_s, refresh_media_duration
 from slysh.job_time import job_duration_s
 from slysh.meeting_capture import (
     NO_OUTPUT_HINT,
@@ -670,12 +671,19 @@ def _decorate_job(
     error = errors.get(job["id"])
     if error:
         payload["speakers_error"] = error
-    duration = job_duration_s(payload)
-    if duration is not None:
-        payload["duration_s"] = round(duration, 1)
     attach_youtube_video(
         payload, segments, enrich=enrich_youtube, db=getattr(app.state, "db", None)
     )
+    processing = job_duration_s(payload)
+    if processing is not None:
+        payload["processing_s"] = round(processing, 1)
+    media_duration = job_media_duration_s(
+        payload,
+        segments=segments,
+        db=getattr(app.state, "db", None),
+    )
+    if media_duration is not None:
+        payload["duration_s"] = round(media_duration, 1)
     return payload
 
 
@@ -1166,6 +1174,7 @@ def _run_engine_job(
         if len(pcm) == 0 and resume_ms is not None:
             db.set_progress(job_id, 1)
             db.set_status(job_id, JobStatus.COMPLETED)
+            refresh_media_duration(db, job_id)
             return
         db.set_progress(job_id, map_transcribe_pass_progress(baseline, 0.0))
 
@@ -1205,6 +1214,7 @@ def _run_engine_job(
             return
         db.set_progress(job_id, 1)
         db.set_status(job_id, JobStatus.COMPLETED)
+        refresh_media_duration(db, job_id)
     except Exception as exc:
         if not job_run_active(db, job_id, run_id) or _engine_job_cancelled(db, job_id):
             return
@@ -1416,7 +1426,7 @@ def _run_remote_job(
         effective_start = effective_transcribe_start_ms(
             job.get("range_start_ms"), resume_ms
         )
-        duration = job_duration_s(job)
+        duration = job_media_duration_s(job, db=db)
         baseline = progress_baseline_for_remote(job, effective_start, duration)
         db.set_progress(job_id, map_transcribe_pass_progress(baseline, 0.0))
 
@@ -1446,6 +1456,7 @@ def _run_remote_job(
             return
         db.set_progress(job_id, 1)
         db.set_status(job_id, JobStatus.COMPLETED)
+        refresh_media_duration(db, job_id)
     except Exception as exc:
         if not job_run_active(db, job_id, run_id):
             return
@@ -2170,6 +2181,7 @@ def _finalize_capture_job(db: Database, state: dict, job_id: int) -> None:
         return
     db.set_progress(job_id, 1)
     db.set_status(job_id, JobStatus.COMPLETED)
+    refresh_media_duration(db, job_id)
 
 
 def create_ui_app(

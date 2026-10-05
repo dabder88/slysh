@@ -118,8 +118,9 @@ function renderActiveJobCard(job) {
   const sub = document.createElement("div");
   sub.className = "hint queue-active-sub";
   const parts = [];
-  if (job.duration_s != null) {
-    parts.push(formatDuration(job.duration_s));
+  const elapsed = job.processing_s != null ? job.processing_s : job.duration_s;
+  if (elapsed != null) {
+    parts.push(formatDuration(elapsed));
   }
   if (job.speakers_running) {
     parts.push(t("common.diarization"));
