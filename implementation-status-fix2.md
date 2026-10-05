@@ -4,7 +4,7 @@
 
 **Легенда:** ✅ готово · 🟡 частично · 🔵 в работе · ⬜ не начато · ⏭️ отложено / вне scope
 
-**Baseline аудита:** `2f19be8`. **Последнее обновление:** 2026-10-05 (R10 iter PCM windows + memmap ASR path).
+**Baseline аудита:** `2f19be8`. **Последнее обновление:** 2026-10-05 (автоматика H закрыта; ручная R15 вынесена).
 
 ---
 
@@ -13,7 +13,7 @@
 | Блок | Статус | Комментарий |
 |------|--------|-------------|
 | **G** Критический минимум | ✅ | коммит `32ba4e8` |
-| **H** Offline / масштаб / приёмка | 🔵 | H4: UI offline sync ✅; WebView2 ~200 МБ в Setup — ⏭️ |
+| **H** Offline / масштаб / приёмка | 🟡 | Код + subset CI ✅; ручная матрица R15 — ниже |
 
 ---
 
@@ -38,15 +38,25 @@
 | ID | Rxx | Статус |
 |----|-----|--------|
 | H1 | R11 | ✅ `engine_watchdog`, `SLYSH_ENGINE_PROGRESS_STALL_S` (default 600s); chunk HTTP timeout = transcribe |
-| H4 | R09 | 🟡 UI venv/wheelhouse ✅; WebView2 standalone в Setup ⏭️ владелец |
 | H2 | R13–R14 | ✅ + redirect allowlist, download без Bearer |
+| H3 | R10 | 🟡 memmap, cancel, `iter_pcm_chunk_windows`; ffmpeg pipe / 1h load — вручную |
+| H4 | R09 | 🟡 UI venv/wheelhouse ✅; WebView2 standalone в Setup ⏭️ владелец |
+| H5 | R15 | 🟡 `run_plan_fix2_targeted_tests` в `ci_mandatory_checks`; Setup `dist\Slysh-Setup.exe` 2026-10-05 10:56 |
+| §5.1 | Gemini CLI | ✅ cwd + blocklist + pytest + `check_gemini_cli_prompt` |
 | §5.2 | secrets_dpapi | ✅ lock + concurrent pytest; corrupt read → `SecretsStoreReadError` |
-| §5.1 | Gemini CLI | 🟡 cwd isolate + blocklist; pytest + `check_gemini_cli_prompt` |
-| H5 | R15 (Setup) | 🟡 subset tests; локальный `dist\Slysh-Setup.exe` 2026-10-05 10:56 |
 | §5.3 | ASR snapshot | ✅ start/resume/retranscribe API + batch `begin_file_transcription` |
-| H3 | R10 | 🟡 memmap + `iter_pcm_chunk_windows`; load/1h — вручную |
 | §5.4 | COM pytest | ✅ sessionfinish + `test_com_pytest_teardown` |
-| H5 | R15 (полная) | 🟡 subset в `ci_mandatory_checks.ps1`; VM/10 min/WebView — вручную |
+
+---
+
+## Ручная приёмка (R15, не блокирует merge кода)
+
+| Сценарий | Статус |
+|----------|--------|
+| VM E6 offline, журнал с SHA-256 Setup | ⬜ |
+| Микрофон / loopback / meeting ≥10 min | ⬜ |
+| WebView E2E (настройки, медиа, экспорт) | ⬜ |
+| Нагрузка R10 (1–3 h файл, замер RAM) | ⬜ |
 
 ---
 

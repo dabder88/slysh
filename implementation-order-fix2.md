@@ -112,7 +112,9 @@
 ### H3 — R10: decode cancel + bounded live pending
 
 - **Файлы:** `decode.py` (Popen → temp PCM, `-ss`/`-t`, `DecodeCancelledError`), `transcribe.py`, `engine_server.py`, `live_buffer.py`, `api.py`.
-- **Тесты:** `test_decode_cancel.py`, `test_live_buffer.py` overflow.
+- **Сделано:** memmap (`SLYSH_DECODE_MEMMAP_BYTES`), ASCII in-place, `iter_pcm_chunk_windows`, live ring buffer.
+- **Тесты:** `test_decode_cancel.py`, `test_decode_memmap.py`, `test_decode_input_path.py`, `test_live_buffer.py`, `test_chunking.py`.
+- **Остаток:** нагрузка 1–3 h; опционально ffmpeg pipe без полного temp PCM.
 
 ### H1 — R11: таймауты UI/engine (коммит `3bede01`)
 

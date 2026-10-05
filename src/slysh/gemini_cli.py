@@ -16,6 +16,9 @@ from slysh.http_proxy import subprocess_env_for_target
 from slysh.providers import find_gemini_binary
 from slysh.remote_asr import RemoteAsrError, parse_transcription_payload
 
+# §5.1 Slysh contract: temp cwd, copy media as fixed basename, prompt uses @basename only;
+# _assert_safe_gemini_cmd blocks yolo/tools/abs paths (see ci/check_gemini_cli_prompt.py).
+
 GEMINI_PROMPT = (
     "Transcribe this audio verbatim in the original language. "
     "Output JSON only with keys text and optional segments "
