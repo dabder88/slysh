@@ -4,7 +4,7 @@
 
 **Легенда:** ✅ готово · 🟡 частично · 🔵 в работе · ⬜ не начато · ⏭️ отложено / вне scope
 
-**Baseline аудита:** `2f19be8`. **Последнее обновление:** 2026-10-05 (§5.3 resume/retranscribe API; CI subset; §5.4 ✅).
+**Baseline аудита:** `2f19be8`. **Последнее обновление:** 2026-10-05 (R10 iter PCM windows + memmap ASR path).
 
 ---
 
@@ -42,9 +42,9 @@
 | H2 | R13–R14 | ✅ + redirect allowlist, download без Bearer |
 | §5.2 | secrets_dpapi | ✅ lock + concurrent pytest; corrupt read → `SecretsStoreReadError` |
 | §5.1 | Gemini CLI | 🟡 cwd isolate + blocklist; pytest + `check_gemini_cli_prompt` |
-| H5 | R15 (Setup) | 🟡 subset tests; локальный `dist\Slysh-Setup.exe` 2026-10-04 22:19 |
+| H5 | R15 (Setup) | 🟡 subset tests; локальный `dist\Slysh-Setup.exe` 2026-10-05 10:56 |
 | §5.3 | ASR snapshot | ✅ start/resume/retranscribe API + batch `begin_file_transcription` |
-| H3 | R10 | 🟡 memmap, cancel, live ring; ASCII in-place + STT/duration pytest |
+| H3 | R10 | 🟡 memmap + `iter_pcm_chunk_windows`; load/1h — вручную |
 | §5.4 | COM pytest | ✅ sessionfinish + `test_com_pytest_teardown` |
 | H5 | R15 (полная) | 🟡 subset в `ci_mandatory_checks.ps1`; VM/10 min/WebView — вручную |
 

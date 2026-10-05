@@ -7,8 +7,9 @@ import numpy as np
 
 from slysh.chunking import (
     SAMPLE_RATE,
+    count_pcm_chunks,
+    iter_pcm_chunk_windows,
     offset_segments,
-    slice_chunks,
     slice_pcm_range,
 )
 from slysh.decode import DecodeCancelledError
@@ -47,14 +48,14 @@ def transcribe_pcm_chunks(
     start_ms_offset: int = 0,
 ) -> tuple[str, list[Segment]]:
     """Run ASR on fixed-size PCM chunks; invoke on_segments after each chunk."""
-    chunks = slice_chunks(np.asarray(pcm, dtype=np.float32))
-    n = len(chunks)
+    pcm_view = np.asarray(pcm, dtype=np.float32, copy=False).reshape(-1)
+    n = count_pcm_chunks(len(pcm_view))
     if n == 0:
         if on_progress is not None:
             on_progress(1.0)
         return ("completed", [])
     segs: list[Segment] = []
-    for i, (start_s, chunk_pcm) in enumerate(chunks):
+    for i, (start_s, chunk_pcm) in enumerate(iter_pcm_chunk_windows(pcm_view)):
         if cancelled():
             return ("cancelled", segs)
         chunk_segs = transcribe_chunk_fn(chunk_pcm)
@@ -122,10 +123,10 @@ class FilePipeline:
             if cancelled():
                 return ("cancelled", segs)
             return ("completed", segs)
-        chunks = slice_chunks(pcm)
-        n = len(chunks)
+        pcm_view = np.asarray(pcm, dtype=np.float32, copy=False).reshape(-1)
+        n = count_pcm_chunks(len(pcm_view))
         segs: list[Segment] = []
-        for i, (start_s, chunk_pcm) in enumerate(chunks):
+        for i, (start_s, chunk_pcm) in enumerate(iter_pcm_chunk_windows(pcm_view)):
             if cancelled():
                 return ("cancelled", segs)
             chunk_segs = self.backend.transcribe_chunk(chunk_pcm, cancelled)

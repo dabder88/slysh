@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+# R10: ffmpeg → temp PCM; large files memmap (SLYSH_DECODE_MEMMAP_BYTES); ASR uses iter_pcm_chunk_windows.
+
 import os
 import re
 import shutil

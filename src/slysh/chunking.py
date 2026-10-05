@@ -1,6 +1,10 @@
 from __future__ import annotations
+
 import os
+from collections.abc import Iterator
+
 import numpy as np
+
 from slysh.models import Segment
 
 SAMPLE_RATE = 16000
@@ -11,16 +15,31 @@ CHUNK_SAMPLES = SAMPLE_RATE * CHUNK_SECONDS
 LIVE_CHUNK_SECONDS = float(os.environ.get("GIGAAM_LIVE_CHUNK_SECONDS", "20"))
 LIVE_CHUNK_SAMPLES = int(SAMPLE_RATE * LIVE_CHUNK_SECONDS)
 
-def slice_chunks(audio: np.ndarray) -> list[tuple[int, np.ndarray]]:
-    """Yield (chunk_start_seconds, pcm) for each usable chunk."""
-    audio = np.asarray(audio, dtype=np.float32).reshape(-1)
-    out: list[tuple[int, np.ndarray]] = []
-    for start in range(0, len(audio), CHUNK_SAMPLES):
-        piece = audio[start : start + CHUNK_SAMPLES]
+def count_pcm_chunks(n_samples: int) -> int:
+    if n_samples <= 0:
+        return 0
+    count = 0
+    for start in range(0, n_samples, CHUNK_SAMPLES):
+        if start < n_samples:
+            count += 1
+    return count
+
+
+def iter_pcm_chunk_windows(
+    audio: np.ndarray,
+) -> Iterator[tuple[int, np.ndarray]]:
+    """Window over PCM without building a list of all chunks (R10)."""
+    pcm = np.asarray(audio, dtype=np.float32, copy=False).reshape(-1)
+    for start in range(0, len(pcm), CHUNK_SAMPLES):
+        piece = pcm[start : start + CHUNK_SAMPLES]
         if len(piece) == 0:
             continue
-        out.append((start // SAMPLE_RATE, piece))
-    return out
+        yield start // SAMPLE_RATE, piece
+
+
+def slice_chunks(audio: np.ndarray) -> list[tuple[int, np.ndarray]]:
+    """Return (chunk_start_seconds, pcm) for each usable chunk."""
+    return list(iter_pcm_chunk_windows(audio))
 
 def offset_segments(
     segments: list[Segment],
@@ -45,7 +64,7 @@ def slice_pcm_range(
     end_ms: int | None = None,
     sample_rate: int = SAMPLE_RATE,
 ) -> tuple[np.ndarray, int]:
-    pcm = np.asarray(audio, dtype=np.float32).reshape(-1)
+    pcm = np.asarray(audio, dtype=np.float32, copy=False).reshape(-1)
     if start_ms is None and end_ms is None:
         return pcm, 0
     total = len(pcm)
