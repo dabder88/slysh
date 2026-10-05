@@ -13,7 +13,7 @@ from slysh.job_asr_snapshot import (
     job_uses_remote_asr,
     model_for_job,
 )
-from slysh.models import JobKind
+from slysh.models import JobKind, JobStatus, Segment
 
 
 def test_model_for_job_prefers_pinned_snapshot(tmp_path, monkeypatch):
@@ -106,3 +106,84 @@ def test_job_start_pins_asr_snapshot_in_api(tmp_path, monkeypatch):
     job = client.get(f"/api/jobs/{job_id}").json()
     assert job["asr_model_id"] == "openrouter:whisper"
     assert job["asr_backend"] == "openrouter"
+
+
+def test_job_resume_keeps_pinned_asr_snapshot(tmp_path, monkeypatch):
+    monkeypatch.setenv("GIGAAM_DESKTOP_HOME", str(tmp_path))
+    remote = ModelItem(
+        id="openrouter:whisper",
+        label="OpenRouter Whisper",
+        backend="openrouter",
+        path="",
+        ready=True,
+        kind="remote",
+    )
+    local = ModelItem(
+        id="local:gigaam",
+        label="GigaAM",
+        backend="gigaam",
+        path="",
+        ready=True,
+        kind="local",
+    )
+    wav = tmp_path / "talk.wav"
+    wav.write_bytes(b"RIFF")
+    db = Database(tmp_path / "app.db")
+    job_id = db.create_job(JobKind.FILE, str(wav))
+    db.set_job_asr_snapshot(job_id, "openrouter:whisper", "openrouter")
+    db.replace_segments(job_id, [Segment(0, 2000, "partial")])
+    db.set_status(job_id, JobStatus.CANCELLED)
+
+    monkeypatch.setattr(api_mod, "_selected_model", lambda: local)
+    monkeypatch.setattr("slysh.job_asr_snapshot.current_asr_model", lambda: local)
+    monkeypatch.setattr(
+        api_mod,
+        "_start_asr_job",
+        lambda _app, _db, _job_id, _path, **_kwargs: None,
+    )
+
+    client = TestClient(create_ui_app(db=db, engine=None))
+    resumed = client.post(f"/api/jobs/{job_id}/start")
+    assert resumed.status_code == 200
+    assert resumed.json()["asr_model_id"] == "openrouter:whisper"
+    assert resumed.json()["asr_backend"] == "openrouter"
+
+
+def test_retranscribe_repins_asr_snapshot(tmp_path, monkeypatch):
+    monkeypatch.setenv("GIGAAM_DESKTOP_HOME", str(tmp_path))
+    remote = ModelItem(
+        id="openrouter:whisper",
+        label="OpenRouter Whisper",
+        backend="openrouter",
+        path="",
+        ready=True,
+        kind="remote",
+    )
+    local = ModelItem(
+        id="local:gigaam",
+        label="GigaAM",
+        backend="gigaam",
+        path="",
+        ready=True,
+        kind="local",
+    )
+    monkeypatch.setattr(api_mod, "_selected_model", lambda: local)
+    monkeypatch.setattr("slysh.job_asr_snapshot.current_asr_model", lambda: local)
+    monkeypatch.setattr(
+        api_mod,
+        "_start_asr_job",
+        lambda _app, _db, _job_id, _path, **_kwargs: None,
+    )
+
+    wav = tmp_path / "talk.wav"
+    wav.write_bytes(b"RIFF")
+    db = Database(tmp_path / "app.db")
+    job_id = db.create_job(JobKind.FILE, str(wav))
+    db.set_job_asr_snapshot(job_id, "openrouter:whisper", "openrouter")
+    db.set_status(job_id, JobStatus.COMPLETED)
+
+    client = TestClient(create_ui_app(db=db, engine=None))
+    again = client.post(f"/api/jobs/{job_id}/retranscribe")
+    assert again.status_code == 200
+    assert again.json()["asr_model_id"] == "local:gigaam"
+    assert again.json()["asr_backend"] == "gigaam"

@@ -4,7 +4,7 @@
 
 **Легенда:** ✅ готово · 🟡 частично · 🔵 в работе · ⬜ не начато · ⏭️ отложено / вне scope
 
-**Baseline аудита:** `2f19be8`. **Последнее обновление:** 2026-10-04 (§5.4 COM pytest + WASAPI apartment).
+**Baseline аудита:** `2f19be8`. **Последнее обновление:** 2026-10-05 (§5.3 resume/retranscribe API; CI subset; §5.4 ✅).
 
 ---
 
@@ -41,12 +41,12 @@
 | H4 | R09 | 🟡 UI venv/wheelhouse ✅; WebView2 standalone в Setup ⏭️ владелец |
 | H2 | R13–R14 | ✅ + redirect allowlist, download без Bearer |
 | §5.2 | secrets_dpapi | ✅ lock + concurrent pytest; corrupt read → `SecretsStoreReadError` |
-| §5.1 | Gemini CLI | 🟡 cwd isolate + block yolo/tools/abs `@path`; pytest |
+| §5.1 | Gemini CLI | 🟡 cwd isolate + blocklist; pytest + `check_gemini_cli_prompt` |
 | H5 | R15 (Setup) | 🟡 subset tests; локальный `dist\Slysh-Setup.exe` 2026-10-04 22:19 |
-| §5.3 | ASR snapshot | ✅ DB pin + `test_job_start_pins_asr_snapshot_in_api` |
+| §5.3 | ASR snapshot | ✅ start/resume/retranscribe API + batch `begin_file_transcription` |
 | H3 | R10 | 🟡 memmap, cancel, live ring; ASCII in-place + STT/duration pytest |
-| §5.4 | COM pytest | 🟡 sessionfinish + `test_com_pytest_teardown` (subset H5) |
-| H5 | R15 (полная) | 🔵 subset: `run_plan_fix2_targeted_tests.ps1`, `smoke_cloud_batch` в CI |
+| §5.4 | COM pytest | ✅ sessionfinish + `test_com_pytest_teardown` |
+| H5 | R15 (полная) | 🟡 subset в `ci_mandatory_checks.ps1`; VM/10 min/WebView — вручную |
 
 ---
 

@@ -4,7 +4,7 @@
 
 **Легенда:** ✅ готово · 🟡 частично · 🔵 в работе / не в git · ⬜ не начато · ⏭️ отложено
 
-**Последнее обновление:** 2026-10-04 — волна **G** plan-fix-2 ✅; волна **H** в работе — см. [`implementation-status-fix2.md`](implementation-status-fix2.md).
+**Последнее обновление:** 2026-10-05 — волна **G** plan-fix-2 ✅; волна **H** 🟡 (остаток: R10 streaming, ручная R15) — [`implementation-status-fix2.md`](implementation-status-fix2.md).
 
 ---
 
@@ -24,7 +24,7 @@
 
 ## Следующий крупный этап (план агента)
 
-**Активно:** волна **H** plan-fix-2 — [`implementation-order-fix2.md`](implementation-order-fix2.md) · [`implementation-status-fix2.md`](implementation-status-fix2.md) (G ✅ `32ba4e8`; H: R11, R10, R13–R14, R09, R15 subset).
+**Активно:** волна **H** plan-fix-2 — [`implementation-order-fix2.md`](implementation-order-fix2.md) · [`implementation-status-fix2.md`](implementation-status-fix2.md) (G ✅; H: R10 🟡, R09/R15 subset 🟡, ручная приёмка).
 
 | Блок | ID | Содержание |
 |------|-----|------------|

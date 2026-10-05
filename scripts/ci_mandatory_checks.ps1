@@ -72,6 +72,12 @@ foreach ($rel in $Smokes) {
     }
 }
 
+Write-Host "=== run_plan_fix2_targeted_tests ==="
+powershell -NoProfile -File (Join-Path $Root "scripts\run_plan_fix2_targeted_tests.ps1")
+if ($LASTEXITCODE -ne 0) {
+    throw "run_plan_fix2_targeted_tests.ps1 failed"
+}
+
 $TestsDir = Join-Path $Root "tests"
 if (-not (Test-Path $TestsDir)) {
     throw "missing tests/ (required for ci_mandatory_checks)"
