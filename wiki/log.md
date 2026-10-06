@@ -2,9 +2,31 @@
 
 Сюда дописывать дату и что изменилось в продовой копии. Старые строки не переписывать.
 
+## 2026-10-06
+
+- plan-fix-3 **I1 / F3-01:** `Database.get_segments_snapshot`, диаризация применяет метки к текущему тексту при неизменной структуре; отказ при смене структуры/спикера во время модели; тесты в `test_speakers_cancel.py`.
+- plan-fix-3: трекеры волны I — `implementation-order-fix3.md`, `implementation-status-fix3.md` (F3-01…F3-07); ведение статуса fix3 — обязанность агента после каждого Ix.
+- EULA RU/EN и корневой LICENSE (2026-10-06): бесплатно только личное некоммерческое использование; корпоративное — по отдельному согласию; усилен отказ от гарантий и отсутствие ответственности (использование на свой риск).
+- Прогресс «Распознавание спикеров»: вехи в engine `/label_speakers`, опрос `/progress` в UI API (`speakers_progress`), полоса в редакторе/очереди по данным движка.
+- Установщик RU: выход Inno Setup `dist\Slysh-Setup-ru.exe` (пара с `Slysh-Setup-en.exe`); обновления GitHub — выбор asset по `ui_locale`, fallback на `Slysh-Setup.exe`.
+- Избранное в экспорте: бейдж «В списке» сбрасывается при удалении пути из списка папок (`onTargetDirsChanged` в `export-favorites.js`, модалка и YouTube-пакет).
+- Модалка экспорта: фикс кнопки «Добавить папку», избранное свёрнуто по умолчанию, пути без RTL/имени файла, подтверждение удаления из избранного; вкладка **Система** — плитки reload/логов по макету.
+- Bento UI: модалка **Экспорт** (`docs/design/export_modal_bento/`) — кнопка «Избранные пути» в один ряд с «Добавить папку», карточки быстрого выбора, ссылка в Настройки; `web/styles/export_modal.css`, обновлён `export-favorites.js`.
+- Bento UI: **Настройки → Система** — спойлер избранных папок (`docs/design/settings_favorites_bento/`), счётчик `#settings-export-favorites-count`, `settings_favorites.css`, `shell.js`.
+
 ## 2026-10-05
 
+- Избранные папки экспорта: в спойлере кнопка «+» добавляет путь в видимый список строк (модалка экспорта и YouTube-пакет); чекбоксы убраны.
+- YouTube пакет: автоэкспорт — избранные папки (спойлер + звёздочка у пути), общий `export-favorites.js` с модалкой экспорта.
+- Bento UI: раздел **YouTube** (`#/youtube`, `youtube-bento-panel`) — макет `docs/design/youtube_bento/`, стили `web/styles/youtube_bento.css`; все invariant `id` для `web/js/youtube.js`; legacy `.youtube-*` в `input.css` ограничены `:not(.youtube-bento-panel)`; тест `tests/test_youtube_bento_dom.py`.
+- Bento UI: экраны **Диктофон** (`#/live`, `live-bento-panel`) и **Запись встречи** (`#/meeting`, `meeting-bento-panel`) — макеты в `docs/design/dictaphone_bento/`, `docs/design/meeting_recording_bento/`; стили `web/styles/*_bento.css`; кнопки с иконками — подписи через label-span id; lead «Подробнее» на встрече.
+- Модалка экспорта: убрано двойное делегирование browse (два диалога папки); `pickFolderWithGhostClickGuard` — счётчик глубины для `pointer-events`; звезда избранного по высоте как поле пути.
+- Избранные папки экспорта: `ui.export_favorite_dirs`, API `/api/ui/export-favorites`, Настройки → Система; в модалке экспорта — звёздочка у пути (мгновенное сохранение), спойлер «Избранные пути» с чекбоксами целей; чекбокс «Запомнить» убран (баг: сброс до PUT).
+- Сценарный пул для агента: `scripts/run_agent_test_pool.ps1`, манифест `agent_test_pool_manifest.ps1`, guide `docs/guides/AGENT-TEST-POOL.md` (только по запросу; CI не менялся).
 - API/UI: столбец «Длительность» — `duration_s` = длина записи (`media_duration_s` в SQLite, сегменты, range, probe); `processing_s` = время расшифровки; статус «Готово» без дубля времени в `library-store.js`.
+- Fix: `/api/library` больше не вызывает ffprobe на каждый job; backfill `media_duration_s` из сегментов при миграции (иначе UI зависал и библиотека казалась пустой).
+- Экспорт из редактора: GET job перед модалом, `pollEditorJob` синхронизирует store; в API `has_transcript` для списков.
+- Прогресс 97–99%: `on_progress(1.0)` после чанков, engine chunk progress для Whisper, `pollEditorJob` + `syncJobBanner`, правило `transcription-progress.mdc`.
 
 ## 2026-10-04
 

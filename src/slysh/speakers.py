@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from typing import Callable, Protocol
 
-from slysh.db import Database, SegmentsRevisionConflictError
+from slysh.db import (
+    Database,
+    SegmentsRevisionConflictError,
+    SegmentsSnapshot,
+)
 from slysh.models import Segment
 
 SPEAKER_CANCELLED_MESSAGE = "Остановлено пользователем"
@@ -49,18 +53,44 @@ def _copy_segments(segments: list[Segment]) -> list[Segment]:
     ]
 
 
+def _structure_key(snapshot: SegmentsSnapshot) -> tuple[tuple[int, int, int], ...]:
+    return tuple((r.row_id, r.start_ms, r.end_ms) for r in snapshot.rows)
+
+
+def _segments_for_backend(snapshot: SegmentsSnapshot) -> list[Segment]:
+    return [
+        Segment(r.start_ms, r.end_ms, r.text, speaker=r.speaker)
+        for r in snapshot.rows
+    ]
+
+
 def _merge_speaker_labels(
-    current: list[Segment],
+    base: SegmentsSnapshot,
+    current: SegmentsSnapshot,
     labeled: list[Segment],
 ) -> list[Segment]:
-    if len(current) != len(labeled):
+    if _structure_key(base) != _structure_key(current):
+        raise SpeakerStructureChangedError("segment structure changed during diarization")
+    if len(labeled) != len(current.rows):
         raise SpeakerStructureChangedError(
-            f"segment count mismatch: {len(current)} vs {len(labeled)}"
+            f"segment count mismatch: {len(current.rows)} vs {len(labeled)}"
         )
-    return [
-        Segment(cur.start_ms, cur.end_ms, cur.text, speaker=lab.speaker)
-        for cur, lab in zip(current, labeled, strict=True)
-    ]
+    merged: list[Segment] = []
+    for i, row in enumerate(current.rows):
+        base_row = base.rows[i]
+        if row.speaker != base_row.speaker:
+            raise SpeakerStructureChangedError(
+                "speaker binding changed during diarization"
+            )
+        lab = labeled[i]
+        if row.start_ms != lab.start_ms or row.end_ms != lab.end_ms:
+            raise SpeakerStructureChangedError(
+                "labeled segment bounds do not match current structure"
+            )
+        merged.append(
+            Segment(row.start_ms, row.end_ms, row.text, speaker=lab.speaker)
+        )
+    return merged
 
 
 def assign_speakers(
@@ -79,26 +109,24 @@ def assign_speakers(
     media_path = str(source_path or job.get("source_path") or "").strip()
     if not media_path:
         raise ValueError(f"job {job_id} has no media path for speaker diarization")
-    base_revision = db.segments_revision(job_id)
-    structure = _copy_segments(db.list_segments(job_id))
+    base = db.get_segments_snapshot(job_id)
     try:
         labeled = backend.label(
             media_path,
-            _copy_segments(structure),
+            _copy_segments(_segments_for_backend(base)),
             cancelled=cancelled,
         )
         if cancelled and cancelled():
             raise SpeakerCancelledError()
-        current = db.list_segments(job_id)
-        merged = _merge_speaker_labels(current, labeled)
-        revision = db.segments_revision(job_id)
-        db.replace_segments(job_id, merged, expected_revision=revision)
+        current = db.get_segments_snapshot(job_id)
+        merged = _merge_speaker_labels(base, current, labeled)
+        db.replace_segments(job_id, merged, expected_revision=current.revision)
         return merged
     except SpeakerCancelledError:
         raise
     except SegmentsRevisionConflictError:
         raise
+    except SpeakerStructureChangedError:
+        raise
     except Exception:
-        if db.segments_revision(job_id) == base_revision:
-            pass
         raise

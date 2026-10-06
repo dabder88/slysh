@@ -6,6 +6,7 @@ import os
 import sqlite3
 import threading
 from datetime import datetime, timezone
+from dataclasses import dataclass
 from functools import wraps
 from pathlib import Path
 
@@ -80,6 +81,21 @@ class SegmentsRevisionConflictError(Exception):
     """Editor save expected_revision does not match the job row."""
 
 
+@dataclass(frozen=True)
+class SegmentSnapshotRow:
+    row_id: int
+    start_ms: int
+    end_ms: int
+    text: str
+    speaker: str | None
+
+
+@dataclass(frozen=True)
+class SegmentsSnapshot:
+    revision: int
+    rows: tuple[SegmentSnapshotRow, ...]
+
+
 class Database:
     def __init__(self, path: Path) -> None:
         self._path = Path(path)
@@ -128,6 +144,7 @@ class Database:
             self._conn.execute("ALTER TABLE jobs ADD COLUMN asr_backend TEXT")
         if "media_duration_s" not in cols:
             self._conn.execute("ALTER TABLE jobs ADD COLUMN media_duration_s REAL")
+        self._backfill_media_duration_s()
         batch_cols = {row[1] for row in self._conn.execute("PRAGMA table_info(batches)")}
         if "archived" not in batch_cols:
             self._conn.execute(
@@ -357,6 +374,34 @@ class Database:
             job_ids,
         ).fetchall()
         return {int(row["job_id"]): int(row["speaker_count"]) for row in rows}
+
+    def _backfill_media_duration_s(self) -> None:
+        self._conn.execute(
+            """
+            UPDATE jobs
+            SET media_duration_s = (
+                SELECT CAST(MAX(end_ms) AS REAL) / 1000.0
+                FROM segments
+                WHERE segments.job_id = jobs.id
+            )
+            WHERE media_duration_s IS NULL
+              AND EXISTS (
+                SELECT 1 FROM segments WHERE segments.job_id = jobs.id
+              )
+            """
+        )
+        self._conn.execute(
+            """
+            UPDATE jobs
+            SET media_duration_s = (
+                CAST(range_end_ms AS REAL) - CAST(range_start_ms AS REAL)
+            ) / 1000.0
+            WHERE media_duration_s IS NULL
+              AND range_start_ms IS NOT NULL
+              AND range_end_ms IS NOT NULL
+              AND range_end_ms > range_start_ms
+            """
+        )
 
     def _segment_max_end_ms_map(self, job_ids: list[int]) -> dict[int, int]:
         if not job_ids:
@@ -679,6 +724,35 @@ class Database:
         if row is None:
             raise KeyError(job_id)
         return int(row[0])
+
+    @_locked
+    def get_segments_snapshot(self, job_id: int) -> SegmentsSnapshot:
+        job = self._conn.execute(
+            "SELECT segments_revision FROM jobs WHERE id = ?",
+            (job_id,),
+        ).fetchone()
+        if job is None:
+            raise KeyError(job_id)
+        seg_rows = self._conn.execute(
+            """
+            SELECT id, start_ms, end_ms, text, speaker
+            FROM segments
+            WHERE job_id = ?
+            ORDER BY id
+            """,
+            (job_id,),
+        ).fetchall()
+        rows = tuple(
+            SegmentSnapshotRow(
+                row_id=int(r["id"]),
+                start_ms=int(r["start_ms"]),
+                end_ms=int(r["end_ms"]),
+                text=str(r["text"]),
+                speaker=r["speaker"],
+            )
+            for r in seg_rows
+        )
+        return SegmentsSnapshot(revision=int(job["segments_revision"]), rows=rows)
 
     @_locked
     def replace_segments(
