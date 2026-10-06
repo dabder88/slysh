@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <title>Slysh</title>
   <link rel="icon" href="/branding/favicon-32.png" type="image/png" sizes="32x32">
-  <link rel="stylesheet" href="/app.css?v=124">
+  <link rel="stylesheet" href="/app.css?v=141">
   <style>
     .boot-error {
       position: fixed;
@@ -162,6 +162,7 @@
             <span class="material-symbols-outlined" aria-hidden="true">arrow_back</span>
           </button>
           <h2 id="topbar-title" class="section-title" hidden></h2>
+          <span id="topbar-subtitle-pill" class="topbar-subtitle-pill" hidden></span>
           <nav id="topbar-tabs" class="topbar-tabs">
             <button type="button" id="topbar-tab-single" class="topbar-tab is-active" data-i18n="page.ad41559a4ca7">Прямая загрузка</button>
             <button type="button" id="topbar-tab-batch" class="topbar-tab" data-i18n="page.c3c5cb4ce7f5">Пакетная обработка</button>
@@ -495,338 +496,781 @@
         </section>
 
         <!-- Live -->
-        <section id="view-live" class="view live-panel">
-          <div class="toolbar">
-            <label class="mic-picker">
-              Микрофон
-              <select id="mic-select"></select>
-            </label>
-            <button type="button" id="btn-refresh-mics" class="btn-outline btn-compact" title="Обновить список микрофонов" data-i18n="page.c2f668e54fb6">Обновить</button>
-            <button type="button" id="btn-rec" data-i18n="page.fbcda4694fbf">Запись</button>
-            <button type="button" id="btn-live-pause" class="btn-outline btn-compact" disabled data-i18n="live.pause">Пауза</button>
-            <button type="button" id="btn-stop" disabled data-i18n="page.6d714e833d40">Стоп</button>
+<!-- ==========================================================================
+     Slysh — Раздел «Диктофон» (Live Speech-to-Text с микрофона)
+     Компонент Modern Pro Bento (Светлая тема, шрифты 13–14px Segoe UI, БЕЗ ЭМОДЗИ)
+     100% совместимость с web/js/live.js и всеми существующими id / data-i18n
+     ========================================================================== -->
+<section id="view-live" class="view live-panel live-bento-panel">
+
+  <!-- 1. Верхний информационный бейдж / шапка подраздела -->
+  <div class="live-bento-lead-card">
+    <div class="live-bento-lead-header">
+      <div class="live-bento-lead-chips">
+        <span class="live-bento-chip live-bento-chip-blue">
+          <svg class="w-3.5 h-3.5 text-blue-600 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+            <line x1="12" y1="19" x2="12" y2="22"/>
+          </svg>
+          <span>Живая речь</span>
+        </span>
+        <span class="live-bento-lead-title">Быстрое надиктовывание текста с микрофона и редактирование заметок</span>
+      </div>
+      <div class="live-bento-lead-tags">
+        <span class="live-badge-mono">ЛОКАЛЬНО</span>
+        <span class="live-badge-mono-subtle">Whisper</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. Bento-карточки управления: Микрофон + Сессия записи -->
+  <div class="live-bento-deck">
+
+    <!-- Bento-карточка 1: Источник звука (Микрофон и VU-метр) -->
+    <div class="live-bento-card live-bento-mic-card">
+      <div class="live-bento-card-header">
+        <label class="live-picker-label" for="mic-select">
+          <svg class="w-4 h-4 text-blue-600 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+            <line x1="12" y1="19" x2="12" y2="22"/>
+          </svg>
+          <span data-i18n="live.micLabel">Микрофон</span>
+        </label>
+        <span class="live-source-status-badge">Активен</span>
+      </div>
+
+      <!-- Селект микрофона + кнопка обновления -->
+      <div class="live-mic-select-row">
+        <div class="live-select-wrap">
+          <select id="mic-select" class="live-device-select" aria-label="Микрофон"></select>
+          <div class="live-select-arrow" aria-hidden="true">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
           </div>
-          <p id="live-hint" class="hint"></p>
-          <p id="live-countdown" class="hint"></p>
-          <div class="meter" aria-hidden="true"><div id="live-meter" class="meter-bar"></div></div>
-          <div id="live-results-bar" class="meeting-results-bar" hidden>
-            <button type="button" id="btn-live-clear" class="btn-outline btn-compact" data-i18n="page.4db06830676a">Очистить экран</button>
-          </div>
-          <div id="live-transcript-wait" class="meeting-transcript-wait" hidden>
-            <span class="meeting-transcript-wait-icon material-symbols-outlined" aria-hidden="true">progress_activity</span>
-            <span data-i18n="page.2ff84cb662e9">Распознаём речь…</span>
-          </div>
-          <textarea id="live-transcript" class="live-transcript" rows="12" spellcheck="true"></textarea>
-          <div id="live-post-actions" class="meeting-post-actions" hidden>
-            <button type="button" id="btn-live-copy" class="btn-outline btn-compact" data-i18n="page.4a05d8619ded">Копировать</button>
-            <button type="button" id="btn-live-export" class="btn-outline btn-compact" data-i18n="page.dd5016c82982">Экспорт</button>
-          </div>
-        </section>
+        </div>
+        <button type="button" id="btn-refresh-mics" class="btn-outline btn-compact live-refresh-btn" title="Обновить список микрофонов" data-i18n-title="page.c2f668e54fb6">
+          <svg class="w-3.5 h-3.5 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="23 4 23 10 17 10"/>
+            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+          </svg>
+          <span data-i18n="page.c2f668e54fb6">Обновить</span>
+        </button>
+      </div>
+
+      <!-- Встроенный VU-метр сигнала микрофона -->
+      <div class="live-meter-integrated">
+        <div class="live-meter-meta">
+          <span class="hint">Уровень сигнала</span>
+          <span id="live-meter-db" class="live-meter-db">-24 dB</span>
+        </div>
+        <div class="meter" aria-hidden="true">
+          <div id="live-meter" class="meter-bar"></div>
+        </div>
+      </div>
+
+      <!-- Сообщение об ошибке или хинт микрофона -->
+      <p id="live-hint" class="hint live-mic-hint"></p>
+    </div>
+
+    <!-- Bento-карточка 2: Пульт управления сессией (Запись / Пауза / Стоп) -->
+    <div class="live-bento-card live-bento-session-card">
+      <div class="live-bento-card-header">
+        <div class="live-session-title-wrap">
+          <span class="live-session-title">Управление сессией</span>
+        </div>
+        <div id="live-session-badge" class="live-session-badge-idle">
+          <span class="live-session-badge-dot"></span>
+          <span id="live-session-badge-text">Ожидание</span>
+        </div>
+      </div>
+
+      <!-- Кнопки управления записью -->
+      <div class="live-controls-row">
+        <button type="button" id="btn-rec" class="live-rec-cta">
+          <span class="live-rec-dot" aria-hidden="true"></span>
+          <span id="lbl-rec-text" data-i18n="page.fbcda4694fbf">Запись</span>
+        </button>
+        <button type="button" id="btn-live-pause" class="btn-outline btn-compact live-pause-btn" disabled>
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>
+          </svg>
+          <span id="btn-live-pause-label" data-i18n="live.pause">Пауза</span>
+        </button>
+        <button type="button" id="btn-stop" class="btn-outline btn-compact live-stop-btn" disabled>
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+            <rect x="5" y="5" width="14" height="14" rx="2"/>
+          </svg>
+          <span data-i18n="page.6d714e833d40">Стоп</span>
+        </button>
+      </div>
+
+      <!-- Статус прослушивания и таймер/обратный отсчет чанка -->
+      <div class="live-status-meta-row">
+        <p id="live-countdown" class="hint live-countdown-hint"></p>
+        <div id="live-rec-timer" class="live-rec-timer-badge hidden">
+          <span class="live-timer-dot"></span>
+          <span id="lbl-live-timer">00:00</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 3. Большая карточка структурированного редактора стенограммы -->
+  <div class="live-bento-editor-card">
+    
+    <!-- Тулбар над текстовым полем -->
+    <div class="live-editor-head">
+      <div class="live-editor-title-wrap">
+        <svg class="w-4 h-4 text-blue-600 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/>
+        </svg>
+        <span class="live-editor-title">Текст надиктованного сообщения</span>
+        <span class="live-editor-subtitle">(Редактируемое поле)</span>
+      </div>
+
+      <!-- Действия с текстом: Копировать, Экспорт, Очистить -->
+      <div class="live-editor-actions">
+        
+        <!-- Кнопки экспорта и копирования (появляются при наличии текста) -->
+        <div id="live-post-actions" class="meeting-post-actions live-post-actions" hidden>
+          <button type="button" id="btn-live-copy" class="btn-outline btn-compact live-btn-copy">
+            <svg class="w-3.5 h-3.5 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+            <span data-i18n="page.4a05d8619ded">Копировать</span>
+          </button>
+          <button type="button" id="btn-live-export" class="btn-outline btn-compact live-btn-export">
+            <svg class="w-3.5 h-3.5 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            <span data-i18n="page.dd5016c82982">Экспорт</span>
+          </button>
+        </div>
+
+        <!-- Кнопка очистки экрана (появляется при наличии текста вне сессии) -->
+        <div id="live-results-bar" class="meeting-results-bar live-results-bar" hidden>
+          <button type="button" id="btn-live-clear" class="btn-outline btn-compact live-btn-clear">
+            <svg class="w-3.5 h-3.5 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+            </svg>
+            <span data-i18n="page.4db06830676a">Очистить экран</span>
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Индикатор распознавания речи (анимируется во время отправки чанков) -->
+    <div id="live-transcript-wait" class="meeting-transcript-wait live-transcript-wait" hidden>
+      <div class="live-wait-spinner" aria-hidden="true"></div>
+      <span class="live-wait-text" data-i18n="page.2ff84cb662e9">Распознаём речь…</span>
+      <span class="live-wait-meta">Whisper · автосохранение</span>
+    </div>
+
+    <!-- Редактируемое поле стенограммы (Нативный textarea с сохранением автосейва 600мс) -->
+    <textarea id="live-transcript" class="live-transcript live-transcript-field" rows="14" spellcheck="true" placeholder="Говорите в микрофон — распознанный текст появится здесь автоматически... Вы можете вносить любые правки руками прямо во время или после записи."></textarea>
+
+    <!-- Подвал редактора со статистикой и индикатором автосохранения -->
+    <div class="live-editor-footer">
+      <div class="live-footer-stats">
+        <span id="live-counter-stats" class="live-counter-text">0 слов · 0 символов</span>
+      </div>
+      <div class="live-footer-autosave">
+        <svg class="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+        <span class="live-autosave-text">Правки сохраняются автоматически</span>
+      </div>
+    </div>
+
+  </div>
+
+</section>
+
 
         <!-- Meeting capture -->
-        <section id="view-meeting" class="view live-panel meeting-panel">
-          <p class="hint meeting-lead" data-i18n="page.670ce135fd6e">
-            Запись системного звука Windows и вашего микрофона без бота в Zoom, Meet или Teams.
-            Предупредите участников. Наушники дают меньше эха, чем колонки. Одна моно-дорожка:
-            отдельных каналов «я / они» нет, спикеров можно разметить после записи.
-            Если Bluetooth подключили уже после запуска Slysh — нажмите «Обновить».
-          </p>
-          <div class="toolbar meeting-toolbar">
-            <label class="mic-picker">
-              <span data-i18n="meeting.outputDevice">Выход</span>
-              <select id="meeting-output-select"></select>
-            </label>
-            <label class="mic-picker">
-              <span data-i18n="meeting.microphoneDevice">Микрофон</span>
-              <select id="meeting-mic-select"></select>
-            </label>
-            <label class="meeting-include-mic">
-              <input type="checkbox" id="meeting-include-mic" checked>
-              <span data-i18n="meeting.myMicrophone">Мой микрофон</span>
-            </label>
-            <button type="button" id="btn-meeting-refresh" class="btn-outline btn-compact" title="Пересканировать наушники и микрофоны, в том числе Bluetooth, подключённые после запуска" data-i18n="page.c2f668e54fb6">Обновить</button>
-            <button type="button" id="btn-meeting-rec" data-i18n="page.fbcda4694fbf">Запись</button>
-            <button type="button" id="btn-meeting-pause" disabled data-i18n="page.03498e395a43">Пауза</button>
-            <button type="button" id="btn-meeting-stop" disabled data-i18n="page.6d714e833d40">Стоп</button>
+<!-- ==========================================================================
+     Slysh — Раздел «Запись встречи» (System Loopback Audio + Microphone)
+     Компонент Modern Pro Bento (Светлая тема, шрифты 13–14px Segoe UI, БЕЗ ЭМОДЗИ)
+     100% совместимость с web/js/meeting.js и всеми существующими id / data-i18n
+     ========================================================================== -->
+<section id="view-meeting" class="view live-panel meeting-panel meeting-bento-panel">
+  
+  <!-- 1. Смарт-баннер подсказок (Сворачиваемый, сохраняет 100% текста подсказки) -->
+  <div class="meeting-bento-lead-card">
+    <div class="meeting-bento-lead-header">
+      <div class="meeting-bento-lead-chips">
+        <span class="meeting-bento-chip meeting-bento-chip-blue">
+          <svg class="w-3.5 h-3.5 text-blue-600 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          </svg>
+          <span>Zoom · Meet · Teams</span>
+        </span>
+        <span class="meeting-bento-lead-title">Запись системного звука Windows и микрофона без бота</span>
+      </div>
+      <button type="button" id="btn-meeting-lead-toggle" class="meeting-bento-lead-toggle-btn" aria-expanded="false">
+        <span id="lbl-meeting-lead-toggle">Подробнее</span>
+        <svg id="icon-meeting-lead-toggle" class="w-3.5 h-3.5 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="6 9 12 15 18 9"/>
+        </svg>
+      </button>
+    </div>
+    <p id="meeting-lead" class="hint meeting-lead hidden" data-i18n="page.670ce135fd6e">
+      Запись системного звука Windows и вашего микрофона без бота в Zoom, Meet или Teams.
+      Предупредите участников. Наушники дают меньше эха, чем колонки. Одна моно-дорожка:
+      отдельных каналов «я / они» нет, спикеров можно разметить после записи.
+      Если Bluetooth подключили уже после запуска Slysh — нажмите «Обновить».
+    </p>
+  </div>
+
+  <!-- 2. Bento-карточки аудиоисточников (Выход и Микрофон со встроенными VU-метрами) -->
+  <div class="meeting-bento-sources-grid">
+    
+    <!-- Карточка 1: Выходной звук (Звук собеседников / Windows Loopback) -->
+    <div class="meeting-bento-source-card">
+      <div class="meeting-bento-source-head">
+        <label class="mic-picker-label" for="meeting-output-select">
+          <svg class="w-4 h-4 text-blue-600 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+            <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+          </svg>
+          <span data-i18n="meeting.outputDevice">Выход</span>
+          <span class="text-slate-400 font-normal text-[12px]">(Собеседники)</span>
+        </label>
+        <span class="meeting-bento-badge-mono">WASAPI</span>
+      </div>
+
+      <div class="meeting-select-wrap">
+        <select id="meeting-output-select" class="meeting-device-select" aria-label="Устройство вывода"></select>
+        <div class="meeting-select-arrow" aria-hidden="true">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Встроенный VU-метр системы -->
+      <div class="meeting-meter-integrated">
+        <div class="meeting-meter-meta">
+          <span class="hint" data-i18n="page.3ac98f278c8c">Система</span>
+          <span id="lbl-meter-system-val" class="meeting-meter-db">-12 dB</span>
+        </div>
+        <div class="meter" aria-hidden="true">
+          <div id="meeting-meter-system" class="meter-bar"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Карточка 2: Микрофон (Ваш голос) -->
+    <div class="meeting-bento-source-card">
+      <div class="meeting-bento-source-head">
+        <label class="mic-picker-label" for="meeting-mic-select">
+          <svg class="w-4 h-4 text-indigo-600 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+          </svg>
+          <span data-i18n="meeting.microphoneDevice">Микрофон</span>
+        </label>
+        <label class="meeting-include-mic">
+          <input type="checkbox" id="meeting-include-mic" checked>
+          <span data-i18n="meeting.myMicrophone">Мой микрофон</span>
+        </label>
+      </div>
+
+      <div class="meeting-mic-select-row">
+        <div class="meeting-select-wrap flex-1">
+          <select id="meeting-mic-select" class="meeting-device-select" aria-label="Микрофон"></select>
+          <div class="meeting-select-arrow" aria-hidden="true">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
           </div>
-          <div id="meeting-rec-banner" class="meeting-rec-banner" hidden>
-            <span class="meeting-rec-dot" aria-hidden="true"></span>
-            <span id="meeting-rec-banner-label" data-i18n="page.69087bd911f0">Идёт запись</span>
-            <span id="meeting-rec-timer">00:00</span>
-          </div>
-          <p id="meeting-hint" class="hint"></p>
-          <p id="meeting-countdown" class="hint"></p>
-          <div class="meeting-meters">
-            <div class="meeting-meter-row">
-              <span class="hint" data-i18n="page.3ac98f278c8c">Система</span>
-              <div class="meter" aria-hidden="true"><div id="meeting-meter-system" class="meter-bar"></div></div>
-            </div>
-            <div class="meeting-meter-row">
-              <span class="hint" data-i18n="page.9c46a3fc49ae">Микрофон</span>
-              <div class="meter" aria-hidden="true"><div id="meeting-meter-mic" class="meter-bar"></div></div>
-            </div>
-          </div>
-          <div class="meeting-view-options">
-            <label class="meeting-timestamps-toggle">
-              <input type="checkbox" id="meeting-show-timestamps">
-              <span data-i18n="meeting.showTimestamps">Таймкоды</span>
-            </label>
-            <label id="meeting-auto-speakers-wrap" class="meeting-auto-speakers-toggle meeting-timestamps-toggle">
-              <input type="checkbox" id="meeting-auto-speakers">
-              <span data-i18n="meeting.autoSpeakersAfterRec">Определять спикеров после записи</span>
-            </label>
-          </div>
-          <div id="meeting-results-bar" class="meeting-results-bar" hidden>
-            <button type="button" id="btn-meeting-clear" class="btn-outline btn-compact" data-i18n="page.4db06830676a">Очистить экран</button>
-          </div>
-          <div id="meeting-transcript-wait" class="meeting-transcript-wait" hidden>
-            <span class="meeting-transcript-wait-icon material-symbols-outlined" aria-hidden="true">progress_activity</span>
-            <span data-i18n="page.2ff84cb662e9">Распознаём речь…</span>
-          </div>
-          <div id="meeting-transcript" class="live-transcript"></div>
-          <div id="meeting-post-actions" class="meeting-post-actions" hidden>
-            <button type="button" id="btn-meeting-copy" class="btn-outline btn-compact" data-i18n="page.4a05d8619ded">Копировать</button>
-            <button type="button" id="btn-meeting-export" class="btn-outline btn-compact" data-i18n="page.dd5016c82982">Экспорт</button>
-          </div>
-          <details id="meeting-speakers-details" class="meeting-speakers-details" hidden>
-            <summary data-i18n="meeting.speakersSection">Распознавание спикеров</summary>
-            <div class="meeting-speakers-details-body">
-              <div id="meeting-speakers-wait" class="meeting-speakers-wait" hidden>
-                <span class="meeting-transcript-wait-icon material-symbols-outlined" aria-hidden="true">progress_activity</span>
-                <span data-i18n="page.b40df6c1040c">Определяем спикеров…</span>
-              </div>
-              <button type="button" id="btn-meeting-speakers" class="btn-outline btn-compact meeting-speakers-btn" hidden data-i18n="page.9e8dc1ce7821">
-                Распознать спикеров
-              </button>
-              <div id="meeting-speaker-rename" class="speaker-rename meeting-speaker-rename" hidden></div>
-            </div>
-          </details>
-          <div id="meeting-export-actions" class="meeting-export-actions export-actions" hidden>
-            <span id="meeting-export-path" class="hint"></span>
-            <div class="export-actions-row">
-              <button type="button" id="btn-meeting-open-export" class="btn-primary btn-compact">
-                <span class="material-symbols-outlined" aria-hidden="true">draft</span>
-                <span data-i18n="editor.openExportFile">Открыть файл</span>
-              </button>
-              <button type="button" id="btn-meeting-open-export-folder" class="btn-outline btn-compact">
-                <span class="material-symbols-outlined" aria-hidden="true">folder_open</span>
-                <span data-i18n="editor.openExportFolder">Открыть в папке</span>
-              </button>
-            </div>
-          </div>
-        </section>
+        </div>
+        <button type="button" id="btn-meeting-refresh" class="btn-outline btn-compact meeting-refresh-btn" title="Пересканировать наушники и микрофоны, в том числе Bluetooth, подключённые после запуска" data-i18n-title="page.c2f668e54fb6">
+          <svg class="w-3.5 h-3.5 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+          </svg>
+          <span id="btn-meeting-refresh-label" data-i18n="page.c2f668e54fb6">Обновить</span>
+        </button>
+      </div>
+
+      <!-- Встроенный VU-метр микрофона -->
+      <div class="meeting-meter-integrated">
+        <div class="meeting-meter-meta">
+          <span class="hint" data-i18n="page.9c46a3fc49ae">Микрофон</span>
+          <span id="lbl-meter-mic-val" class="meeting-meter-db">-24 dB</span>
+        </div>
+        <div class="meter" aria-hidden="true">
+          <div id="meeting-meter-mic" class="meter-bar"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 3. Панель управления записью и параметры отображения -->
+  <div class="meeting-bento-toolbar-card">
+    <div class="toolbar meeting-toolbar">
+      <!-- Кнопка Запись -->
+      <button type="button" id="btn-meeting-rec" class="btn-primary meeting-rec-cta">
+        <span class="meeting-rec-btn-dot" aria-hidden="true"></span>
+        <span id="btn-meeting-rec-label" data-i18n="page.fbcda4694fbf">Запись</span>
+      </button>
+
+      <!-- Пауза -->
+      <button type="button" id="btn-meeting-pause" class="btn-outline btn-compact" disabled>
+        <span id="btn-meeting-pause-label" data-i18n="page.03498e395a43">Пауза</span>
+      </button>
+
+      <!-- Стоп -->
+      <button type="button" id="btn-meeting-stop" class="btn-outline btn-compact" disabled>
+        <span data-i18n="page.6d714e833d40">Стоп</span>
+      </button>
+
+      <!-- Баннер активной записи с таймером -->
+      <div id="meeting-rec-banner" class="meeting-rec-banner" hidden>
+        <span class="meeting-rec-dot" aria-hidden="true"></span>
+        <span id="meeting-rec-banner-label" data-i18n="page.69087bd911f0">Идёт запись</span>
+        <span id="meeting-rec-timer">00:00</span>
+      </div>
+
+      <!-- Служебные подсказки и обратный отсчет фрагментов -->
+      <p id="meeting-hint" class="hint"></p>
+      <p id="meeting-countdown" class="hint meeting-countdown-text"></p>
+    </div>
+
+    <!-- Чекбоксы: Таймкоды и Спикеры -->
+    <div class="meeting-view-options">
+      <label class="meeting-timestamps-toggle">
+        <input type="checkbox" id="meeting-show-timestamps">
+        <span data-i18n="meeting.showTimestamps">Таймкоды</span>
+      </label>
+      <label id="meeting-auto-speakers-wrap" class="meeting-auto-speakers-toggle meeting-timestamps-toggle">
+        <input type="checkbox" id="meeting-auto-speakers">
+        <span data-i18n="meeting.autoSpeakersAfterRec">Определять спикеров после записи</span>
+      </label>
+    </div>
+  </div>
+
+  <!-- 4. Холст стенограммы (live-transcript) -->
+  <div class="meeting-bento-transcript-card">
+    
+    <!-- Верхний тулбар результатов -->
+    <div class="meeting-transcript-topbar">
+      <div class="meeting-transcript-title-group">
+        <span class="meeting-transcript-heading">Стенограмма встречи</span>
+        <span id="meeting-status-badge" class="meeting-status-badge">Ожидание</span>
+      </div>
+
+      <div class="meeting-transcript-actions-group">
+        <!-- Кнопки копирования и экспорта (показываются после записи) -->
+        <div id="meeting-post-actions" class="meeting-post-actions" hidden>
+          <button type="button" id="btn-meeting-copy" class="btn-outline btn-compact">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+            <span data-i18n="page.4a05d8619ded">Копировать</span>
+          </button>
+          <button type="button" id="btn-meeting-export" class="btn-outline btn-compact btn-export-highlight">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            <span data-i18n="page.dd5016c82982">Экспорт</span>
+          </button>
+        </div>
+
+        <!-- Кнопка очистки -->
+        <div id="meeting-results-bar" class="meeting-results-bar" hidden>
+          <button type="button" id="btn-meeting-clear" class="btn-outline btn-compact btn-clear-text" data-i18n="page.4db06830676a">
+            Очистить экран
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Индикатор распознавания (показывается при активной сессии) -->
+    <div id="meeting-transcript-wait" class="meeting-transcript-wait" hidden>
+      <span class="meeting-transcript-wait-icon material-symbols-outlined" aria-hidden="true">progress_activity</span>
+      <span data-i18n="page.2ff84cb662e9">Распознаём речь…</span>
+    </div>
+
+    <!-- Контейнер реплик (наполняется через createSegmentParagraph в meeting.js) -->
+    <div id="meeting-transcript" class="live-transcript" tabindex="0"></div>
+
+  </div>
+
+  <!-- 5. Разметка спикеров (Диаризация) -->
+  <details id="meeting-speakers-details" class="meeting-speakers-details" hidden>
+    <summary data-i18n="meeting.speakersSection">
+      <div class="meeting-speakers-summary-content">
+        <svg class="w-4 h-4 text-purple-600 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+        </svg>
+        <span>Распознавание спикеров</span>
+      </div>
+    </summary>
+    <div class="meeting-speakers-details-body">
+      <div id="meeting-speakers-wait" class="meeting-speakers-wait" hidden>
+        <span class="meeting-transcript-wait-icon material-symbols-outlined" aria-hidden="true">progress_activity</span>
+        <span data-i18n="page.b40df6c1040c">Определяем спикеров…</span>
+      </div>
+      <button type="button" id="btn-meeting-speakers" class="btn-outline btn-compact meeting-speakers-btn" hidden data-i18n="page.9e8dc1ce7821">
+        Распознать спикеров
+      </button>
+      <div id="meeting-speaker-rename" class="speaker-rename meeting-speaker-rename" hidden></div>
+    </div>
+  </details>
+
+  <!-- 6. Панель успешного экспорта файлов -->
+  <div id="meeting-export-actions" class="meeting-export-actions export-actions" hidden>
+    <span id="meeting-export-path" class="hint"></span>
+    <div class="export-actions-row">
+      <button type="button" id="btn-meeting-open-export" class="btn-primary btn-compact">
+        <span class="material-symbols-outlined" aria-hidden="true">draft</span>
+        <span data-i18n="editor.openExportFile">Открыть файл</span>
+      </button>
+      <button type="button" id="btn-meeting-open-export-folder" class="btn-outline btn-compact">
+        <span class="material-symbols-outlined" aria-hidden="true">folder_open</span>
+        <span data-i18n="editor.openExportFolder">Открыть в папке</span>
+      </button>
+    </div>
+  </div>
+
+</section>
+
 
         <!-- YouTube -->
-        <section id="view-youtube" class="view youtube-panel">
-          <p class="hint youtube-lead" data-i18n="page.7adfc9947822">
-            Вставьте ссылку на видео YouTube и получите готовый транскрипт из субтитров.
-          </p>
-          <div class="card youtube-card">
-            <div class="youtube-mode-tabs" role="tablist">
-              <button type="button" id="youtube-mode-single" class="youtube-mode-tab is-active" data-youtube-mode="single" data-i18n="page.8c25fdeb8efb">Одно видео</button>
-              <button type="button" id="youtube-mode-batch" class="youtube-mode-tab" data-youtube-mode="batch" data-i18n="page.56c808257984">Пакет</button>
-            </div>
-            <div id="youtube-single-panel">
-            <label class="youtube-url-field" for="youtube-url">
-              <span class="youtube-url-label" data-i18n="page.54fbfaf96a2d">Ссылка на видео</span>
-              <div class="youtube-url-wrap">
-                <span class="material-symbols-outlined youtube-url-icon" aria-hidden="true">link</span>
-                <input
-                  type="url"
-                  id="youtube-url"
-                  class="youtube-url-input"
-                  placeholder="https://www.youtube.com/watch?v=…"
-                  spellcheck="false"
-                  autocomplete="off"
-                >
-              </div>
+<!-- ==========================================================================
+     Slysh — Раздел «YouTube» (Извлечение субтитров и пакетная обработка)
+     Компонент Modern Pro Bento (Светлая тема, шрифты 12-15px Segoe UI, БЕЗ ЭМОДЗИ)
+     100% совместимость с web/js/youtube.js и всеми существующими id / data-i18n
+     ========================================================================== -->
+<section id="view-youtube" class="view youtube-panel youtube-bento-panel">
+  
+  <!-- 1. Верхний информационный бейдж / шапка подраздела -->
+  <div class="youtube-bento-lead-card">
+    <div class="youtube-bento-lead-header">
+      <div class="youtube-bento-lead-chips">
+        <span class="youtube-bento-chip youtube-bento-chip-red">
+          <svg class="w-3.5 h-3.5 text-red-600 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+          </svg>
+          <span>YouTube</span>
+        </span>
+        <span class="youtube-bento-lead-title">Извлечение субтитров и транскриптов без скачивания видео</span>
+      </div>
+      <div class="youtube-bento-lead-tags">
+        <span class="youtube-badge-mono">СУБТИТРЫ</span>
+        <span class="youtube-badge-mono-subtle">Быстро</span>
+      </div>
+    </div>
+    <p id="youtube-lead" class="hint youtube-lead hidden" data-i18n="page.7adfc9947822">
+      Вставьте ссылку на видео YouTube и получите готовый транскрипт из субтитров.
+    </p>
+  </div>
+
+  <!-- 2. Главная Bento-карточка рабочей области -->
+  <div class="card youtube-card youtube-bento-main-card">
+    
+    <!-- Переключатель режимов: Одно видео / Пакет (шрифт 13px, SemiBold) -->
+    <div class="youtube-mode-tabs" role="tablist">
+      <button type="button" id="youtube-mode-single" class="youtube-mode-tab is-active" data-youtube-mode="single" data-i18n="page.8c25fdeb8efb">
+        Одно видео
+      </button>
+      <button type="button" id="youtube-mode-batch" class="youtube-mode-tab" data-youtube-mode="batch" data-i18n="page.56c808257984">
+        Пакет
+      </button>
+    </div>
+
+    <!-- 3. Панель одиночного видео (Ссылка на видео) -->
+    <div id="youtube-single-panel" class="youtube-single-panel">
+      <label class="youtube-url-field" for="youtube-url">
+        <span class="youtube-url-label" data-i18n="page.54fbfaf96a2d">Ссылка на видео</span>
+        <div class="youtube-url-wrap">
+          <svg class="youtube-url-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+          </svg>
+          <input
+            type="url"
+            id="youtube-url"
+            class="youtube-url-input"
+            placeholder="https://www.youtube.com/watch?v=…"
+            spellcheck="false"
+            autocomplete="off"
+          >
+        </div>
+      </label>
+    </div>
+
+    <!-- 4. Панель пакетной обработки (Скрыта по умолчанию, переключается в js) -->
+    <div id="youtube-batch-panel" class="youtube-batch-panel" hidden>
+      
+      <!-- Источник пакета: Список ссылок или Канал/плейлист -->
+      <fieldset class="youtube-batch-source">
+        <legend data-i18n="page.8290a3dbc0c8">Источник</legend>
+        <div class="youtube-batch-source-row">
+          <label class="youtube-batch-source-option" for="youtube-batch-mode-lines">
+            <input type="radio" name="youtube-batch-mode" id="youtube-batch-mode-lines" value="lines" checked>
+            <span data-i18n="page.e6f294420d21">Список ссылок (по одной на строку)</span>
+          </label>
+          <label class="youtube-batch-source-option" for="youtube-batch-mode-feed">
+            <input type="radio" name="youtube-batch-mode" id="youtube-batch-mode-feed" value="feed">
+            <span data-i18n="page.9d2ed01e54fb">Канал или плейлист (одна ссылка)</span>
+          </label>
+        </div>
+      </fieldset>
+
+      <!-- Многострочный ввод списка ссылок -->
+      <label class="field youtube-field-wrap" id="youtube-batch-lines-wrap">
+        <span class="field-label" data-i18n="page.488356b435d9">Ссылки на видео</span>
+        <textarea id="youtube-batch-lines" class="youtube-batch-textarea" rows="6" spellcheck="false" placeholder="https://www.youtube.com/watch?v=…"></textarea>
+      </label>
+
+      <!-- Ввод ссылки на канал или плейлист (показывается при выборе feed) -->
+      <label class="field youtube-field-wrap" id="youtube-batch-feed-wrap" hidden>
+        <span class="field-label" data-i18n="page.c55f5be758a9">URL канала или плейлиста</span>
+        <div class="youtube-url-wrap">
+          <svg class="youtube-url-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1"/>
+          </svg>
+          <input type="url" id="youtube-batch-feed-url" class="youtube-url-input" placeholder="https://www.youtube.com/@…/videos">
+        </div>
+      </label>
+
+      <!-- Фильтры канала / плейлиста -->
+      <details class="youtube-batch-filters" hidden>
+        <summary><span data-i18n="youtube.batchFiltersSummary">Фильтры (канал / плейлист)</span></summary>
+        <div class="youtube-batch-filters-grid">
+          <label class="field">
+            <span class="field-label" data-i18n="page.b3136b0109e3">Лимит видео</span>
+            <input type="number" id="youtube-batch-limit" min="1" placeholder="5">
+          </label>
+          <label class="field">
+            <span class="field-label" data-i18n="page.a29f6fdb5502">Не раньше</span>
+            <input type="date" id="youtube-batch-dateafter">
+          </label>
+          <label class="field">
+            <span class="field-label" data-i18n="page.e37eb0da4f9b">Не позже</span>
+            <input type="date" id="youtube-batch-datebefore">
+          </label>
+          <div class="youtube-batch-filters-row">
+            <label class="field youtube-batch-start-video-field">
+              <span class="field-label" data-i18n="page.1eb9aa7cfb7f">Ссылка на видео для старта</span>
+              <input type="url" id="youtube-batch-start-video" class="youtube-url-input font-mono" placeholder="https://www.youtube.com/watch?v=…" spellcheck="false" autocomplete="off">
             </label>
-            </div>
-            <fieldset class="youtube-methods">
-              <legend data-i18n="page.13c04f33d515">Способ получения</legend>
-              <div class="youtube-method-card" data-youtube-method="apify">
-                <label class="youtube-method-head" for="youtube-method-apify">
-                  <input type="radio" name="youtube-method" id="youtube-method-apify" value="apify" checked>
-                  <span class="youtube-method-title" data-i18n="page.30ec6b7515f1">Облачный сервис</span>
-                </label>
-                <details class="youtube-method-details">
-                  <summary data-i18n="youtube.methodSetup">Настройка способа</summary>
-                  <div class="youtube-method-panel">
-                    <p class="hint" data-i18n="page.ce894836fbe0">Транскрипт получается через облако Apify. Браузер и cookies на вашем ПК не нужны.</p>
-                    <ol class="youtube-steps">
-                      <li data-i18n-html="youtube.apifyStep1">Зарегистрируйтесь на <a href="https://apify.com/" target="_blank" rel="noopener noreferrer">apify.com</a>.</li>
-                      <li data-i18n-html="youtube.apifyStep2">Откройте <a href="https://console.apify.com/account/integrations" target="_blank" rel="noopener noreferrer">API tokens</a> в личном кабинете.</li>
-                      <li data-i18n="youtube.apifyStep3">Создайте токен и скопируйте его.</li>
-                      <li data-i18n="youtube.apifyStep4">Вставьте ключ ниже и нажмите «Сохранить».</li>
-                    </ol>
-                    <div class="youtube-panel-row">
-                      <input
-                        id="youtube-apify-key"
-                        type="password"
-                        autocomplete="off"
-                        spellcheck="false"
-                        placeholder="Apify API token"
-                      >
-                      <button type="button" id="btn-youtube-apify-save" class="btn-outline btn-compact" data-i18n="page.4864057d626a">Сохранить</button>
-                    </div>
-                    <p id="youtube-apify-key-hint" class="hint"></p>
-                  </div>
-                </details>
-              </div>
-              <div class="youtube-method-card" data-youtube-method="firefox">
-                <label class="youtube-method-head" for="youtube-method-firefox">
-                  <input type="radio" name="youtube-method" id="youtube-method-firefox" value="firefox">
-                  <span class="youtube-method-title" data-i18n="page.4d1c2deba446">Через ваш Firefox</span>
-                </label>
-                <details class="youtube-method-details">
-                  <summary data-i18n="youtube.methodSetup">Настройка способа</summary>
-                  <div class="youtube-method-panel">
-                    <p class="hint" data-i18n-html="youtube.firefoxHint">
-                      Бесплатно и локально. Войдите в YouTube в Firefox — приложение возьмёт cookies оттуда.
-                      Извлечение доступно <strong>только из Mozilla Firefox</strong>.
-                    </p>
-                    <p id="youtube-firefox-meta" class="hint"></p>
-                    <div class="youtube-panel-actions">
-                      <button type="button" id="btn-youtube-extract-cookies-quick" class="btn-outline btn-compact" data-i18n="page.79d4c67eaa00">
-                        Быстро из Firefox
-                      </button>
-                      <label class="mic-picker">
-                        <span data-i18n="youtube.firefoxProfile">Профиль Firefox</span>
-                        <select id="youtube-browser-profile"></select>
-                      </label>
-                      <button type="button" id="btn-youtube-extract-cookies" class="btn-outline btn-compact" data-i18n="page.6a1b5fc6fa5b">Извлечь</button>
-                    </div>
-                  </div>
-                </details>
-              </div>
-              <div class="youtube-method-card" data-youtube-method="cookies">
-                <label class="youtube-method-head" for="youtube-method-cookies">
-                  <input type="radio" name="youtube-method" id="youtube-method-cookies" value="cookies">
-                  <span class="youtube-method-title" data-i18n="page.302efca28f87">Через другой браузер</span>
-                </label>
-                <details class="youtube-method-details">
-                  <summary data-i18n="youtube.methodSetup">Настройка способа</summary>
-                  <div class="youtube-method-panel">
-                    <p class="hint" data-i18n="page.b5c6227b8085">
-                      Если вы пользуетесь Chrome, Edge или другим браузером — экспортируйте cookies вручную
-                      и загрузите файл сюда.
-                    </p>
-                    <ol class="youtube-steps">
-                      <li data-i18n-html="youtube.cookiesStep1">Установите расширение <a href="https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc" target="_blank" rel="noopener noreferrer">Get cookies.txt LOCALLY</a> (Chrome/Edge).</li>
-                      <li data-i18n-html="youtube.cookiesStep2">Откройте <a href="https://www.youtube.com/" target="_blank" rel="noopener noreferrer">youtube.com</a> и войдите в аккаунт.</li>
-                      <li data-i18n-html="youtube.cookiesStep3">Через расширение экспортируйте cookies для youtube.com в файл <code>cookies.txt</code>.</li>
-                      <li data-i18n="youtube.cookiesStep4">Нажмите «Загрузить cookies.txt» ниже.</li>
-                    </ol>
-                    <p id="youtube-import-meta" class="hint"></p>
-                    <div class="youtube-panel-actions">
-                      <button type="button" id="btn-youtube-import-cookies" class="btn-outline btn-compact" data-i18n="page.8b6e8552f157">Загрузить cookies.txt</button>
-                    </div>
-                  </div>
-                </details>
-              </div>
-            </fieldset>
-            <div class="youtube-status-row">
-              <span id="youtube-status-apify" class="youtube-status-chip" data-i18n="page.7651ef63e832">Облако</span>
-              <span id="youtube-status-firefox" class="youtube-status-chip">Firefox</span>
-              <span id="youtube-status-cookies-file" class="youtube-status-chip" data-i18n="page.582ddc72086b">Файл cookies</span>
-              <span id="youtube-status-ytdlp" class="youtube-status-chip" hidden>yt-dlp</span>
-              <span id="youtube-status-browser-cookie3" class="youtube-status-chip" hidden>browser-cookie3</span>
-            </div>
-            <div class="youtube-actions" id="youtube-single-actions">
-              <button type="button" id="btn-youtube-ingest" class="btn-primary" data-i18n="page.35e044345972">Получить транскрипт</button>
-            </div>
-            <p id="youtube-ingest-status" class="hint youtube-ingest-status"></p>
-            <div id="youtube-batch-panel" class="youtube-batch-panel" hidden>
-              <fieldset class="youtube-batch-source">
-                <legend data-i18n="page.8290a3dbc0c8">Источник</legend>
-                <label class="youtube-batch-source-option" for="youtube-batch-mode-lines">
-                  <input type="radio" name="youtube-batch-mode" id="youtube-batch-mode-lines" value="lines" checked>
-                  <span data-i18n="page.e6f294420d21">Список ссылок (по одной на строку)</span>
-                </label>
-                <label class="youtube-batch-source-option" for="youtube-batch-mode-feed">
-                  <input type="radio" name="youtube-batch-mode" id="youtube-batch-mode-feed" value="feed">
-                  <span data-i18n="page.9d2ed01e54fb">Канал или плейлист (одна ссылка)</span>
-                </label>
-              </fieldset>
-              <label class="field" id="youtube-batch-lines-wrap">
-                <span class="field-label" data-i18n="page.488356b435d9">Ссылки на видео</span>
-                <textarea id="youtube-batch-lines" class="youtube-batch-textarea" rows="6" spellcheck="false" placeholder="https://www.youtube.com/watch?v=…"></textarea>
-              </label>
-              <label class="field" id="youtube-batch-feed-wrap" hidden>
-                <span class="field-label" data-i18n="page.c55f5be758a9">URL канала или плейлиста</span>
-                <input type="url" id="youtube-batch-feed-url" class="youtube-url-input" placeholder="https://www.youtube.com/@…/videos">
-              </label>
-              <details class="youtube-batch-filters">
-                <summary data-i18n="youtube.batchFiltersSummary">Фильтры (канал / плейлист)</summary>
-                <div class="youtube-batch-filters-grid">
-                  <label class="field">
-                    <span class="field-label" data-i18n="page.b3136b0109e3">Лимит видео</span>
-                    <input type="number" id="youtube-batch-limit" min="1" placeholder="5">
-                  </label>
-                  <label class="field">
-                    <span class="field-label" data-i18n="page.a29f6fdb5502">Не раньше</span>
-                    <input type="date" id="youtube-batch-dateafter">
-                  </label>
-                  <label class="field">
-                    <span class="field-label" data-i18n="page.e37eb0da4f9b">Не позже</span>
-                    <input type="date" id="youtube-batch-datebefore">
-                  </label>
-                  <div class="youtube-batch-filters-row">
-                    <label class="field youtube-batch-start-video-field">
-                      <span class="field-label" data-i18n="page.1eb9aa7cfb7f">Ссылка на видео для старта</span>
-                      <input type="url" id="youtube-batch-start-video" class="youtube-url-input" placeholder="https://www.youtube.com/watch?v=…" spellcheck="false" autocomplete="off">
-                    </label>
-                    <label class="field youtube-batch-direction-field">
-                      <span class="field-label" data-i18n="page.ea8f530a954c">Направление от стартового</span>
-                      <select id="youtube-batch-direction">
-                        <option value="older" data-i18n="page.45b470a5e262">Старее (к концу ленты)</option>
-                        <option value="newer" data-i18n="page.1b95f58ff583">Новее (к началу ленты)</option>
-                      </select>
-                    </label>
-                  </div>
-                </div>
-              </details>
-              <div class="youtube-batch-rules">
-                <label class="youtube-batch-option">
-                  <input type="checkbox" id="youtube-batch-skip-completed" checked>
-                  <span data-i18n="page.4e9bd75441b6">Пропускать уже готовые в пакете</span>
-                </label>
-                <label class="youtube-batch-option">
-                  <input type="checkbox" id="youtube-batch-export">
-                  <span data-i18n="page.b9ae7bf1d7f1">Автоэкспорт после каждого видео</span>
-                </label>
-                <div id="youtube-batch-export-options" class="youtube-batch-export-options" hidden>
-                  <label class="field">
-                    <span class="field-label" data-i18n="page.04e42537897f">Формат экспорта</span>
-                    <select id="youtube-batch-export-fmt">
-                      <option value="md">Markdown (Obsidian)</option>
-                      <option value="srt">SRT</option>
-                      <option value="vtt">VTT</option>
-                      <option value="txt">TXT</option>
-                    </select>
-                  </label>
-                  <div class="field">
-                    <span class="field-label" data-i18n="page.a63e955bbb32">Папки экспорта</span>
-                    <div id="youtube-batch-export-dirs" class="export-dirs-list"></div>
-                    <button type="button" id="youtube-batch-export-dir-add" class="btn-outline btn-compact export-dir-add" data-i18n="page.585b38ac2082">
-                      Добавить папку
-                    </button>
-                    <p class="hint" data-i18n="page.8ca10256cc62">Пустой список — файлы в каталог данных приложения (youtube/exports).</p>
-                  </div>
-                </div>
-              </div>
-              <div class="youtube-actions">
-                <button type="button" id="btn-youtube-batch-resolve" class="btn-outline" data-i18n="page.a55edbb7c1eb">Проверить список</button>
-                <button type="button" id="btn-youtube-batch-start" class="btn-primary" data-i18n="page.050583a41244">Запустить пакет</button>
-              </div>
-              <p id="youtube-batch-api-hint" class="hint" hidden data-i18n="page.b51ce168a12d">
-                Пакетный API недоступен. Закройте Slysh и запустите Slysh.bat заново (сброс кэша интерфейса не перезагружает Python).
+            <label class="field youtube-batch-direction-field">
+              <span class="field-label" data-i18n="page.ea8f530a954c">Направление от стартового</span>
+              <select id="youtube-batch-direction">
+                <option value="older" data-i18n="page.45b470a5e262">Старее (к концу ленты)</option>
+                <option value="newer" data-i18n="page.1b95f58ff583">Новее (к началу ленты)</option>
+              </select>
+            </label>
+          </div>
+        </div>
+      </details>
+
+      <!-- Правила и автоэкспорт -->
+      <div class="youtube-batch-rules">
+        <label class="youtube-batch-option">
+          <input type="checkbox" id="youtube-batch-skip-completed" checked>
+          <span data-i18n="page.4e9bd75441b6">Пропускать уже готовые в пакете</span>
+        </label>
+        <label class="youtube-batch-option">
+          <input type="checkbox" id="youtube-batch-export">
+          <span data-i18n="page.b9ae7bf1d7f1">Автоэкспорт после каждого видео</span>
+        </label>
+        
+        <div id="youtube-batch-export-options" class="youtube-batch-export-options" hidden>
+          <label class="field">
+            <span class="field-label" data-i18n="page.04e42537897f">Формат экспорта</span>
+            <select id="youtube-batch-export-fmt">
+              <option value="md">Markdown (Obsidian)</option>
+              <option value="srt">SRT</option>
+              <option value="vtt">VTT</option>
+              <option value="txt">TXT</option>
+            </select>
+          </label>
+          <div class="field">
+            <span class="field-label" data-i18n="page.a63e955bbb32">Папки экспорта</span>
+            <div id="youtube-batch-export-dirs" class="export-dirs-list"></div>
+            <button type="button" id="youtube-batch-export-dir-add" class="btn-outline btn-compact export-dir-add">
+              <svg class="w-3.5 h-3.5 inline-block mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+              <span data-i18n="page.585b38ac2082">Добавить папку</span>
+            </button>
+            <details id="youtube-batch-export-favorites-spoiler" class="export-favorites-spoiler">
+              <summary><span data-i18n="exportUi.favoritePathsSpoiler">Избранные пути</span></summary>
+              <p id="youtube-batch-export-favorites-empty" class="hint export-favorites-pick-empty" hidden data-i18n="exportUi.favoritePickEmpty">
+                Добавьте звёздочкой у пути или в Настройках → Система
               </p>
-              <p id="youtube-batch-preview" class="hint"></p>
-              <p id="youtube-batch-status" class="hint youtube-ingest-status"></p>
+              <div id="youtube-batch-export-favorites-pick-list" class="export-favorites-pick-list"></div>
+              <p class="hint export-favorites-pick-hint" data-i18n="exportUi.favoritePickHint">Нажмите +, чтобы добавить путь в список папок выше.</p>
+            </details>
+            <p class="hint" data-i18n="page.8ca10256cc62">Пустой список — файлы в каталог данных приложения (youtube/exports).</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Действия пакетного режима -->
+      <div class="youtube-actions">
+        <button type="button" id="btn-youtube-batch-resolve" class="btn-outline" data-i18n="page.a55edbb7c1eb">Проверить список</button>
+        <button type="button" id="btn-youtube-batch-start" class="btn-primary" data-i18n="page.050583a41244">Запустить пакет</button>
+      </div>
+      <p id="youtube-batch-api-hint" class="hint" hidden data-i18n="page.b51ce168a12d">
+        Пакетный API недоступен. Закройте Slysh и запустите Slysh.bat заново (сброс кэша интерфейса не перезагружает Python).
+      </p>
+      <p id="youtube-batch-preview" class="hint"></p>
+      <p id="youtube-batch-status" class="hint youtube-ingest-status"></p>
+    </div>
+
+    <!-- 5. Способ получения (ОБЩИЙ ДЛЯ ОДНОГО ВИДЕО И ПАКЕТА) -->
+    <fieldset class="youtube-methods">
+      <legend data-i18n="page.13c04f33d515">Способ получения</legend>
+      
+      <!-- Способ 1: Облачный сервис (Apify) -->
+      <div class="youtube-method-card" data-youtube-method="apify">
+        <div class="youtube-method-header-row">
+          <label class="youtube-method-head" for="youtube-method-apify">
+            <input type="radio" name="youtube-method" id="youtube-method-apify" value="apify" checked>
+            <span class="youtube-method-title" data-i18n="page.30ec6b7515f1">Облачный сервис</span>
+          </label>
+          <span id="youtube-status-apify" class="youtube-status-chip app-status-chip" data-i18n="page.7651ef63e832">Облако</span>
+        </div>
+        
+        <details class="youtube-method-details">
+          <summary class="youtube-method-summary">
+            <svg class="youtube-gear-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
+            <span data-i18n="youtube.methodSetup">Настройка способа</span>
+          </summary>
+          <div class="youtube-method-panel">
+            <p class="hint" data-i18n="page.ce894836fbe0">Транскрипт получается через облако Apify. Браузер и cookies на вашем ПК не нужны.</p>
+            <ol class="youtube-steps">
+              <li data-i18n-html="youtube.apifyStep1">Зарегистрируйтесь на <a href="https://apify.com/" target="_blank" rel="noopener noreferrer">apify.com</a>.</li>
+              <li data-i18n-html="youtube.apifyStep2">Откройте <a href="https://console.apify.com/account/integrations" target="_blank" rel="noopener noreferrer">API tokens</a> в личном кабинете.</li>
+              <li data-i18n="youtube.apifyStep3">Создайте токен и скопируйте его.</li>
+              <li data-i18n="youtube.apifyStep4">Вставьте ключ ниже и нажмите «Сохранить».</li>
+            </ol>
+            <div class="youtube-panel-row">
+              <input
+                id="youtube-apify-key"
+                type="password"
+                autocomplete="off"
+                spellcheck="false"
+                placeholder="Apify API token"
+              >
+              <button type="button" id="btn-youtube-apify-save" class="btn-outline btn-compact" data-i18n="page.4864057d626a">Сохранить</button>
+            </div>
+            <p id="youtube-apify-key-hint" class="hint"></p>
+          </div>
+        </details>
+      </div>
+
+      <!-- Способ 2: Через Firefox -->
+      <div class="youtube-method-card" data-youtube-method="firefox">
+        <div class="youtube-method-header-row">
+          <label class="youtube-method-head" for="youtube-method-firefox">
+            <input type="radio" name="youtube-method" id="youtube-method-firefox" value="firefox">
+            <span class="youtube-method-title" data-i18n="page.4d1c2deba446">Через ваш Firefox</span>
+          </label>
+          <span id="youtube-status-firefox" class="youtube-status-chip app-status-chip">Firefox</span>
+        </div>
+        
+        <details class="youtube-method-details">
+          <summary class="youtube-method-summary">
+            <svg class="youtube-gear-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
+            <span data-i18n="youtube.methodSetup">Настройка способа</span>
+          </summary>
+          <div class="youtube-method-panel">
+            <p class="hint" data-i18n-html="youtube.firefoxHint">
+              Бесплатно и локально. Войдите в YouTube в Firefox — приложение возьмёт cookies оттуда.
+              Извлечение доступно <strong>только из Mozilla Firefox</strong>.
+            </p>
+            <p id="youtube-firefox-meta" class="hint"></p>
+            <div class="youtube-panel-actions">
+              <button type="button" id="btn-youtube-extract-cookies-quick" class="btn-outline btn-compact" data-i18n="page.79d4c67eaa00">
+                Быстро из Firefox
+              </button>
+              <label class="mic-picker">
+                <span data-i18n="youtube.firefoxProfile">Профиль Firefox</span>
+                <select id="youtube-browser-profile"></select>
+              </label>
+              <button type="button" id="btn-youtube-extract-cookies" class="btn-outline btn-compact" data-i18n="page.6a1b5fc6fa5b">Извлечь</button>
             </div>
           </div>
-        </section>
+        </details>
+      </div>
+
+      <!-- Способ 3: Через файл cookies.txt -->
+      <div class="youtube-method-card" data-youtube-method="cookies">
+        <div class="youtube-method-header-row">
+          <label class="youtube-method-head" for="youtube-method-cookies">
+            <input type="radio" name="youtube-method" id="youtube-method-cookies" value="cookies">
+            <span class="youtube-method-title" data-i18n="page.302efca28f87">Через другой браузер</span>
+          </label>
+          <span id="youtube-status-cookies-file" class="youtube-status-chip app-status-chip" data-i18n="page.582ddc72086b">Файл cookies</span>
+        </div>
+        
+        <details class="youtube-method-details">
+          <summary class="youtube-method-summary">
+            <svg class="youtube-gear-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
+            <span data-i18n="youtube.methodSetup">Настройка способа</span>
+          </summary>
+          <div class="youtube-method-panel">
+            <p class="hint" data-i18n="page.b5c6227b8085">
+              Если вы пользуетесь Chrome, Edge или другим браузером — экспортируйте cookies вручную
+              и загрузите файл сюда.
+            </p>
+            <ol class="youtube-steps">
+              <li data-i18n-html="youtube.cookiesStep1">Установите расширение <a href="https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc" target="_blank" rel="noopener noreferrer">Get cookies.txt LOCALLY</a> (Chrome/Edge).</li>
+              <li data-i18n-html="youtube.cookiesStep2">Откройте <a href="https://www.youtube.com/" target="_blank" rel="noopener noreferrer">youtube.com</a> и войдите в аккаунт.</li>
+              <li data-i18n-html="youtube.cookiesStep3">Через расширение экспортируйте cookies для youtube.com в файл <code>cookies.txt</code>.</li>
+              <li data-i18n="youtube.cookiesStep4">Нажмите «Загрузить cookies.txt» ниже.</li>
+            </ol>
+            <p id="youtube-import-meta" class="hint"></p>
+            <div class="youtube-panel-actions">
+              <button type="button" id="btn-youtube-import-cookies" class="btn-outline btn-compact" data-i18n="page.8b6e8552f157">Загрузить cookies.txt</button>
+            </div>
+          </div>
+        </details>
+      </div>
+
+    </fieldset>
+
+    <!-- Скрытые системные чипы yt-dlp и browser-cookie3 (для поддержки js) -->
+    <div class="youtube-status-row hidden-chips-row">
+      <span id="youtube-status-ytdlp" class="youtube-status-chip app-status-chip" hidden>yt-dlp</span>
+      <span id="youtube-status-browser-cookie3" class="youtube-status-chip app-status-chip" hidden>browser-cookie3</span>
+    </div>
+
+    <!-- 6. Кнопка действия для Одиночного видео -->
+    <div class="youtube-actions" id="youtube-single-actions">
+      <button type="button" id="btn-youtube-ingest" class="btn-primary" data-i18n="page.35e044345972">Получить транскрипт</button>
+    </div>
+    <p id="youtube-ingest-status" class="hint youtube-ingest-status"></p>
+
+  </div>
+
+</section>
 
         <!-- Legacy workspace -->
         <section id="view-legacy" class="view legacy-workspace">
@@ -1565,22 +2009,56 @@
       </section>
       </div>
 
-      <div id="settings-pane-system" class="settings-bento-pane" role="tabpanel" aria-labelledby="settings-tab-system" hidden>
+      <div id="settings-pane-system" class="settings-bento-pane settings-system-pane" role="tabpanel" aria-labelledby="settings-tab-system" hidden>
       <p id="settings-app-version" class="hint settings-app-version" hidden></p>
-      <div class="settings-reload-block settings-bento-tile">
+      <details class="settings-spoiler settings-bento-spoiler settings-export-favorites-spoiler" id="settings-export-favorites-spoiler">
+        <summary class="settings-bento-spoiler-summary">
+          <div class="settings-bento-spoiler-left">
+            <span class="settings-bento-spoiler-chevron" aria-hidden="true">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <polyline points="9 18 15 12 9 6"></polyline>
+              </svg>
+            </span>
+            <span class="settings-bento-spoiler-icon" aria-hidden="true">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
+              </svg>
+            </span>
+            <span class="spoiler-summary-label" data-i18n="settings.exportFavoriteDirsTitle">Избранные папки экспорта</span>
+            <span class="settings-bento-count-badge" id="settings-export-favorites-count">0</span>
+          </div>
+        </summary>
+        <div class="spoiler-body settings-bento-spoiler-body">
+          <p class="hint settings-export-favorites-hint" data-i18n="settings.exportFavoriteDirsHint">В экспорте и YouTube-пакете: «+» в спойлере «Избранные пути» или звёздочка у строки папки. Здесь — полный список избранного.</p>
+          <div id="settings-export-favorite-dirs" class="export-dirs-list"></div>
+          <div class="settings-export-favorites-actions">
+            <button type="button" id="settings-export-favorite-add" class="btn-outline btn-compact export-dir-add">
+              <span class="material-symbols-outlined" aria-hidden="true">add</span>
+              <span data-i18n="exportUi.addFolder">Добавить папку</span>
+            </button>
+            <button type="button" id="settings-export-favorite-save" class="btn-primary btn-compact" data-i18n="settings.exportFavoriteDirsSave">Сохранить</button>
+          </div>
+        </div>
+      </details>
+      <div class="settings-reload-block settings-bento-tile settings-system-tile">
         <p class="hint settings-reload-hint" data-i18n="page.62ec01817f96">После правок в файлах интерфейса перезагрузите окно, чтобы подтянуть изменения.</p>
-        <button type="button" id="btn-reload-ui" class="btn-outline settings-reload-btn" data-i18n-title="settings.reloadUiTitle" title="Перезагрузить окно приложения">
-          <span class="material-symbols-outlined" aria-hidden="true">refresh</span>
-          <span data-i18n="settings.reloadUi">Обновить интерфейс</span>
-        </button>
-        <button type="button" id="btn-reset-ui-cache" class="btn-outline settings-reload-btn" data-i18n-title="settings.resetUiCacheTitle" title="Очистить сохранённое состояние интерфейса">
-          <span class="material-symbols-outlined" aria-hidden="true">delete_sweep</span>
-          <span data-i18n="settings.resetUiCache">Сбросить кэш интерфейса</span>
-        </button>
+        <div class="settings-reload-btns-row">
+          <button type="button" id="btn-reload-ui" class="settings-reload-btn settings-system-action-btn" data-i18n-title="settings.reloadUiTitle" title="Перезагрузить окно приложения">
+            <span class="material-symbols-outlined" aria-hidden="true">refresh</span>
+            <span data-i18n="settings.reloadUi">Обновить интерфейс</span>
+          </button>
+          <button type="button" id="btn-reset-ui-cache" class="settings-reload-btn settings-system-action-btn" data-i18n-title="settings.resetUiCacheTitle" title="Очистить сохранённое состояние интерфейса">
+            <span class="material-symbols-outlined" aria-hidden="true">delete_sweep</span>
+            <span data-i18n="settings.resetUiCache">Сбросить кэш интерфейса</span>
+          </button>
+        </div>
       </div>
-      <div class="settings-logs-block">
-        <p class="hint settings-logs-hint"><span data-i18n="settings.appLogLabel">Лог приложения:</span> <code id="settings-logs-path">%LOCALAPPDATA%\Slysh\logs\app.log</code></p>
-        <button type="button" id="btn-open-logs" class="btn-outline settings-reload-btn" data-i18n-title="settings.openLogsFolderTitle" title="Открыть папку с логами">
+      <div class="settings-logs-block settings-system-tile">
+        <div class="settings-logs-hint">
+          <span data-i18n="settings.appLogLabel">Лог приложения:</span>
+          <code id="settings-logs-path">%LOCALAPPDATA%\Slysh\logs\app.log</code>
+        </div>
+        <button type="button" id="btn-open-logs" class="settings-reload-btn settings-system-action-btn" data-i18n-title="settings.openLogsFolderTitle" title="Открыть папку с логами">
           <span class="material-symbols-outlined" aria-hidden="true">folder_open</span>
           <span data-i18n="settings.openLogsFolder">Открыть папку логов</span>
         </button>
@@ -1752,16 +2230,19 @@
   </div>
 
   <div id="export-modal" class="modal" hidden>
-    <div class="modal-card" role="dialog" aria-labelledby="export-title">
+    <div class="modal-card export-modal-card" role="dialog" aria-labelledby="export-title">
       <div class="modal-card-header">
         <h2 id="export-title" data-i18n="page.dd5016c82982">Экспорт</h2>
         <button type="button" id="export-close" class="modal-card-close icon-btn" data-i18n-title="page.4ae50d30739d" title="Закрыть" aria-label="Закрыть">
-          <span class="material-symbols-outlined" aria-hidden="true">close</span>
+          <svg class="export-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
         </button>
       </div>
       <p id="export-batch-hint" class="hint" hidden></p>
       <label class="field">
-        <span data-i18n="exportUi.format">Формат</span>
+        <span class="field-label" data-i18n="exportUi.format">Формат</span>
         <select id="export-fmt">
           <option value="md">Markdown (Obsidian)</option>
           <option value="srt">SRT</option>
@@ -1770,20 +2251,53 @@
         </select>
       </label>
       <label class="field" id="export-name-field">
-        <span data-i18n="exportUi.fileName">Имя файла</span>
-        <input id="export-name" type="text" spellcheck="false">
+        <span class="field-label" data-i18n="exportUi.fileName">Имя файла</span>
+        <input id="export-name" type="text" spellcheck="false" autocomplete="off">
       </label>
       <div class="field" id="export-dirs-field">
         <span class="field-label" data-i18n="page.38ee4ea3f9e8">Папки</span>
         <div id="export-dirs-list" class="export-dirs-list"></div>
-        <button type="button" id="export-dir-add" class="btn-outline btn-compact export-dir-add">
-          <span class="material-symbols-outlined" aria-hidden="true">add</span>
-          <span data-i18n="exportUi.addFolder">Добавить папку</span>
-        </button>
+        <div class="export-dir-actions-row">
+          <button type="button" id="export-dir-add" class="btn-outline btn-compact export-dir-add">
+            <svg class="export-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            <span data-i18n="exportUi.addFolder">Добавить папку</span>
+          </button>
+          <button type="button" id="export-favorites-toggle" class="export-favorites-toggle-btn" aria-expanded="false" aria-controls="export-favorites-container">
+            <svg class="export-fav-star-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
+            </svg>
+            <span data-i18n="exportUi.favoritePathsSpoiler">Избранные пути</span>
+            <span id="export-favorites-count-badge" class="export-fav-count-badge">0</span>
+            <svg class="export-fav-chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </button>
+        </div>
+        <div id="export-favorites-container" class="export-favorites-container" hidden>
+          <p class="export-favorites-header-title" data-i18n="exportUi.favoritesQuickPickTitle">Папки быстрого выбора</p>
+          <p id="export-favorites-pick-empty" class="hint export-favorites-pick-empty" hidden data-i18n="exportUi.favoritePickEmpty">
+            Добавьте звёздочкой у пути или в Настройках → Система
+          </p>
+          <div id="export-favorites-pick-list" class="export-favorites-pick-list"></div>
+        </div>
       </div>
       <div class="modal-actions">
         <button type="button" id="export-confirm" class="btn-primary" data-i18n="page.4864057d626a">Сохранить</button>
         <button type="button" id="export-cancel" class="ghost" data-i18n="page.0ec753be8df9">Отмена</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="export-favorite-remove-modal" class="modal" hidden>
+    <div class="modal-card export-favorite-remove-card" role="dialog" aria-labelledby="export-favorite-remove-title">
+      <h2 id="export-favorite-remove-title" data-i18n="exportUi.favoriteRemoveTitle">Удалить из избранного?</h2>
+      <p id="export-favorite-remove-body" class="hint export-favorite-remove-body"></p>
+      <div class="modal-actions">
+        <button type="button" id="export-favorite-remove-confirm" class="btn-primary" data-i18n="exportUi.favoriteRemoveConfirm">Удалить</button>
+        <button type="button" id="export-favorite-remove-cancel" class="ghost" data-i18n="page.0ec753be8df9">Отмена</button>
       </div>
     </div>
   </div>
@@ -1855,33 +2369,34 @@
       "/js/batch-panel.js": "/js/batch-panel.js?v=47",
       "/js/batch-kind.js": "/js/batch-kind.js?v=45",
       "/js/dashboard.js": "/js/dashboard.js?v=46",
-      "/js/editor.js": "/js/editor.js?v=59",
+      "/js/editor.js": "/js/editor.js?v=63",
       "/js/transcript-format.js": "/js/transcript-format.js?v=1",
       "/js/errors.js": "/js/errors.js?v=45",
       "/js/i18n.js": "/js/i18n.js?v=56",
       "/js/icons.js": "/js/icons.js?v=45",
       "/js/intake-duplicate.js": "/js/intake-duplicate.js?v=45",
       "/js/intake-followup.js": "/js/intake-followup.js?v=1",
-      "/js/legacy.js": "/js/legacy.js?v=65",
+      "/js/legacy.js": "/js/legacy.js?v=77",
+      "/js/export-favorites.js": "/js/export-favorites.js?v=8",
       "/js/media-time.js": "/js/media-time.js?v=45",
       "/js/library-store.js": "/js/library-store.js?v=48",
       "/js/job-source.js": "/js/job-source.js?v=45",
       "/js/library-table-filters.js": "/js/library-table-filters.js?v=45",
       "/js/library-table.js": "/js/library-table.js?v=45",
-      "/js/library-utils.js": "/js/library-utils.js?v=50",
-      "/js/live.js": "/js/live.js?v=49",
-      "/js/meeting.js": "/js/meeting.js?v=50",
+      "/js/library-utils.js": "/js/library-utils.js?v=52",
+      "/js/live.js": "/js/live.js?v=51",
+      "/js/meeting.js": "/js/meeting.js?v=52",
       "/js/asr-context-bar.js": "/js/asr-context-bar.js?v=1",
       "/js/main.js": "/js/main.js?v=60",
       "/js/secret-field.js": "/js/secret-field.js?v=46",
       "/js/orphan-files-table.js": "/js/orphan-files-table.js?v=46",
       "/js/queue.js": "/js/queue.js?v=47",
-      "/js/router.js": "/js/router.js?v=49",
-      "/js/shell.js": "/js/shell.js?v=87",
+      "/js/router.js": "/js/router.js?v=51",
+      "/js/shell.js": "/js/shell.js?v=89",
       "/js/state.js": "/js/state.js?v=45",
       "/js/transcripts.js": "/js/transcripts.js?v=45",
       "/js/version.js": "/js/version.js?v=45",
-      "/js/youtube.js": "/js/youtube.js?v=48"
+      "/js/youtube.js": "/js/youtube.js?v=52"
     }
   }
   </script>

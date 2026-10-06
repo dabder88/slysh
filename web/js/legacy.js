@@ -20,6 +20,20 @@ import { isYoutubeBatch } from "./batch-kind.js";
 import { reportError } from "./errors.js";
 import { ensureIntakeAllowed } from "./intake-duplicate.js";
 import {
+  addExportDirRowToList,
+  applyFavoritePathToExportList,
+  buildFavoriteKeySet,
+  collectExportTargetDirs,
+  fetchExportFavoriteDirs,
+  fillExportDirsList,
+  initExportFavoriteRemoveConfirm,
+  initExportFavoritesToggle,
+  renderFavoritePickList,
+  syncAllExportDirRowStars,
+  syncExportDirRemoveButtons,
+  syncExportDirRowStar,
+} from "./export-favorites.js";
+import {
   batchIntakeResult,
   openIntakeFollowup,
   orphansIntakeResult,
@@ -68,6 +82,8 @@ const exportNameEl = document.getElementById("export-name");
 const exportDirsListEl = document.getElementById("export-dirs-list");
 const exportDirAddBtn = document.getElementById("export-dir-add");
 const exportFmtEl = document.getElementById("export-fmt");
+const exportFavoritesPickListEl = document.getElementById("export-favorites-pick-list");
+const exportFavoritesPickEmptyEl = document.getElementById("export-favorites-pick-empty");
 const exportActionsEl = document.getElementById("export-actions");
 const exportActionsPathEl = document.getElementById("export-actions-path");
 const ctxMenu = document.getElementById("ctx-menu");
@@ -105,7 +121,23 @@ export function syncSelectedJobId(id) {
   selectedId = id;
 }
 
-let segmentsRevision = 0;
+/** @type {Map<number, number>} */
+const segmentsRevisionByJob = new Map();
+
+function getSegmentsRevision(jobId) {
+  if (jobId == null) {
+    return 0;
+  }
+  const key = Number(jobId);
+  return segmentsRevisionByJob.get(key) ?? 0;
+}
+
+function setSegmentsRevision(jobId, rev) {
+  if (jobId == null) {
+    return;
+  }
+  segmentsRevisionByJob.set(Number(jobId), Number(rev) || 0);
+}
 let pollTimer = null;
 let jobs = [];
 let batches = [];
@@ -135,11 +167,22 @@ function isModalBackdropSuppressed() {
   return Date.now() < modalBackdropSuppressUntil;
 }
 
+/** @type {Map<HTMLElement, { depth: number, prevPointerEvents: string }>} */
+const pickFolderModalGuard = new Map();
+
 async function pickFolderWithGhostClickGuard(current = "", modalEl = null) {
   suppressModalBackdrop(500);
-  const prevPointerEvents = modalEl?.style.pointerEvents ?? "";
   if (modalEl) {
-    modalEl.style.pointerEvents = "none";
+    let guard = pickFolderModalGuard.get(modalEl);
+    if (!guard) {
+      guard = { depth: 0, prevPointerEvents: modalEl.style.pointerEvents ?? "" };
+      pickFolderModalGuard.set(modalEl, guard);
+    }
+    if (guard.depth === 0) {
+      guard.prevPointerEvents = modalEl.style.pointerEvents ?? "";
+      modalEl.style.pointerEvents = "none";
+    }
+    guard.depth += 1;
   }
   try {
     if (!window.pywebview?.api?.pick_folder) {
@@ -150,7 +193,14 @@ async function pickFolderWithGhostClickGuard(current = "", modalEl = null) {
     return folder || null;
   } finally {
     if (modalEl) {
-      modalEl.style.pointerEvents = prevPointerEvents;
+      const guard = pickFolderModalGuard.get(modalEl);
+      if (guard) {
+        guard.depth -= 1;
+        if (guard.depth <= 0) {
+          modalEl.style.pointerEvents = guard.prevPointerEvents;
+          pickFolderModalGuard.delete(modalEl);
+        }
+      }
     }
   }
 }
@@ -324,6 +374,10 @@ function progressStageLabel(job) {
   }
   if (job.status === "finalizing" || job.capture_finalizing) {
     return t("legacy.stageFinalizeCapture");
+  }
+  const prog = Number(job?.progress ?? 0);
+  if (job.status === "running" && prog >= 0.97 && prog < 1) {
+    return t("legacy.stageFinalChunk");
   }
   return t("legacy.stageTranscribe");
 }
@@ -528,6 +582,9 @@ function canStartJob(job) {
 export function jobHasTranscriptContent(job) {
   if (!job) {
     return false;
+  }
+  if (job.has_transcript === true) {
+    return true;
   }
   if (Array.isArray(job.segments) && job.segments.length > 0) {
     return true;
@@ -957,15 +1014,28 @@ function isEditingTranscript() {
   return document.activeElement === transcriptEl;
 }
 
-function syncSegmentsRevision(rev) {
+function syncSegmentsRevision(jobId, rev) {
   if (isEditingTranscript()) {
     return;
   }
-  segmentsRevision = Number(rev) || 0;
+  if (jobId == null) {
+    return;
+  }
+  const id = Number(jobId);
+  const activeId =
+    getRoute() === "editor"
+      ? Number(window.__editorCurrentJobId?.() ?? selectedId)
+      : Number(selectedId);
+  if (activeId != null && id !== activeId) {
+    return;
+  }
+  setSegmentsRevision(id, rev);
 }
 
 if (typeof window !== "undefined") {
   window.__syncSegmentsRevision = syncSegmentsRevision;
+  window.__getSegmentsRevision = getSegmentsRevision;
+  window.__setSegmentsRevision = setSegmentsRevision;
 }
 
 async function selectJob(id) {
@@ -985,7 +1055,7 @@ async function selectJob(id) {
     }
   }
   if (!isEditingTranscript()) {
-    segmentsRevision = Number(job.segments_revision) || 0;
+    setSegmentsRevision(id, job.segments_revision);
     renderTranscript(job.transcript || "");
   }
   syncSpeakersUi(job);
@@ -1038,7 +1108,7 @@ async function pollJobs() {
   syncPoll();
 }
 
-function syncTranscribeUi(job) {
+export function syncTranscribeUi(job) {
   const youtube = isYoutubeJob(job);
   const isActive = Boolean(
     job &&
@@ -1060,7 +1130,7 @@ function syncTranscribeUi(job) {
 
   const continueMode = shouldShowContinueTranscribe(job);
   if (transcribeBtn) {
-    transcribeBtn.hidden = false;
+    transcribeBtn.hidden = isActive || !canStart;
     transcribeBtn.disabled = !canStart;
     transcribeBtn.textContent = youtube
       ? t("common.refreshTranscript")
@@ -1084,7 +1154,7 @@ function syncTranscribeUi(job) {
     retranscribeBtn.hidden = !canRetranscribe;
   }
   if (topTranscribe) {
-    topTranscribe.hidden = !inEditor;
+    topTranscribe.hidden = !inEditor || isActive || !canStart;
     topTranscribe.disabled = !canStart;
     const topLabel = topTranscribe.querySelector("span:last-child");
     if (topLabel) {
@@ -1100,6 +1170,10 @@ function syncTranscribeUi(job) {
     if (!isActive) {
       topStop.disabled = true;
     }
+  }
+  const topExport = document.getElementById("btn-topbar-export");
+  if (topExport && inEditor) {
+    topExport.hidden = !canExportJob(job);
   }
 
   const armId = isActive && job ? job.id : null;
@@ -2034,9 +2108,10 @@ async function saveSegments() {
   }
   const saveJobId = jobId;
   const draftGenAtStart = window.__editorDraftGeneration?.() ?? 0;
+  const revisionAtStart = getSegmentsRevision(saveJobId);
   const payload = {
     transcript: transcriptEl.value,
-    expected_revision: segmentsRevision,
+    expected_revision: revisionAtStart,
   };
   try {
     const res = await api(`/api/jobs/${jobId}/segments`, {
@@ -2046,14 +2121,14 @@ async function saveSegments() {
     });
     const job = await api(`/api/jobs/${jobId}`);
     upsertJobInStore(job);
-    if (res?.segments_revision != null) {
-      segmentsRevision = Number(res.segments_revision) || segmentsRevision;
-    } else {
-      segmentsRevision = Number(job.segments_revision) || segmentsRevision;
-    }
+    const newRevision =
+      res?.segments_revision != null
+        ? Number(res.segments_revision) || revisionAtStart
+        : Number(job.segments_revision) || revisionAtStart;
+    setSegmentsRevision(saveJobId, newRevision);
     if (saveResponseAppliesToEditor(saveJobId, draftGenAtStart)) {
       renderTranscript(job.transcript || "");
-      window.__editorMarkDraftSaved?.();
+      window.__editorMarkDraftSaved?.(newRevision);
       window.__editorRefreshJob?.(job);
     }
     showToast("common.saved");
@@ -2061,7 +2136,7 @@ async function saveSegments() {
     if (err.status === 409) {
       showToast(err.message || String(err));
       const job = await api(`/api/jobs/${jobId}`);
-      segmentsRevision = Number(job.segments_revision) || segmentsRevision;
+      setSegmentsRevision(saveJobId, job.segments_revision);
       if (saveResponseAppliesToEditor(saveJobId, draftGenAtStart) && !isEditingTranscript()) {
         renderTranscript(job.transcript || "");
       }
@@ -2080,6 +2155,11 @@ function sourceDir(sourcePath) {
   return (sourcePath || "").replace(/[/\\][^/\\]+$/, "");
 }
 
+/** @type {Set<string>} */
+let exportModalFavoriteKeys = new Set();
+let exportModalFavoriteDirsCache = [];
+let exportFavoritesToggleReady = false;
+
 function closeExportModal() {
   if (!exportModal) {
     return;
@@ -2087,69 +2167,106 @@ function closeExportModal() {
   exportModal.hidden = true;
   pendingExportJobs = null;
   exportTargetJobId = null;
+  exportModalFavoriteKeys = new Set();
   resetExportDirs("");
 }
 
-function createExportDirRow(value = "") {
-  const row = document.createElement("div");
-  row.className = "export-dir-row field-row";
-
-  const input = document.createElement("input");
-  input.type = "text";
-  input.className = "export-dir-input";
-  input.spellcheck = false;
-  input.value = value;
-
-  const browseBtn = document.createElement("button");
-  browseBtn.type = "button";
-  browseBtn.className = "btn-outline btn-compact";
-  browseBtn.dataset.act = "browse";
-  browseBtn.title = t("common.browse");
-  browseBtn.setAttribute("aria-label", t("common.browse"));
-  browseBtn.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">folder_open</span>';
-
-  const removeBtn = document.createElement("button");
-  removeBtn.type = "button";
-  removeBtn.className = "btn-outline btn-compact export-dir-remove";
-  removeBtn.dataset.act = "remove";
-  removeBtn.title = t("common.delete");
-  removeBtn.setAttribute("aria-label", t("common.delete"));
-  removeBtn.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">close</span>';
-
-  row.append(input, browseBtn, removeBtn);
-  return row;
-}
-
-function syncExportDirRemoveButtons() {
+function resetExportDirs(initialPaths = "") {
   if (!exportDirsListEl) {
     return;
   }
-  const rows = exportDirsListEl.querySelectorAll(".export-dir-row");
-  const hideRemove = rows.length <= 1;
-  rows.forEach((row) => {
-    const removeBtn = row.querySelector('[data-act="remove"]');
-    if (removeBtn) {
-      removeBtn.hidden = hideRemove;
-    }
+  let paths;
+  if (Array.isArray(initialPaths)) {
+    paths = initialPaths.length ? initialPaths : [""];
+  } else {
+    paths = [initialPaths || ""];
+  }
+  fillExportDirsList(exportDirsListEl, paths, { showFavoriteStar: false });
+  renderExportModalFavoritePickList([]);
+}
+
+function ensureExportFavoritesToggle(dirsCount) {
+  if (exportFavoritesToggleReady) {
+    return;
+  }
+  const toggleBtn = document.getElementById("export-favorites-toggle");
+  const containerEl = document.getElementById("export-favorites-container");
+  const countBadgeEl = document.getElementById("export-favorites-count-badge");
+  if (!toggleBtn || !containerEl) {
+    return;
+  }
+  initExportFavoritesToggle({ toggleBtn, containerEl, countBadgeEl, count: dirsCount });
+  exportFavoritesToggleReady = true;
+}
+
+function renderExportModalFavoritePickList(dirs) {
+  exportModalFavoriteDirsCache = Array.isArray(dirs) ? dirs : [];
+  renderFavoritePickList(exportFavoritesPickListEl, exportFavoritesPickEmptyEl, exportModalFavoriteDirsCache, {
+    onAdd: (dir) => {
+      const result = applyFavoritePathToExportList(exportDirsListEl, dir, exportDirRowOptions());
+      if (result === "duplicate") {
+        showToast(t("exportUi.favoriteAlreadyInList"));
+      } else if (result !== "noop") {
+        renderExportModalFavoritePickList(exportModalFavoriteDirsCache);
+      }
+    },
+    onRemove: (updatedDirs) => {
+      exportModalFavoriteDirsCache = updatedDirs;
+      exportModalFavoriteKeys = buildFavoriteKeySet(updatedDirs);
+      renderExportModalFavoritePickList(updatedDirs);
+      syncAllExportDirRowStars(exportDirsListEl, exportModalFavoriteKeys);
+    },
+    targetListEl: exportDirsListEl,
   });
 }
 
-function addExportDirRow(value = "") {
-  if (!exportDirsListEl) {
-    return null;
-  }
-  const row = createExportDirRow(value);
-  exportDirsListEl.appendChild(row);
-  syncExportDirRemoveButtons();
-  return row;
+function exportDirRowOptions() {
+  return {
+    onBrowse: browseExportFolderInput,
+    favoriteKeys: exportModalFavoriteKeys,
+    showFavoriteStar: true,
+    onFavoriteToggled: handleExportFavoriteToggled,
+    onTargetDirsChanged: () => renderExportModalFavoritePickList(exportModalFavoriteDirsCache),
+  };
 }
 
-function resetExportDirs(initialPath = "") {
-  if (!exportDirsListEl) {
+async function handleExportFavoriteToggled(result) {
+  if (result?.error) {
+    showToast(result.error.message || String(result.error));
     return;
   }
-  exportDirsListEl.replaceChildren();
-  addExportDirRow(initialPath);
+  let dirs = result?.dirs;
+  if (!dirs) {
+    try {
+      dirs = await fetchExportFavoriteDirs({ fresh: true });
+    } catch (err) {
+      showToast(err.message || String(err));
+      return;
+    }
+  }
+  exportModalFavoriteKeys = buildFavoriteKeySet(dirs);
+  renderExportModalFavoritePickList(dirs);
+  syncAllExportDirRowStars(exportDirsListEl, exportModalFavoriteKeys);
+  if (result?.added) {
+    showToast(t("settings.exportFavoriteDirsSaved"));
+  }
+}
+
+async function prepareExportModalDirs(fallbackDir) {
+  let dirs = [];
+  try {
+    dirs = await fetchExportFavoriteDirs({ fresh: true });
+  } catch {
+    dirs = [];
+  }
+  exportModalFavoriteKeys = buildFavoriteKeySet(dirs);
+  fillExportDirsList(exportDirsListEl, [fallbackDir || ""], exportDirRowOptions());
+  ensureExportFavoritesToggle(dirs.length);
+  renderExportModalFavoritePickList(dirs);
+}
+
+function addExportDirRow(value = "") {
+  return addExportDirRowToList(exportDirsListEl, value, exportDirRowOptions());
 }
 
 function removeExportDirRow(row) {
@@ -2160,28 +2277,11 @@ function removeExportDirRow(row) {
     return;
   }
   row.remove();
-  syncExportDirRemoveButtons();
+  syncExportDirRemoveButtons(exportDirsListEl);
 }
 
 function collectExportDirectories() {
-  if (!exportDirsListEl) {
-    return [];
-  }
-  const seen = new Set();
-  const unique = [];
-  for (const input of exportDirsListEl.querySelectorAll(".export-dir-input")) {
-    const value = (input.value || "").trim();
-    if (!value) {
-      continue;
-    }
-    const key = value.toLowerCase();
-    if (seen.has(key)) {
-      continue;
-    }
-    seen.add(key);
-    unique.push(value);
-  }
-  return unique;
+  return collectExportTargetDirs(exportDirsListEl);
 }
 
 async function browseExportFolderInput(inputEl) {
@@ -2192,6 +2292,10 @@ async function browseExportFolderInput(inputEl) {
     const folder = await pickFolderWithGhostClickGuard(inputEl.value || "", exportModal);
     if (folder) {
       inputEl.value = folder;
+      const row = inputEl.closest(".export-dir-row");
+      if (row) {
+        syncExportDirRowStar(row, exportModalFavoriteKeys);
+      }
     }
     return;
   }
@@ -2245,24 +2349,25 @@ async function openExportModal() {
     showToast("legacy.k9064548");
     return;
   }
-  let job = jobById(id);
-  if (!job) {
-    try {
-      job = await api(`/api/jobs/${id}`);
-      upsertJobInStore(job);
-    } catch {
-      job = null;
-    }
-  }
-  openJobExportModal(job);
+  const stub = jobById(id) || { id };
+  await openJobExportModal(stub);
 }
 
-function openJobExportModal(job) {
-  if (!job) {
+async function openJobExportModal(job) {
+  const jobId = job?.id;
+  if (jobId == null) {
     showToast("legacy.k8638182");
     return;
   }
-  if (!canExportJob(job)) {
+  let fresh = job;
+  try {
+    fresh = await api(`/api/jobs/${jobId}`);
+    upsertJobInStore(fresh);
+  } catch (err) {
+    showToast(err.message || String(err));
+    return;
+  }
+  if (!canExportJob(fresh)) {
     showToast("legacy.k9486817");
     return;
   }
@@ -2270,12 +2375,12 @@ function openJobExportModal(job) {
     showToast("common.restartApp");
     return;
   }
-  exportTargetJobId = job.id;
+  exportTargetJobId = fresh.id;
   pendingExportJobs = null;
   setExportModalMode("single");
   exportFmtEl.value = "srt";
-  exportNameEl.value = `${sourceStem(job.source_path)}.srt`;
-  resetExportDirs(sourceDir(job.source_path));
+  exportNameEl.value = `${sourceStem(fresh.source_path)}.srt`;
+  await prepareExportModalDirs(sourceDir(fresh.source_path));
   exportModal.hidden = false;
   requestAnimationFrame(() => {
     exportNameEl?.focus();
@@ -2283,7 +2388,7 @@ function openJobExportModal(job) {
   });
 }
 
-function openBatchExportModal(jobsToExport) {
+async function openBatchExportModal(jobsToExport) {
   const exportable = (jobsToExport || []).filter((job) => canExportJob(job));
   if (!exportable.length) {
     showToast("legacy.k1604307");
@@ -2297,7 +2402,7 @@ function openBatchExportModal(jobsToExport) {
   pendingExportJobs = exportable;
   setExportModalMode("batch", exportable.length);
   exportFmtEl.value = "srt";
-  resetExportDirs(sourceDir(exportable[0].source_path));
+  await prepareExportModalDirs(sourceDir(exportable[0].source_path));
   exportModal.hidden = false;
 }
 
@@ -2788,22 +2893,14 @@ function bindLegacyEvents() {
     const row = addExportDirRow("");
     const input = row?.querySelector(".export-dir-input");
     input?.focus();
+    renderExportModalFavoritePickList(exportModalFavoriteDirsCache);
   });
-  exportDirsListEl?.addEventListener("click", (event) => {
-    const btn = event.target.closest("[data-act]");
-    if (!btn) {
-      return;
-    }
-    const row = btn.closest(".export-dir-row");
-    if (btn.dataset.act === "browse") {
-      const input = row?.querySelector(".export-dir-input");
-      browseExportFolderInput(input).catch((err) => showToast(err.message || String(err)));
-      return;
-    }
-    if (btn.dataset.act === "remove") {
-      removeExportDirRow(row);
+  exportDirsListEl?.addEventListener("input", (event) => {
+    if (event.target?.classList?.contains("export-dir-input")) {
+      renderExportModalFavoritePickList(exportModalFavoriteDirsCache);
     }
   });
+  initExportFavoriteRemoveConfirm();
   exportFmtEl?.addEventListener("change", () => syncExportNameExtension());
   document.getElementById("btn-open-export")?.addEventListener("click", () =>
     openSavedExport(false).catch((err) => showToast(err.message || String(err)))
@@ -3135,4 +3232,6 @@ export {
   unarchiveSelectedJob,
   pickFilePaths,
   pickFolderPath,
+  syncJobBanner,
+  syncSpeakersUi,
 };

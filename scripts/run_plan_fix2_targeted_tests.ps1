@@ -16,6 +16,7 @@ $env:SLYSH_DISABLE_OPENAPI = "1"
 
 $PyTests = @(
     "tests/test_speakers_cancel.py",
+    "tests/test_editor_segments_revision_guard.py",
     "tests/test_chunking.py",
     "tests/test_single_instance.py",
     "tests/test_secrets_dpapi_migration.py",

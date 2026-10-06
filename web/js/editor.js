@@ -3,13 +3,16 @@ import { api, jobDisplayName, isYoutubeJob, formatDuration, showToast } from "./
 import { jobSourceLabel } from "./job-source.js";
 import { reportError } from "./errors.js";
 import { getRoute, navigate } from "./router.js";
-import { batchById, jobStatusLabel } from "./library-store.js";
+import { batchById, jobStatusLabel, upsertJobInStore } from "./library-store.js";
 import { localeDateTag, t } from "./i18n.js";
 import {
   selectJob,
   setEditorRefreshHook,
   refreshLibrary,
   syncExportActions,
+  syncTranscribeUi,
+  syncSpeakersUi,
+  syncJobBanner,
   openBatchExportModal,
   syncSelectedJobId,
   hideEditorJobBanner,
@@ -256,9 +259,15 @@ async function pollEditorJob() {
     return;
   }
   currentJob = job;
+  upsertJobInStore(job);
+  syncTranscribeUi(job);
+  syncSpeakersUi(job);
+  syncExportActions(job);
+  syncJobBanner(job);
+  syncEditorChrome(job);
   syncEditModeAvailability(job);
   if (!editorDraftDirty) {
-    window.__syncSegmentsRevision?.(job.segments_revision);
+    window.__syncSegmentsRevision?.(jobId, job.segments_revision);
   }
   if (editorMode === "view" && !editorDraftDirty) {
     renderViewSegments(job);
@@ -271,6 +280,10 @@ async function pollEditorJob() {
       syncSpeakersPanel();
       drawWaveform(job);
       await refreshLibrary();
+      upsertJobInStore(job);
+      syncTranscribeUi(job);
+      syncSpeakersUi(job);
+      syncExportActions(job);
     }
   }
 }
@@ -934,6 +947,7 @@ function renderEditor(job) {
     renderViewSegments(job);
   }
   renderBatchPanel(job);
+  syncSpeakersUi(job);
   syncSpeakersPanel();
   drawWaveform(job);
   updateTransport(job);
@@ -973,11 +987,14 @@ function bumpEditorDraftGeneration() {
   return editorDraftGeneration;
 }
 
-export function markEditorDraftSaved() {
+export function markEditorDraftSaved(newRevision = null) {
   editorDraftDirty = false;
   if (currentJobId != null && editorDrafts.has(currentJobId)) {
     const draft = editorDrafts.get(currentJobId);
     draft.dirty = false;
+    if (newRevision != null) {
+      draft.revision = Number(newRevision) || draft.revision;
+    }
   }
 }
 
@@ -994,10 +1011,13 @@ function stashEditorDraft(jobId) {
   if (jobId == null || !textarea || !editorDraftDirty) {
     return;
   }
+  const rev =
+    window.__getSegmentsRevision?.(jobId) ??
+    (Number(currentJob?.segments_revision) || 0);
   editorDrafts.set(jobId, {
     text: textarea.value,
     dirty: true,
-    revision: Number(currentJob?.segments_revision) || 0,
+    revision: Number(rev) || 0,
   });
 }
 
@@ -1009,6 +1029,7 @@ function restoreEditorDraft(job) {
   }
   textarea.value = draft.text;
   editorDraftDirty = true;
+  window.__setSegmentsRevision?.(job.id, draft.revision);
   return true;
 }
 
