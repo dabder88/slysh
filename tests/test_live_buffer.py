@@ -38,10 +38,48 @@ def test_push_overflow_preserves_wav_on_disk(tmp_path, monkeypatch):
     assert (tmp_path / "rec.wav").stat().st_size > 0
 
 
-def test_flush_short_tail_returns_none(tmp_path):
+@pytest.mark.parametrize(
+    "n_samples",
+    [0, 1, 3200, 8000, 15999, 16000],
+)
+def test_flush_tail_sample_counts(tmp_path, n_samples):
+    session = LiveSession(wav_path=tmp_path / "rec.wav")
+    if n_samples:
+        session.push(np.zeros(n_samples, np.float32))
+    tail = session.flush()
+    if n_samples <= 0:
+        assert tail is None
+    else:
+        assert tail is not None
+        assert len(tail) == n_samples
+    assert session.flush() is None
+
+
+def test_flush_short_tail_not_discarded(tmp_path):
     session = LiveSession(wav_path=tmp_path / "rec.wav")
     session.push(np.zeros(SAMPLE_RATE // 2, np.float32))  # 0.5s
-    assert session.flush() is None
+    tail = session.flush()
+    assert tail is not None
+    assert len(tail) == SAMPLE_RATE // 2
+
+
+def test_flush_twice_does_not_duplicate_tail(tmp_path):
+    session = LiveSession(wav_path=tmp_path / "rec.wav")
+    session.push(np.ones(8000, np.float32))
+    first = session.flush()
+    second = session.flush()
+    assert first is not None
+    assert len(first) == 8000
+    assert second is None
+
+
+def test_take_pending_tail_short_remainder(tmp_path):
+    session = LiveSession(wav_path=tmp_path / "rec.wav")
+    session.push(np.zeros(4000, np.float32))
+    tail = session.take_pending_tail()
+    assert tail is not None
+    assert len(tail) == 4000
+    assert session.take_pending_tail() is None
 
 
 def test_take_pending_tail_keeps_wav_open(tmp_path):

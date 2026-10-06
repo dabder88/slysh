@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 import soundfile as sf
 
-from slysh.chunking import LIVE_CHUNK_SAMPLES, MIN_CHUNK_SAMPLES, SAMPLE_RATE
+from slysh.chunking import LIVE_CHUNK_SAMPLES, SAMPLE_RATE
 
 _DEFAULT_MAX_PENDING = 3 * LIVE_CHUNK_SAMPLES
 LIVE_MAX_PENDING_SAMPLES = int(
@@ -80,7 +80,7 @@ class LiveSession:
         with self._lock:
             if self._file.closed:
                 return None
-            if self._pending_len < MIN_CHUNK_SAMPLES:
+            if self._pending_len <= 0:
                 return None
             tail = self._pending[: self._pending_len].copy()
             self._pending_len = 0
@@ -90,6 +90,8 @@ class LiveSession:
         with self._lock:
             if not self._file.closed:
                 self._file.close()
-            if self._pending_len >= MIN_CHUNK_SAMPLES:
-                return self._pending[: self._pending_len].copy()
-            return None
+            if self._pending_len <= 0:
+                return None
+            tail = self._pending[: self._pending_len].copy()
+            self._pending_len = 0
+            return tail

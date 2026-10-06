@@ -4,7 +4,7 @@
 
 **Легенда:** ✅ готово · 🟡 частично · 🔵 в работе · ⬜ не начато · ⏭️ отложено / вне scope
 
-**Baseline аудита:** `6f8690d`. **Последнее обновление:** 2026-10-06 — **I1** ✅, **I2** ✅ (F3-06 revision per job).
+**Baseline аудита:** `6f8690d`. **Последнее обновление:** 2026-10-06 — **I1–I3** ✅ (F3-02 live/meeting хвост).
 
 ---
 
@@ -12,7 +12,7 @@
 
 | Блок | Статус | Комментарий |
 |------|--------|-------------|
-| **I** F3-01…F3-07 | 🔵 | I1–I2 ✅; I3–I7 ⬜ |
+| **I** F3-01…F3-07 | 🔵 | I1–I3 ✅; I4–I7 ⬜ |
 | **I8** CI / Setup / отчёт | ⬜ | После закрытия I1–I7 |
 
 Полный pytest на baseline аудита **не** выполнялся (plan-fix-3 §1). Статус «готово» здесь — только после тестов и поведенческой проверки по plan-fix-3 §10.
@@ -25,7 +25,7 @@
 |----|-----|-----|--------|---|--------|-------------------|
 | I1 | F3-01 | R01 | Атомарный snapshot сегментов + apply диаризации | P1 | ✅ | `get_segments_snapshot`, `test_speakers_cancel.py` (+3 race/structure) |
 | I2 | F3-06 | R02 | `segmentsRevision` per job, save A не трогает B | P2 | ✅ | `segmentsRevisionByJob`, `test_editor_segments_revision_guard.py` |
-| I3 | F3-02 | R04 | Хвост &lt; 1 с в live/meeting | P1 | ⬜ | `live_buffer.py`; файловая ветка уже ✅ |
+| I3 | F3-02 | R04 | Хвост &lt; 1 с в live/meeting | P1 | ✅ | `live_buffer flush/take_pending_tail`, `test_live_buffer.py` |
 | I4 | F3-03 | R10 | Meeting overflow → stop + ошибка | P1 | ⬜ | vs диктофон `LiveBufferOverflowError` |
 | I5 | F3-05 | R07 | Proxy password не в `.bak` | P2 | ⬜ | дополнение G7 |
 | I6 | F3-07 | R10 | Очистка temp PCM при ошибке/отмене | P2 | ⬜ | `decode.py` finally |
