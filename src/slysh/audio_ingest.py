@@ -21,6 +21,12 @@ class AudioIngestOverflowError(RuntimeError):
 
 def notify_capture_overflow(holder: dict) -> None:
     """Signal live/meeting capture state: stop worker and surface error in status."""
+    if holder.get("_overflow_notified"):
+        stop = holder.get("stop_event")
+        if stop is not None:
+            stop.set()
+        return
+    holder["_overflow_notified"] = True
     if not holder.get("error"):
         holder["error"] = AUDIO_INGEST_OVERFLOW_MESSAGE
     stop = holder.get("stop_event")

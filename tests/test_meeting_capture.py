@@ -367,6 +367,44 @@ def test_meeting_capture_pause_skips_session_push(tmp_path):
     session.flush()
 
 
+def test_meeting_flush_mix_notifies_on_pending_overflow(tmp_path, monkeypatch):
+    import threading
+
+    from slysh.audio_ingest import AUDIO_INGEST_OVERFLOW_MESSAGE
+    from slysh.chunking import LIVE_CHUNK_SAMPLES
+    from slysh.live_buffer import LIVE_MAX_PENDING_SAMPLES, LiveSession
+    from slysh.meeting_capture import MeetingCapture
+
+    monkeypatch.setattr(
+        "slysh.live_buffer.LIVE_MAX_PENDING_SAMPLES",
+        LIVE_CHUNK_SAMPLES + 100,
+    )
+    session = LiveSession(tmp_path / "m.wav")
+    stop = threading.Event()
+    holder = {
+        "error": None,
+        "stop_event": stop,
+        "rms_mic": 0.0,
+        "rms_system": 0.0,
+    }
+    capture = MeetingCapture(
+        session=session,
+        output_device_id=None,
+        mic_device_id=None,
+        include_mic=False,
+        rms_holder=holder,
+    )
+    capture.mixer.push_system(np.zeros(LIVE_CHUNK_SAMPLES, np.float32))
+    capture._flush_mix()
+    capture.mixer.push_system(np.zeros(500, np.float32))
+    capture._flush_mix()
+    assert stop.is_set()
+    assert holder["error"] == AUDIO_INGEST_OVERFLOW_MESSAGE
+    capture.mixer.push_system(np.zeros(500, np.float32))
+    capture._flush_mix()
+    assert holder.get("_overflow_notified")
+
+
 def test_loopback_supported_is_win32_only(monkeypatch):
     monkeypatch.setattr(meeting_capture.sys, "platform", "win32")
     assert meeting_capture.loopback_supported() is True

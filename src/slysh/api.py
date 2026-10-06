@@ -61,6 +61,7 @@ from slysh.decode import DecodeCancelledError, decode_pcm_16k_mono
 from slysh.db import Database, SegmentsRevisionConflictError
 from slysh.engine_client import EngineError, cancel as engine_cancel
 from slysh.engine_client import health as engine_health
+from slysh.engine_client import progress as engine_progress_http
 from slysh.engine_client import transcribe_chunk
 from slysh.transcribe import transcribe_pcm_chunks
 from slysh.export import (
@@ -158,6 +159,7 @@ from slysh.source_path import require_existing_file
 from slysh.time_range import normalize_range
 from slysh.transcript import format_transcript, parse_transcript
 from slysh.ui_locale import resolve_ui_locale, save_ui_locale
+from slysh.ui_prefs import load_export_favorite_dirs, save_export_favorite_dirs
 from slysh.youtube_cookies import (
     YoutubeCookiesError,
     cookies_status,
@@ -273,6 +275,10 @@ class ComputeBody(BaseModel):
 
 class UiLocaleBody(BaseModel):
     ui_locale: str
+
+
+class ExportFavoriteDirsBody(BaseModel):
+    dirs: list[str] = []
 
 
 class AsrModelBody(BaseModel):
@@ -668,6 +674,13 @@ def _decorate_job(
     started_at = started.get(job["id"])
     if payload["speakers_running"] and started_at:
         payload["speakers_elapsed_s"] = round(time.monotonic() - started_at, 1)
+    progress_map = getattr(app.state, "speaker_progress", {})
+    speaker_frac = progress_map.get(job["id"])
+    if payload["speakers_running"] and speaker_frac is not None:
+        try:
+            payload["speakers_progress"] = round(float(speaker_frac), 3)
+        except (TypeError, ValueError):
+            pass
     error = errors.get(job["id"])
     if error:
         payload["speakers_error"] = error
@@ -684,6 +697,11 @@ def _decorate_job(
     )
     if media_duration is not None:
         payload["duration_s"] = round(media_duration, 1)
+    if segments is not None:
+        payload["has_transcript"] = len(segments) > 0
+    else:
+        max_end = job.get("segment_max_end_ms")
+        payload["has_transcript"] = max_end is not None and int(max_end) > 0
     return payload
 
 
@@ -1097,6 +1115,19 @@ def engine_progress_fraction(info: dict) -> float | None:
     return max(0.0, min(1.0, value))
 
 
+def speaker_engine_progress_fraction(info: dict) -> float | None:
+    """Map engine /progress during label_speakers to UI fraction 0..1."""
+    if str(info.get("phase") or "") != "speakers":
+        return None
+    try:
+        raw = float(info.get("progress") or 0)
+    except (TypeError, ValueError):
+        return None
+    # Engine uses 0.05 at start of speakers phase through ~0.95 before done.
+    normalized = (raw - 0.05) / 0.95
+    return max(0.0, min(1.0, normalized))
+
+
 def _segments_from_engine(payload: dict) -> list[Segment]:
     return [
         Segment(
@@ -1426,7 +1457,7 @@ def _run_remote_job(
         effective_start = effective_transcribe_start_ms(
             job.get("range_start_ms"), resume_ms
         )
-        duration = job_media_duration_s(job, db=db)
+        duration = job_media_duration_s(job, db=db, allow_file_probe=True)
         baseline = progress_baseline_for_remote(job, effective_start, duration)
         db.set_progress(job_id, map_transcribe_pass_progress(baseline, 0.0))
 
@@ -2131,14 +2162,29 @@ def _live_worker(app: FastAPI, db: Database) -> None:
     while True:
         if state.get("session") is None:
             break
-        if _capture_ingest_overflowed(state):
-            notify_capture_overflow(state)
-            job_id = state.get("job_id")
-            if job_id is not None:
-                db.set_error(
-                    int(job_id),
-                    str(state.get("error") or AUDIO_INGEST_OVERFLOW_MESSAGE),
-                )
+        overflow_err = str(state.get("error") or "").strip()
+        if _capture_ingest_overflowed(state) or (
+            stop_event.is_set() and overflow_err
+        ):
+            if not state.get("_capture_overflow_stopped"):
+                state["_capture_overflow_stopped"] = True
+                notify_capture_overflow(state)
+                job_id = state.get("job_id")
+                if job_id is not None:
+                    db.set_error(
+                        int(job_id),
+                        str(state.get("error") or AUDIO_INGEST_OVERFLOW_MESSAGE),
+                    )
+                if state.get("kind") == "meeting":
+                    with _capture_control_lock(app):
+                        capture = state.get("capture")
+                        if capture is not None:
+                            try:
+                                capture.stop()
+                            except Exception:
+                                pass
+                            state["capture"] = None
+                        state["listening"] = False
             stop_event.set()
         with _capture_control_lock(app):
             session = state.get("session")
@@ -2245,6 +2291,7 @@ def create_ui_app(
     app.state.speaker_jobs = {}
     app.state.speaker_errors = {}
     app.state.speaker_started = {}
+    app.state.speaker_progress = {}
     app.state.speaker_cancels = {}
     app.state.speaker_ytdlp_procs = {}
     app.state.batch_runner = None
@@ -2648,6 +2695,7 @@ def create_ui_app(
                     logging.exception("engine cancel failed for speakers job %s", job_id)
             app.state.speaker_jobs.pop(job_id, None)
             app.state.speaker_started.pop(job_id, None)
+            app.state.speaker_progress.pop(job_id, None)
             app.state.speaker_errors[job_id] = SPEAKER_CANCELLED_MESSAGE
             proc = app.state.speaker_ytdlp_procs.get(job_id)
             if proc is not None:
@@ -2699,10 +2747,33 @@ def create_ui_app(
                 app.state.speaker_jobs.pop(job_id, None)
                 app.state.speaker_started.pop(job_id, None)
                 return
+            poll_stop = threading.Event()
+
+            def _poll_speaker_progress(engine_url: str) -> None:
+                while not poll_stop.is_set():
+                    if app.state.speaker_jobs.get(job_id) != "running":
+                        break
+                    try:
+                        info = engine_progress_http(engine_url)
+                        frac = speaker_engine_progress_fraction(info)
+                        if frac is not None:
+                            app.state.speaker_progress[job_id] = frac
+                    except Exception:
+                        pass
+                    if poll_stop.wait(1.0):
+                        break
+
+            poll_thread: threading.Thread | None = None
             try:
                 engine_url = _ensure_engine_url(app)
                 from slysh.speakers_engine import EngineSpeakersBackend
 
+                poll_thread = threading.Thread(
+                    target=_poll_speaker_progress,
+                    args=(engine_url,),
+                    daemon=True,
+                )
+                poll_thread.start()
                 labeled = assign_speakers(
                     db,
                     job_id,
@@ -2724,9 +2795,13 @@ def create_ui_app(
                 logging.exception("speakers failed for job %s", job_id)
                 app.state.speaker_errors[job_id] = str(exc).strip() or "диаризация не удалась"
             finally:
+                poll_stop.set()
+                if poll_thread is not None:
+                    poll_thread.join(timeout=2.0)
                 coord.end_local(job_id)
                 app.state.speaker_cancels.pop(job_id, None)
                 app.state.speaker_ytdlp_procs.pop(job_id, None)
+                app.state.speaker_progress.pop(job_id, None)
                 app.state.speaker_jobs.pop(job_id, None)
                 app.state.speaker_started.pop(job_id, None)
 
@@ -3050,6 +3125,14 @@ def create_ui_app(
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return {"ui_locale": locale}
+
+    @app.get("/api/ui/export-favorites")
+    def get_export_favorite_dirs() -> dict:
+        return {"dirs": load_export_favorite_dirs()}
+
+    @app.put("/api/ui/export-favorites")
+    def put_export_favorite_dirs(body: ExportFavoriteDirsBody) -> dict:
+        return {"dirs": save_export_favorite_dirs(body.dirs)}
 
     @app.get("/api/compute")
     def get_compute() -> dict:

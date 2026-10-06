@@ -9,7 +9,7 @@ import numpy as np
 from slysh.audio_ingest import AudioIngestQueue, notify_capture_overflow
 from slysh.chunking import SAMPLE_RATE
 from slysh.sounddevice_lazy import sd
-from slysh.live_buffer import LiveSession
+from slysh.live_buffer import LiveBufferOverflowError, LiveSession
 from slysh.wasapi_loopback import (
     WasapiLoopback,
     list_render_endpoints,
@@ -581,7 +581,10 @@ class MeetingCapture:
         self.rms_holder["rms_system"] = float(self.mixer.rms_system)
         self.rms_holder["rms_mic"] = float(self.mixer.rms_mic)
         if mixed.size:
-            self.session.push(mixed)
+            try:
+                self.session.push(mixed)
+            except LiveBufferOverflowError:
+                notify_capture_overflow(self.rms_holder)
 
     def _on_wasapi_system(self, frames) -> None:
         if self._paused:
