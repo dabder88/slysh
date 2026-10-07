@@ -48,6 +48,9 @@ def _read_stored_proxy_password() -> str:
         data["proxy"] = block
 
     mutate_settings(patch)
+    from slysh.settings_store import sync_settings_backup_from_primary
+
+    sync_settings_backup_from_primary()
     return plain
 
 
@@ -167,7 +170,10 @@ def public_proxy_config() -> dict[str, Any]:
 
 
 def migrate_proxy_secret() -> None:
+    from slysh.settings_store import sync_settings_backup_from_primary
+
     _read_stored_proxy_password()
+    sync_settings_backup_from_primary()
 
 
 def build_proxy_url(config: dict[str, Any] | None = None) -> str:

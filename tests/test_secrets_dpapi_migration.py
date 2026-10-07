@@ -57,6 +57,36 @@ def test_migrate_proxy_password_out_of_settings(tmp_path, monkeypatch):
     assert pub["password"] == ""
     settings = json.loads((tmp_path / "settings.json").read_text(encoding="utf-8"))
     assert "password" not in (settings.get("proxy") or {})
+    bak = json.loads((tmp_path / "settings.json.bak").read_text(encoding="utf-8"))
+    assert "password" not in (bak.get("proxy") or {})
+    assert "secret-proxy-pwd" not in (tmp_path / "settings.json.bak").read_text(encoding="utf-8")
+
+
+def test_provider_then_proxy_migration_leaves_no_plaintext_in_bak(tmp_path, monkeypatch):
+    monkeypatch.setenv("GIGAAM_DESKTOP_HOME", str(tmp_path))
+    mutate_settings(
+        lambda data: data.update(
+            {
+                "providers": {
+                    "openrouter": {"model": "m", "api_key": "sk-both-test"},
+                },
+                "proxy": {
+                    "enabled": True,
+                    "host": "127.0.0.1",
+                    "port": 8080,
+                    "password": "pwd-both-test",
+                    "targets": {},
+                },
+            }
+        )
+    )
+    migrate_legacy_provider_secrets()
+    migrate_proxy_secret()
+    bak_text = (tmp_path / "settings.json.bak").read_text(encoding="utf-8")
+    assert "sk-both-test" not in bak_text
+    assert "pwd-both-test" not in bak_text
+    assert load_proxy_config()["password"] == "pwd-both-test"
+    assert openrouter_api_key() == "sk-both-test"
 
 
 def test_set_nested_fails_when_store_corrupt(tmp_path, monkeypatch):
