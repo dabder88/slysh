@@ -4,7 +4,7 @@
 
 **Легенда:** ✅ готово · 🟡 частично · 🔵 в работе · ⬜ не начато · ⏭️ отложено / вне scope
 
-**Baseline аудита:** `6f8690d`. **Последнее обновление:** 2026-10-07 — **I1–I7** ✅; **I8** 🟡 gate без full pytest по умолчанию.
+**Baseline аудита:** `6f8690d`. **Последнее обновление:** 2026-10-07 — волна **I** (F3-01…07 + I8) ✅; Setup пересобран на `7a7fd40`.
 
 ---
 
@@ -13,7 +13,7 @@
 | Блок | Статус | Комментарий |
 |------|--------|-------------|
 | **I** F3-01…F3-07 | ✅ | I1–I7 закрыты |
-| **I8** CI / Setup / отчёт | 🟡 | `run_plan_fix3_gate.ps1` + `write_setup_acceptance_record`; full pytest опционально |
+| **I8** CI / Setup / отчёт | ✅ | gate + fingerprint Setup (см. ниже); full pytest — опционально |
 
 Полный pytest на baseline аудита **не** выполнялся (plan-fix-3 §1). Статус «готово» здесь — только после тестов и поведенческой проверки по plan-fix-3 §10.
 
@@ -30,7 +30,18 @@
 | I5 | F3-05 | R07 | Proxy password не в `.bak` | P2 | ✅ | `http_proxy.py` + `test_secrets_dpapi_migration.py` |
 | I6 | F3-07 | R10 | Очистка temp PCM при ошибке/отмене | P2 | ✅ | `decode_pcm_16k_mono` finally, `test_decode_pcm_cleanup.py` |
 | I7 | F3-04 | R09 | Offline wheelhouse + единый bootstrap | P1 | ✅ | `requirements-ui.txt`, `uv pip sync`, `test_offline_bootstrap.py` (+ integration) |
-| I8 | — | R15 | Subset CI, gate, Setup SHA-256 | — | 🟡 | `run_plan_fix3_gate.ps1` (targeted+JS); `meeting_capture` в subset; full pytest — `SLYSH_GATE_FULL_PYTEST=1`; Setup fingerprint после локальной сборки |
+| I8 | — | R15 | Subset CI, gate, Setup SHA-256 | — | ✅ | `run_plan_fix3_gate.ps1`; payload+Setup 2026-10-07; `dist\acceptance\setup-fingerprint-latest.json` |
+
+---
+
+## Setup (I8, git `7a7fd40`)
+
+| Артефакт | LastWriteTime (локально) | SHA-256 |
+|----------|--------------------------|---------|
+| `dist\Slysh-Setup-ru.exe` | 2026-10-07 12:46:10 +07:00 | `48AA32A511ABF1003E6B9E7493CB2AC970BED5C169AA34AC611A73C63E1E3576` |
+| `dist\Slysh-Setup-en.exe` | 2026-10-07 12:48:25 +07:00 | `63C266063FD55D12129EE7B8B0A595DAC26BC5BD6991F316FE37ECAEE1F4BDCD` |
+
+Payload: `wheelhouse\requirements-ui.txt` + 24 wheels; WebView2 — только bootstrapper в `installer\redist` (без standalone ~200 МБ).
 
 ---
 
