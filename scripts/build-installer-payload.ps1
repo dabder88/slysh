@@ -273,11 +273,6 @@ $ReqExport = Join-Path $Wheelhouse "requirements-export.txt"
 if ($LASTEXITCODE -ne 0) {
     throw "uv export for wheelhouse failed with exit code $LASTEXITCODE"
 }
-$ReqUi = Join-Path $Wheelhouse "requirements-ui.txt"
-Copy-Item -LiteralPath $ReqExport -Destination $ReqUi -Force
-if (-not (Test-Path -LiteralPath $ReqUi)) {
-    throw "wheelhouse requirements-ui.txt missing after export copy"
-}
 & $BundledUv run --directory $Payload --with pip pip download -r $ReqExport -d $Wheelhouse
 if ($LASTEXITCODE -ne 0) {
     throw "pip download for wheelhouse failed with exit code $LASTEXITCODE"
@@ -308,6 +303,19 @@ if ($whCount -lt 10) {
     throw "wheelhouse too small ($($whCount) wheels): $Wheelhouse"
 }
 Write-Host "wheelhouse: $whCount wheels"
+$ReqUi = Join-Path $Wheelhouse "requirements-ui.txt"
+$WriteReqUi = Join-Path $Root "scripts\write_wheelhouse_requirements_ui.py"
+$ReqUiPy = Join-Path $Root ".venv\Scripts\python.exe"
+if (-not (Test-Path -LiteralPath $ReqUiPy)) {
+    $ReqUiPy = "python"
+}
+& $ReqUiPy $WriteReqUi $ReqExport $Wheelhouse $AppVersion $ReqUi
+if ($LASTEXITCODE -ne 0) {
+    throw "write_wheelhouse_requirements_ui.py failed with exit code $LASTEXITCODE"
+}
+if (-not (Test-Path -LiteralPath $ReqUi)) {
+    throw "wheelhouse requirements-ui.txt missing after write"
+}
 
 $html = Get-Content -LiteralPath (Join-Path $Payload "web\index.html") -Raw -Encoding UTF8
 foreach ($needle in @("btn-download-model", "engine-setup-settings", "btn-install-engine")) {
@@ -326,6 +334,12 @@ $env:SLYSH_PAYLOAD_DIR = $PayloadStaging
 if ($LASTEXITCODE -ne 0) {
     Remove-Item Env:SLYSH_PAYLOAD_DIR -ErrorAction SilentlyContinue
     throw "smoke_installer_layout.py failed on staging (previous payload unchanged)"
+}
+$SmokeRepair = Join-Path $Root "scripts\smoke_offline_venv_repair.py"
+& $SmokePy $SmokeRepair
+if ($LASTEXITCODE -ne 0) {
+    Remove-Item Env:SLYSH_PAYLOAD_DIR -ErrorAction SilentlyContinue
+    throw "smoke_offline_venv_repair.py failed on staging (previous payload unchanged)"
 }
 
 $Sanity = Join-Path $Root "scripts\check_payload_sanity.py"

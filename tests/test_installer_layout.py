@@ -33,6 +33,7 @@ def test_launcher_isolates_models_catalog_env():
     assert "UV_PYTHON_INSTALL_DIR" in src
     assert "venv_usable" in src
     assert "run_uv_sync" in src
+    assert "find_bundled_python" in src
     assert "launch-last-error.txt" in src
     assert "startup-crash.log" in src
     assert "clear_dev_python_env" in src
@@ -47,6 +48,11 @@ def test_shell_shows_model_download_controls_without_engine_gate():
     assert "showBtn" in shell
     assert "enginePackages" in shell
     assert "btnEnabled = showBtn && enginePackages" in shell
+
+
+def test_inno_script_excludes_staging_venv_from_install():
+    text = ISS.read_text(encoding="utf-8")
+    assert ".venv,.venv\\*" in text or ".venv,.venv/*" in text
 
 
 def test_inno_script_has_uninstall_cleanup():

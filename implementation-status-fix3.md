@@ -34,14 +34,14 @@
 
 ---
 
-## Setup (после proxy_tools wheel, локально)
+## Setup (offline venv repair fix, локально)
 
 | Артефакт | LastWriteTime (локально) | SHA-256 |
 |----------|--------------------------|---------|
-| `dist\Slysh-Setup-ru.exe` | 2026-10-07 13:09:06 +07:00 | `C3CFAC122BBE91588A58C22D2D27530A849F7D6C850549A80D8DC9FCBCCE3871` |
-| `dist\Slysh-Setup-en.exe` | 2026-10-07 13:10:48 +07:00 | `84632DD8B4864E16A308270B360EA7C9CFF9E2B0C264A8943295D468608A2277` |
+| `dist\Slysh-Setup-ru.exe` | 2026-10-07 15:57:40 +07:00 | `2FF79D4EB10CAD7A0A4AB131458B9D849BAAFC4987E977BA01F7F2D87FA19851` |
+| `dist\Slysh-Setup-en.exe` | 2026-10-07 15:59:22 +07:00 | `6CBD68AA5AD5383247649C5DCAF0EDBEF5CDA93A853B9E6B9A3AA0AB12B0A131` |
 
-Payload: `wheelhouse\requirements-ui.txt` + wheels only (в т.ч. `proxy_tools`, не sdist); WebView2 — только bootstrapper в `installer\redist` (без standalone ~200 МБ).
+Payload: установщик **без** staging `.venv`; `requirements-ui.txt` без hashes + `slysh==…`; repair: `uv venv --python runtime\python\…` + `uv pip sync --no-index`.
 
 ---
 

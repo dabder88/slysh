@@ -17,7 +17,7 @@
 #define MyOutputBase "Slysh-Setup-en"
 #define MyLicenseFile "LICENSE-EN.txt"
 #else
-#define MyOutputBase "Slysh-Setup"
+#define MyOutputBase "Slysh-Setup-ru"
 #define MyLicenseFile "LICENSE-RU.txt"
 #endif
 #define MyAppUserModelId "Slysh.DesktopApp"
@@ -57,7 +57,7 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Files]
 ; models/ — отдельная строка; при удалении по умолчанию сносится (см. InitializeUninstall).
-Source: "{#Payload}\*"; DestDir: "{app}"; Excludes: "models,models\*,models\*"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#Payload}\*"; DestDir: "{app}"; Excludes: "models,models\*,models\*,.venv,.venv\*"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#Payload}\models\*"; DestDir: "{app}\models"; Flags: ignoreversion recursesubdirs createallsubdirs
 #ifexist "redist\MicrosoftEdgeWebView2RuntimeInstallerX64.exe"
 Source: "redist\MicrosoftEdgeWebView2RuntimeInstallerX64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall; Check: not WebView2Installed

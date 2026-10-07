@@ -31,6 +31,17 @@ def venv_python_path(install_root: Path) -> Path:
     return venv_dir(install_root) / "Scripts" / "python.exe"
 
 
+def bundled_python_path(install_root: Path) -> Path | None:
+    """Portable CPython shipped under runtime/python (installer payload)."""
+    rt = Path(install_root) / "runtime" / "python"
+    if not rt.is_dir():
+        return None
+    candidates = sorted(rt.glob("cpython-*/python.exe"))
+    if not candidates:
+        return None
+    return candidates[0]
+
+
 def wheelhouse_ready(install_root: Path, *, min_wheels: int = 1) -> bool:
     wh = wheelhouse_dir(install_root)
     if not wh.is_dir():
@@ -45,7 +56,11 @@ def offline_pip_sync_ready(install_root: Path, *, min_wheels: int = 1) -> bool:
 
 
 def uv_venv_create_argv(install_root: Path) -> list[str]:
-    return ["venv", str(venv_dir(install_root))]
+    args: list[str] = ["venv", str(venv_dir(install_root))]
+    bundled = bundled_python_path(install_root)
+    if bundled is not None:
+        args.extend(["--python", str(bundled)])
+    return args
 
 
 def uv_pip_sync_argv(install_root: Path) -> list[str]:

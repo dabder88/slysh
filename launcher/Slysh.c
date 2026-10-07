@@ -712,12 +712,48 @@ static int wheelhouse_has_requirements_ui(const wchar_t *root) {
     return path_exists(req);
 }
 
+static int find_bundled_python(const wchar_t *root, wchar_t *python, size_t python_chars) {
+    wchar_t rt[MAX_PATH * 2];
+    wchar_t pattern[MAX_PATH * 2];
+    WIN32_FIND_DATAW fd;
+    HANDLE h;
+
+    python[0] = L'\0';
+    if (!PathCombineW(rt, root, L"runtime\\python"))
+        return 0;
+    if (!path_is_directory(rt))
+        return 0;
+    if (swprintf_s(pattern, sizeof(pattern) / sizeof(pattern[0]), L"%ls\\cpython-*", rt) < 0)
+        return 0;
+    h = FindFirstFileW(pattern, &fd);
+    if (h == INVALID_HANDLE_VALUE)
+        return 0;
+    do {
+        if ((fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0)
+            continue;
+        if (wcscmp(fd.cFileName, L".") == 0 || wcscmp(fd.cFileName, L"..") == 0)
+            continue;
+        if (!PathCombineW(python, rt, fd.cFileName))
+            continue;
+        if (!PathAppendW(python, L"python.exe"))
+            continue;
+        if (path_exists(python)) {
+            FindClose(h);
+            return 1;
+        }
+        python[0] = L'\0';
+    } while (FindNextFileW(h, &fd));
+    FindClose(h);
+    return 0;
+}
+
 static int run_uv_sync(const wchar_t *root, DWORD *exit_code) {
     wchar_t uv[MAX_PATH * 2];
     wchar_t wheelhouse[MAX_PATH * 2];
     wchar_t venv_py[MAX_PATH * 2];
     wchar_t req_ui[MAX_PATH * 2];
     wchar_t venv_dir[MAX_PATH * 2];
+    wchar_t bundled_py[MAX_PATH * 2];
     wchar_t cmdline[4096];
 
     if (!PathCombineW(uv, root, L"bin\\uv.exe") || !path_exists(uv))
@@ -731,11 +767,16 @@ static int run_uv_sync(const wchar_t *root, DWORD *exit_code) {
             return 0;
         if (!PathCombineW(venv_py, root, L".venv\\Scripts\\python.exe"))
             return 0;
+        if (!find_bundled_python(root, bundled_py, sizeof(bundled_py) / sizeof(bundled_py[0]))) {
+            *exit_code = 127;
+            return 0;
+        }
         swprintf_s(cmdline,
                    sizeof(cmdline) / sizeof(cmdline[0]),
-                   L"\"%ls\" venv \"%ls\"",
+                   L"\"%ls\" venv \"%ls\" --python \"%ls\"",
                    uv,
-                   venv_dir);
+                   venv_dir,
+                   bundled_py);
         if (!run_process_wait(uv, cmdline, root, exit_code, 1) || *exit_code != 0)
             return 1;
         swprintf_s(cmdline,
@@ -761,7 +802,7 @@ static int run_uv_sync(const wchar_t *root, DWORD *exit_code) {
     return run_process_wait(uv, cmdline, root, exit_code, 1);
 }
 
-static int write_venv_repair_error(const wchar_t *root, DWORD sync_code, int retried) {
+static int write_venv_repair_error(const wchar_t *root, DWORD sync_code, int retried, const wchar_t *phase) {
     wchar_t err_file[MAX_PATH * 2];
     SYSTEMTIME st;
     FILE *fp = NULL;
@@ -772,13 +813,14 @@ static int write_venv_repair_error(const wchar_t *root, DWORD sync_code, int ret
     if (_wfopen_s(&fp, err_file, L"a, ccs=UTF-8") != 0 || fp == NULL)
         return 0;
     fwprintf(fp,
-             L"[%04u-%02u-%02u %02u:%02u:%02u] venv repair: uv sync exit %lu%s\n",
+             L"[%04u-%02u-%02u %02u:%02u:%02u] venv repair: %ls exit %lu%s\n",
              (unsigned)st.wYear,
              (unsigned)st.wMonth,
              (unsigned)st.wDay,
              (unsigned)st.wHour,
              (unsigned)st.wMinute,
              (unsigned)st.wSecond,
+             phase != NULL ? phase : L"uv",
              (unsigned long)sync_code,
              retried ? L" (after removing .venv)" : L"");
     fclose(fp);
@@ -820,7 +862,11 @@ static int ensure_venv(const wchar_t *root) {
 
     if (!run_uv_sync(root, &code) || code != 0) {
         splash_hide();
-        write_venv_repair_error(root, code, 0);
+        write_venv_repair_error(
+            root,
+            code,
+            0,
+            wheelhouse_has_requirements_ui(root) ? L"uv venv or pip sync" : L"uv sync");
         if (wheelhouse_has_wheels(root)) {
             show_error(L"Slysh",
                        L"Не удалось восстановить окружение из локального wheelhouse.\n"

@@ -1,5 +1,5 @@
 @echo off
-setlocal
+setlocal EnableDelayedExpansion
 title Slysh
 
 rem Broken NO_PROXY values like '::1/128' break huggingface_hub on Windows.
@@ -38,7 +38,13 @@ goto :start
 :ensure_venv
 if exist "%ROOT%\bin\uv.exe" (
     if exist "%ROOT%\wheelhouse\requirements-ui.txt" (
-        "%ROOT%\bin\uv.exe" venv "%ROOT%\.venv"
+        set "BUNDLED_PY="
+        for /d %%D in ("%ROOT%\runtime\python\cpython-*") do set "BUNDLED_PY=%%D\python.exe"
+        if not exist "!BUNDLED_PY!" (
+            echo Не найден bundled Python в runtime\python
+            goto :venv_fail
+        )
+        "%ROOT%\bin\uv.exe" venv "%ROOT%\.venv" --python "!BUNDLED_PY!"
         if errorlevel 1 goto :venv_fail
         "%ROOT%\bin\uv.exe" pip sync --python "%ROOT%\.venv\Scripts\python.exe" --no-index --find-links "%ROOT%\wheelhouse" "%ROOT%\wheelhouse\requirements-ui.txt"
     ) else if exist "%ROOT%\wheelhouse\*.whl" (

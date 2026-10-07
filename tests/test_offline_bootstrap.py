@@ -15,6 +15,7 @@ from slysh.offline_bootstrap import (
     LEGACY_OFFLINE_UV_SYNC_FLAGS,
     OFFLINE_PIP_SYNC_FLAGS,
     UI_REQUIREMENTS_FILENAME,
+    bundled_python_path,
     offline_pip_sync_ready,
     offline_repair_steps,
     requirements_ui_path,
@@ -62,9 +63,14 @@ def test_offline_repair_steps_pip_includes_venv_when_missing(tmp_path: Path):
     wh.mkdir()
     (wh / "a.whl").write_bytes(b"x")
     (wh / UI_REQUIREMENTS_FILENAME).write_text("x\n", encoding="utf-8")
+    rt = tmp_path / "runtime" / "python" / "cpython-3.12.11-windows-x86_64-none"
+    rt.mkdir(parents=True)
+    (rt / "python.exe").write_bytes(b"")
     steps = offline_repair_steps(tmp_path)
     assert len(steps) == 2
     assert steps[0][0] == "venv"
+    assert "--python" in steps[0]
+    assert bundled_python_path(tmp_path) is not None
     assert steps[1][0:2] == ["pip", "sync"]
 
 
@@ -100,6 +106,8 @@ def test_slysh_bat_offline_pip_sync_contract():
     assert "requirements-ui.txt" in bat
     assert "pip sync" in bat
     assert "--no-index" in bat
+    assert "--python" in bat
+    assert "runtime\\python\\cpython-" in bat
 
 
 def test_launcher_c_offline_wheelhouse_contract():
