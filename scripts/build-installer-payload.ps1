@@ -239,8 +239,8 @@ try {
     } else {
         Write-Host "Bundled Python present under runtime\python - skip uv python install"
     }
-    Write-Host "uv sync --no-editable (light UI venv)..."
-    & $BundledUv sync --no-editable
+    Write-Host "uv sync --no-editable --no-dev (light UI venv)..."
+    & $BundledUv sync --no-editable --no-dev
     if ($LASTEXITCODE -ne 0) {
         throw "uv sync failed with exit code $LASTEXITCODE (staging kept at $Payload)"
     }
@@ -272,6 +272,11 @@ $ReqExport = Join-Path $Wheelhouse "requirements-export.txt"
 & $BundledUv export --frozen --no-dev --no-emit-project --no-editable --format requirements.txt -o $ReqExport
 if ($LASTEXITCODE -ne 0) {
     throw "uv export for wheelhouse failed with exit code $LASTEXITCODE"
+}
+$ReqUi = Join-Path $Wheelhouse "requirements-ui.txt"
+Copy-Item -LiteralPath $ReqExport -Destination $ReqUi -Force
+if (-not (Test-Path -LiteralPath $ReqUi)) {
+    throw "wheelhouse requirements-ui.txt missing after export copy"
 }
 & $BundledUv run --directory $Payload --with pip pip download -r $ReqExport -d $Wheelhouse
 if ($LASTEXITCODE -ne 0) {

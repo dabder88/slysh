@@ -37,8 +37,12 @@ goto :start
 
 :ensure_venv
 if exist "%ROOT%\bin\uv.exe" (
-    if exist "%ROOT%\wheelhouse\*.whl" (
-        "%ROOT%\bin\uv.exe" sync --no-editable --find-links "%ROOT%\wheelhouse" --offline
+    if exist "%ROOT%\wheelhouse\requirements-ui.txt" (
+        "%ROOT%\bin\uv.exe" venv "%ROOT%\.venv"
+        if errorlevel 1 goto :venv_fail
+        "%ROOT%\bin\uv.exe" pip sync --python "%ROOT%\.venv\Scripts\python.exe" --no-index --find-links "%ROOT%\wheelhouse" "%ROOT%\wheelhouse\requirements-ui.txt"
+    ) else if exist "%ROOT%\wheelhouse\*.whl" (
+        "%ROOT%\bin\uv.exe" sync --no-editable --no-dev --find-links "%ROOT%\wheelhouse" --offline
     ) else (
         "%ROOT%\bin\uv.exe" sync
     )
@@ -53,11 +57,15 @@ if exist "%ROOT%\bin\uv.exe" (
     echo Первый запуск: ставлю интерфейс. Пакеты расшифровки ^(torch, GigaAM^) — в окне после согласия.
     uv sync
 )
-if errorlevel 1 (
+if errorlevel 1 goto :venv_fail
+goto :after_venv
+
+:venv_fail
     echo Не удалось поставить окружение.
     pause
     exit /b 1
-)
+
+:after_venv
 if not exist "%PYTHON%" (
     echo Не найден %PYTHON% после uv sync.
     pause

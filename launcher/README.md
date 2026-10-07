@@ -28,7 +28,7 @@ Before starting Python, the launcher sets (same as `Slysh.bat`, plus UI catalog 
 - **`UV_PYTHON_INSTALL_DIR`** — `{install}\runtime\python` (bundled CPython for uv; not `%AppData%\Roaming\uv`)
 - `HF_HOME`, `HUGGINGFACE_HUB_CACHE`, `PATH` (`bin\`)
 
-If `.venv` is missing, broken (wrong `pyvenv.cfg` `home`), or `pythonw` fails a probe, the launcher runs **`bin\uv.exe sync`** once. When `wheelhouse\*.whl` is present (installer payload), repair uses **`sync --no-editable --find-links wheelhouse --offline`** — same contract as `Slysh.bat` and `slysh.offline_bootstrap`. On failure it removes `.venv` and retries. Repair details go to `{install}\launch-last-error.txt` (`venv repair: uv sync …`).
+If `.venv` is missing, broken (wrong `pyvenv.cfg` `home`), or `pythonw` fails a probe, the launcher repairs the light UI venv via **`bin\uv.exe`**. When `wheelhouse\requirements-ui.txt` and wheels are present (installer payload), repair is **`uv venv .venv`** then **`uv pip sync --python .venv\Scripts\python.exe --no-index --find-links wheelhouse requirements-ui.txt`** — same contract as `Slysh.bat` and `slysh.offline_bootstrap`. Older payloads without `requirements-ui.txt` fall back to **`sync --no-editable --no-dev --find-links wheelhouse --offline`**. On failure it removes `.venv` and retries. Repair details go to `{install}\launch-last-error.txt` (`venv repair: uv sync …`).
 
 Source must be compiled with **`/utf-8`** so Russian `MessageBoxW` strings are correct.
 

@@ -31,6 +31,9 @@ def main() -> int:
     wh_count = len(list(wheelhouse.glob("*.whl"))) if wheelhouse.is_dir() else 0
     if wh_count < 10:
         return _fail(f"wheelhouse must have at least 10 wheels, got {wh_count}")
+    req_ui = wheelhouse / "requirements-ui.txt"
+    if not req_ui.is_file():
+        return _fail(f"missing wheelhouse requirements-ui.txt ({req_ui})")
 
     required = [
         PAYLOAD / "bin" / "ffmpeg.exe",

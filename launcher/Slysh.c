@@ -704,19 +704,55 @@ static int wheelhouse_has_wheels(const wchar_t *root) {
     return 1;
 }
 
+static int wheelhouse_has_requirements_ui(const wchar_t *root) {
+    wchar_t req[MAX_PATH * 2];
+
+    if (!PathCombineW(req, root, L"wheelhouse\\requirements-ui.txt"))
+        return 0;
+    return path_exists(req);
+}
+
 static int run_uv_sync(const wchar_t *root, DWORD *exit_code) {
     wchar_t uv[MAX_PATH * 2];
     wchar_t wheelhouse[MAX_PATH * 2];
-    wchar_t cmdline[2048];
+    wchar_t venv_py[MAX_PATH * 2];
+    wchar_t req_ui[MAX_PATH * 2];
+    wchar_t venv_dir[MAX_PATH * 2];
+    wchar_t cmdline[4096];
 
     if (!PathCombineW(uv, root, L"bin\\uv.exe") || !path_exists(uv))
         return 0;
+    if (wheelhouse_has_requirements_ui(root) && wheelhouse_has_wheels(root)) {
+        if (!PathCombineW(wheelhouse, root, L"wheelhouse"))
+            return 0;
+        if (!PathCombineW(req_ui, root, L"wheelhouse\\requirements-ui.txt"))
+            return 0;
+        if (!PathCombineW(venv_dir, root, L".venv"))
+            return 0;
+        if (!PathCombineW(venv_py, root, L".venv\\Scripts\\python.exe"))
+            return 0;
+        swprintf_s(cmdline,
+                   sizeof(cmdline) / sizeof(cmdline[0]),
+                   L"\"%ls\" venv \"%ls\"",
+                   uv,
+                   venv_dir);
+        if (!run_process_wait(uv, cmdline, root, exit_code, 1) || *exit_code != 0)
+            return 1;
+        swprintf_s(cmdline,
+                   sizeof(cmdline) / sizeof(cmdline[0]),
+                   L"\"%ls\" pip sync --python \"%ls\" --no-index --find-links \"%ls\" \"%ls\"",
+                   uv,
+                   venv_py,
+                   wheelhouse,
+                   req_ui);
+        return run_process_wait(uv, cmdline, root, exit_code, 1);
+    }
     if (wheelhouse_has_wheels(root)) {
         if (!PathCombineW(wheelhouse, root, L"wheelhouse"))
             return 0;
         swprintf_s(cmdline,
                    sizeof(cmdline) / sizeof(cmdline[0]),
-                   L"\"%ls\" sync --no-editable --find-links \"%ls\" --offline",
+                   L"\"%ls\" sync --no-editable --no-dev --find-links \"%ls\" --offline",
                    uv,
                    wheelhouse);
     } else {

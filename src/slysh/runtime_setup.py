@@ -10,6 +10,7 @@ import threading
 import time
 from pathlib import Path
 
+from slysh.offline_bootstrap import offline_pip_sync_ready, uv_pip_sync_argv
 from slysh.paths import app_dir, install_root, logs_dir, project_root
 from slysh.subprocess_win import subprocess_no_console_kwargs
 
@@ -33,10 +34,20 @@ def ui_wheelhouse_dir() -> Path | None:
 
 def uv_sync_ui_argv() -> tuple[str, ...]:
     """Light UI venv sync (Slysh.bat :ensure_venv). Uses wheelhouse when present."""
+    root = install_root()
+    if offline_pip_sync_ready(root):
+        return tuple(uv_pip_sync_argv(root))
     wh = ui_wheelhouse_dir()
     if wh is None:
         return ("sync",)
-    return ("sync", "--find-links", str(wh), "--offline")
+    return (
+        "sync",
+        "--no-editable",
+        "--no-dev",
+        "--find-links",
+        str(wh),
+        "--offline",
+    )
 
 
 def uv_sync_engine_argv() -> tuple[str, ...]:

@@ -149,18 +149,32 @@ try {
         if ($whCount -lt 10) {
             Fail "ProbeOfflineUiSync requires wheelhouse with 10+ wheels"
         }
-        $syncArgs = @(
-            "sync",
-            "--no-editable",
-            "--find-links", $Wheelhouse,
-            "--offline",
-            "--no-progress"
-        )
-        & $Uv @syncArgs
-        if ($LASTEXITCODE -ne 0) {
-            Fail "uv sync --offline --find-links wheelhouse failed"
+        $ReqUi = Join-Path $Wheelhouse "requirements-ui.txt"
+        if (Test-Path -LiteralPath $ReqUi) {
+            $venvDir = Join-Path $Root ".venv"
+            & $Uv venv $venvDir --no-progress
+            if ($LASTEXITCODE -ne 0) { Fail "uv venv for offline pip sync failed" }
+            $venvPy = Join-Path $venvDir "Scripts\python.exe"
+            & $Uv pip sync --python $venvPy --no-index --find-links $Wheelhouse $ReqUi --no-progress
+            if ($LASTEXITCODE -ne 0) {
+                Fail "uv pip sync --no-index wheelhouse failed"
+            }
+            $checks["offline_ui_sync"] = "pip_sync"
+        } else {
+            $syncArgs = @(
+                "sync",
+                "--no-editable",
+                "--no-dev",
+                "--find-links", $Wheelhouse,
+                "--offline",
+                "--no-progress"
+            )
+            & $Uv @syncArgs
+            if ($LASTEXITCODE -ne 0) {
+                Fail "uv sync --offline --find-links wheelhouse failed"
+            }
+            $checks["offline_ui_sync"] = "legacy_sync"
         }
-        $checks["offline_ui_sync"] = "ok"
     }
 } finally {
     Pop-Location
