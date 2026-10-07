@@ -34,14 +34,14 @@
 
 ---
 
-## Setup (I8, git `7a7fd40`)
+## Setup (после proxy_tools wheel, локально)
 
 | Артефакт | LastWriteTime (локально) | SHA-256 |
 |----------|--------------------------|---------|
-| `dist\Slysh-Setup-ru.exe` | 2026-10-07 12:46:10 +07:00 | `48AA32A511ABF1003E6B9E7493CB2AC970BED5C169AA34AC611A73C63E1E3576` |
-| `dist\Slysh-Setup-en.exe` | 2026-10-07 12:48:25 +07:00 | `63C266063FD55D12129EE7B8B0A595DAC26BC5BD6991F316FE37ECAEE1F4BDCD` |
+| `dist\Slysh-Setup-ru.exe` | 2026-10-07 13:09:06 +07:00 | `C3CFAC122BBE91588A58C22D2D27530A849F7D6C850549A80D8DC9FCBCCE3871` |
+| `dist\Slysh-Setup-en.exe` | 2026-10-07 13:10:48 +07:00 | `84632DD8B4864E16A308270B360EA7C9CFF9E2B0C264A8943295D468608A2277` |
 
-Payload: `wheelhouse\requirements-ui.txt` + 24 wheels; WebView2 — только bootstrapper в `installer\redist` (без standalone ~200 МБ).
+Payload: `wheelhouse\requirements-ui.txt` + wheels only (в т.ч. `proxy_tools`, не sdist); WebView2 — только bootstrapper в `installer\redist` (без standalone ~200 МБ).
 
 ---
 

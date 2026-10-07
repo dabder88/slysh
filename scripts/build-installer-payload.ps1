@@ -282,6 +282,23 @@ if (-not (Test-Path -LiteralPath $ReqUi)) {
 if ($LASTEXITCODE -ne 0) {
     throw "pip download for wheelhouse failed with exit code $LASTEXITCODE"
 }
+$ProxySdists = @(Get-ChildItem -LiteralPath $Wheelhouse -Filter "proxy_tools*.tar.gz" -ErrorAction SilentlyContinue)
+foreach ($sdist in $ProxySdists) {
+    Write-Host "Building proxy_tools wheel from $($sdist.Name)..."
+    & $BundledUv run --directory $Payload --with pip pip wheel $sdist.FullName --no-deps -w $Wheelhouse
+    if ($LASTEXITCODE -ne 0) {
+        throw "pip wheel for proxy_tools failed with exit code $LASTEXITCODE"
+    }
+    Remove-Item -LiteralPath $sdist.FullName -Force
+}
+$ProxyWh = @(Get-ChildItem -LiteralPath $Wheelhouse -Filter "proxy_tools*.whl" -ErrorAction SilentlyContinue)
+if ($ProxyWh.Count -lt 1) {
+    throw "wheelhouse missing proxy_tools wheel (offline pip sync requires wheels only)"
+}
+$LeftSdists = @(Get-ChildItem -LiteralPath $Wheelhouse -Filter "*.tar.gz" -ErrorAction SilentlyContinue)
+if ($LeftSdists.Count -gt 0) {
+    throw "wheelhouse still has sdists after wheel build: $($LeftSdists.Name -join ', ')"
+}
 & $BundledUv build --wheel -o $Wheelhouse
 if ($LASTEXITCODE -ne 0) {
     throw "uv build wheel for slysh failed with exit code $LASTEXITCODE"

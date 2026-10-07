@@ -34,6 +34,11 @@ def main() -> int:
     req_ui = wheelhouse / "requirements-ui.txt"
     if not req_ui.is_file():
         return _fail(f"missing wheelhouse requirements-ui.txt ({req_ui})")
+    if list(wheelhouse.glob("proxy_tools*.whl")) == []:
+        return _fail("wheelhouse missing proxy_tools*.whl (offline repair)")
+    sdists = list(wheelhouse.glob("*.tar.gz"))
+    if sdists:
+        return _fail(f"wheelhouse must not contain sdists: {[p.name for p in sdists[:5]]}")
 
     required = [
         PAYLOAD / "bin" / "ffmpeg.exe",
