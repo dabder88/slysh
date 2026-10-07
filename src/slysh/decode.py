@@ -63,6 +63,14 @@ def _safe_unlink(path: str | Path) -> None:
         pass
 
 
+def _close_pcm_mapping(pcm: np.ndarray) -> None:
+    if isinstance(pcm, np.memmap):
+        try:
+            pcm._mmap.close()
+        except (AttributeError, ValueError, OSError):
+            pass
+
+
 def decode_memmap_threshold_bytes() -> int:
     raw = (os.environ.get("SLYSH_DECODE_MEMMAP_BYTES") or "").strip()
     if raw:
@@ -169,6 +177,8 @@ def decode_pcm_16k_mono(
     fd_pcm, pcm_path = tempfile.mkstemp(prefix="gigaam_pcm_", suffix=".f32le")
     os.close(fd_pcm)
     media_tmp: str | None = None
+    pcm_out: np.ndarray | None = None
+    succeeded = False
     try:
         media_input, media_tmp = _prepare_media_input(source)
         cmd = _ffmpeg_pcm_cmd(
@@ -195,13 +205,18 @@ def decode_pcm_16k_mono(
         pcm_file = Path(pcm_path)
         if not pcm_file.is_file() or pcm_file.stat().st_size == 0:
             raise DecodeError(DECODE_FAILED_MESSAGE)
-        pcm = _load_pcm_f32le(pcm_path)
-        if pcm.size == 0:
+        pcm_out = _load_pcm_f32le(pcm_path)
+        if pcm_out.size == 0:
             raise DecodeError(DECODE_FAILED_MESSAGE)
-        return pcm, 16000
+        succeeded = True
+        return pcm_out, 16000
     finally:
         if media_tmp:
             _safe_unlink(media_tmp)
+        if not succeeded:
+            if pcm_out is not None:
+                _close_pcm_mapping(pcm_out)
+            _safe_unlink(pcm_path)
 
 
 _DURATION_RE = re.compile(
