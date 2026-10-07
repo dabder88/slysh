@@ -4,7 +4,7 @@
 
 **Легенда:** ✅ готово · 🟡 частично · 🔵 в работе · ⬜ не начато · ⏭️ отложено / вне scope
 
-**Baseline аудита:** `6f8690d`. **Последнее обновление:** 2026-10-07 — **I1–I7** ✅ (F3-04 offline bootstrap); I8 ⬜.
+**Baseline аудита:** `6f8690d`. **Последнее обновление:** 2026-10-07 — **I1–I7** ✅; **I8** 🟡 gate без full pytest по умолчанию.
 
 ---
 
@@ -13,7 +13,7 @@
 | Блок | Статус | Комментарий |
 |------|--------|-------------|
 | **I** F3-01…F3-07 | ✅ | I1–I7 закрыты |
-| **I8** CI / Setup / отчёт | ⬜ | полный pytest + SHA-256 Setup |
+| **I8** CI / Setup / отчёт | 🟡 | `run_plan_fix3_gate.ps1` + `write_setup_acceptance_record`; full pytest опционально |
 
 Полный pytest на baseline аудита **не** выполнялся (plan-fix-3 §1). Статус «готово» здесь — только после тестов и поведенческой проверки по plan-fix-3 §10.
 
@@ -30,7 +30,7 @@
 | I5 | F3-05 | R07 | Proxy password не в `.bak` | P2 | ✅ | `http_proxy.py` + `test_secrets_dpapi_migration.py` |
 | I6 | F3-07 | R10 | Очистка temp PCM при ошибке/отмене | P2 | ✅ | `decode_pcm_16k_mono` finally, `test_decode_pcm_cleanup.py` |
 | I7 | F3-04 | R09 | Offline wheelhouse + единый bootstrap | P1 | ✅ | `requirements-ui.txt`, `uv pip sync`, `test_offline_bootstrap.py` (+ integration) |
-| I8 | — | R15 | Subset CI, full pytest, Setup SHA-256 | — | ⬜ | расширить `run_plan_fix2_targeted_tests` или преемник |
+| I8 | — | R15 | Subset CI, gate, Setup SHA-256 | — | 🟡 | `run_plan_fix3_gate.ps1` (targeted+JS); `meeting_capture` в subset; full pytest — `SLYSH_GATE_FULL_PYTEST=1`; Setup fingerprint после локальной сборки |
 
 ---
 

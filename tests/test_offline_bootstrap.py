@@ -122,6 +122,10 @@ def test_e6_probe_flags_match_module(tmp_path: Path):
     assert args[0] == "pip"
 
 
+@pytest.mark.skipif(
+    os.environ.get("SLYSH_PYTEST_GATE") == "1",
+    reason="gate: no PyPI download (SLYSH_PYTEST_GATE)",
+)
 @pytest.mark.skipif(shutil.which("uv") is None, reason="uv not on PATH")
 def test_offline_pip_sync_installs_from_wheelhouse(tmp_path: Path):
     uv = shutil.which("uv")

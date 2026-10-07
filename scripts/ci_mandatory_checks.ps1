@@ -72,25 +72,10 @@ foreach ($rel in $Smokes) {
     }
 }
 
-Write-Host "=== run_plan_fix2_targeted_tests ==="
-powershell -NoProfile -File (Join-Path $Root "scripts\run_plan_fix2_targeted_tests.ps1")
+Write-Host "=== run_plan_fix3_gate (targeted + full pytest) ==="
+powershell -NoProfile -File (Join-Path $Root "scripts\run_plan_fix3_gate.ps1")
 if ($LASTEXITCODE -ne 0) {
-    throw "run_plan_fix2_targeted_tests.ps1 failed"
-}
-
-$TestsDir = Join-Path $Root "tests"
-if (-not (Test-Path $TestsDir)) {
-    throw "missing tests/ (required for ci_mandatory_checks)"
-}
-Write-Host "=== pytest tests ==="
-$env:PYTHONPATH = "src"
-$env:GIGAAM_SKIP_ENGINE = "1"
-$env:GIGAAM_UI_AUTH = "0"
-$env:GIGAAM_LOOPBACK_STRICT = "0"
-$env:SLYSH_DISABLE_OPENAPI = "1"
-& $Python -m pytest tests -q
-if ($LASTEXITCODE -ne 0) {
-    throw "pytest failed"
+    throw "run_plan_fix3_gate.ps1 failed"
 }
 
 Write-Host "ci_mandatory_checks: OK"
