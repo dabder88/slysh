@@ -97,6 +97,18 @@ def test_parse_expected_sha256():
     )
 
 
+def test_parse_expected_sha256_picks_digest_for_asset_name():
+    ru = "a" * 64
+    en = "b" * 64
+    body = (
+        f"sha256: {ru}  Slysh-Setup-1.0.0-ru.exe\n"
+        f"sha256: {en}  Slysh-Setup-1.0.0-en.exe\n"
+    )
+    assert updates._parse_expected_sha256(body, "Slysh-Setup-1.0.0-en.exe") == en
+    assert updates._parse_expected_sha256(body, "Slysh-Setup-1.0.0-ru.exe") == ru
+    assert updates._parse_expected_sha256(body) == ru
+
+
 def test_versioned_setup_asset_name():
     assert updates.versioned_setup_asset_name("ru", "1.0.0") == "Slysh-Setup-1.0.0-ru.exe"
     assert updates.versioned_setup_asset_name("en", "v2.3.4") == "Slysh-Setup-2.3.4-en.exe"

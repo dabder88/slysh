@@ -4,10 +4,38 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def _load_github_token() -> str:
+    token = os.environ.get("GITHUB_TOKEN", "").strip()
+    if token:
+        return token
+    env_path = ROOT / ".env"
+    if env_path.is_file():
+        for line in env_path.read_text(encoding="utf-8").splitlines():
+            if line.startswith("GITHUB_TOKEN="):
+                return line.split("=", 1)[1].strip()
+    return ""
+
+
+def _fetch_github_release(url: str) -> dict:
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+    token = _load_github_token()
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    req = urllib.request.Request(url, headers=headers)
+    with urllib.request.urlopen(req, timeout=45.0) as resp:
+        return json.loads(resp.read().decode("utf-8"))
 
 
 def main() -> int:
@@ -48,27 +76,50 @@ def main() -> int:
     slug = github_repo_slug()
     url = f"https://api.github.com/repos/{slug}/releases/latest"
     try:
-        release = updates._http_json(url)
-    except Exception as exc:
+        release = _fetch_github_release(url)
+    except urllib.error.HTTPError as exc:
         print(f"GET {url}")
-        print(f"FAILED: {exc}")
+        print(f"FAILED: HTTP {exc.code}")
+        if exc.code == 404 and not _load_github_token():
+            print(
+                "Подсказка: 404 без токена часто значит приватный репозиторий. "
+                "Для конечных пользователей репозиторий должен быть public; "
+                "для локальной проверки задайте GITHUB_TOKEN в .env."
+            )
         print(
             "Ожидание в UI: «Не удалось проверить обновления». "
             "Нужен публичный репозиторий, хотя бы один GitHub Release "
             "и корректный github_repo в version.json."
         )
         return 2
+    except Exception as exc:
+        print(f"GET {url}")
+        print(f"FAILED: {exc}")
+        return 2
 
     tag = str(release.get("tag_name") or "")
     latest = updates._parse_release_version(tag)
     current = release_version()
     body = str(release.get("body") or "")
-    sha = updates._parse_expected_sha256(body)
     asset = updates._pick_setup_asset(release)
+    asset_name = str(asset.get("name") or "")
+    sha = updates._parse_expected_sha256(body, asset_name)
     print(f"release tag: {tag} -> {latest}")
-    print(f"asset: {asset.get('name')}")
-    print(f"sha256 in body: {'yes' if sha else 'no'}")
+    print(f"asset: {asset_name}")
+    print(f"sha256 for asset: {'yes' if sha else 'no'}")
 
+    from slysh.ui_locale import save_ui_locale
+
+    for locale in ("ru", "en"):
+        save_ui_locale(locale)
+        a = updates._pick_setup_asset(release)
+        name = str(a.get("name") or "")
+        digest = updates._parse_expected_sha256(body, name)
+        ok = bool(digest and re.fullmatch(r"[a-f0-9]{64}", digest))
+        print(f"locale {locale}: asset={name} sha256_ok={ok}")
+
+    # Same JSON fetch as UI (public repo). For private repo use token only in this smoke.
+    updates._http_json = _fetch_github_release  # type: ignore[method-assign]
     try:
         result = updates.check_for_updates()
     except ValueError as exc:

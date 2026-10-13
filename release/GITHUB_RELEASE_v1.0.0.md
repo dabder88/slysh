@@ -15,7 +15,6 @@ Upload to this release:
 
 - `Slysh-Setup-1.0.0-ru.exe`
 - `Slysh-Setup-1.0.0-en.exe`
-- Optional aliases for in-app updates and README buttons: `Slysh-Setup-ru.exe`, `Slysh-Setup-en.exe` (same files, duplicate upload or re-upload with short names)
 
 ## SHA-256 (required for in-app update check)
 

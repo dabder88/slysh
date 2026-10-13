@@ -224,8 +224,18 @@ def _pick_setup_asset(release: dict[str, Any]) -> dict[str, Any]:
     raise ValueError(f"В релизе нет установщика ({', '.join(preferred)})")
 
 
-def _parse_expected_sha256(body: str) -> str | None:
-    match = _SHA256_IN_BODY.search(body or "")
+def _parse_expected_sha256(body: str, asset_name: str | None = None) -> str | None:
+    text = body or ""
+    name = str(asset_name or "").strip()
+    if name:
+        per_asset = re.compile(
+            rf"sha256:\s*([a-fA-F0-9]{{64}})\s+{re.escape(name)}\b",
+            re.IGNORECASE | re.MULTILINE,
+        )
+        match = per_asset.search(text)
+        if match:
+            return match.group(1).lower()
+    match = _SHA256_IN_BODY.search(text)
     if not match:
         return None
     return match.group(1).lower()
@@ -262,6 +272,7 @@ def check_for_updates() -> dict[str, Any]:
     tag = str(release.get("tag_name") or "")
     latest = _parse_release_version(tag)
     asset = _pick_setup_asset(release)
+    asset_name = str(asset.get("name") or "")
     download_url = str(asset.get("browser_download_url") or "")
     if not download_url.startswith("https://"):
         raise ValueError("Не удалось проверить обновления")
@@ -271,7 +282,7 @@ def check_for_updates() -> dict[str, Any]:
         "tag": tag,
         "download_url": download_url,
         "size": int(asset.get("size") or 0),
-        "expected_sha256": _parse_expected_sha256(body),
+        "expected_sha256": _parse_expected_sha256(body, asset_name),
         "release_notes": body.strip(),
         "html_url": str(release.get("html_url") or f"https://github.com/{slug}/releases/tag/{tag}"),
     }
