@@ -14,15 +14,9 @@ import { isArchivedOrphan, isArchivedBatch } from "./library-utils.js";
 import { mountLibraryTable } from "./library-table.js";
 import { t } from "./i18n.js";
 
-function archiveFileBulk() {
-  return [
-    ["unarchive", t("archive.unarchive")],
-    ["export", t("common.export")],
-    ["delete", t("common.delete")],
-  ];
-}
+const STORAGE_KEY = "archive-library";
 
-function archiveBatchBulk() {
+function archiveBulkActions() {
   return [
     ["unarchive", t("archive.unarchive")],
     ["export", t("common.export")],
@@ -31,13 +25,10 @@ function archiveBatchBulk() {
 }
 
 let archiveBound = false;
-let activeTab = "files";
 const expandedBatches = new Set();
-const selectedFileKeys = new Set();
-const selectedBatchKeys = new Set();
+const selectedKeys = new Set();
 
-let filesWrap = null;
-let batchesWrap = null;
+let libraryWrap = null;
 
 function archivedJobStatusLabel() {
   return t("jobStatus.archived");
@@ -45,19 +36,6 @@ function archivedJobStatusLabel() {
 
 function archivedJobStatusTone() {
   return "done";
-}
-
-function applyArchiveTabUi(tab) {
-  activeTab = tab === "batches" ? "batches" : "files";
-  document.querySelectorAll("#view-archive .legacy-tab").forEach((btn) => {
-    btn.classList.toggle("is-active", btn.dataset.tab === activeTab);
-  });
-  if (filesWrap) {
-    filesWrap.hidden = activeTab !== "files";
-  }
-  if (batchesWrap) {
-    batchesWrap.hidden = activeTab !== "batches";
-  }
 }
 
 function toggleExpandedBatch(batchId) {
@@ -77,52 +55,62 @@ function selectedBatchesFromKeys(keys, batchList) {
   return batchList.filter((batch) => keys.has(`batch:${batch.id}`));
 }
 
-function renderArchiveFiles() {
-  if (!filesWrap) {
-    return;
+function runArchiveBulkAction(action, jobs, batchList) {
+  const selectedJobs = selectedJobsFromKeys(selectedKeys, jobs);
+  const selectedBatches = selectedBatchesFromKeys(selectedKeys, batchList);
+  const tasks = [];
+  if (selectedJobs.length) {
+    tasks.push(
+      runJobsBulkAction(selectedJobs, action, {
+        onClear: () => {
+          for (const job of selectedJobs) {
+            selectedKeys.delete(`job:${job.id}`);
+          }
+        },
+      })
+    );
   }
-  const { orphans } = getLibrarySnapshot();
-  const jobs = orphans.filter(isArchivedOrphan);
-  pruneLibrarySelectedKeys(selectedFileKeys, new Set(jobs.map((job) => `job:${job.id}`)));
-
-  mountLibraryTable(filesWrap, {
-    storageKey: "archive-files",
-    jobs,
-    batches: [],
-    emptyMessage:
-      t("archive.emptyFiles"),
-    jobStatusLabel: archivedJobStatusLabel,
-    jobStatusTone: archivedJobStatusTone,
-    expandedBatches,
-    onExpandChange: () => renderArchive(),
-    onJobClick: (job) => navigate("editor", { jobId: job.id }),
-    onJobContextMenu: (event, job, batchId) => openContextMenu(event, job, batchId),
-    onBatchClick: () => {},
-    onBatchContextMenu: () => {},
-    selectable: true,
-    selectedKeys: selectedFileKeys,
-    bulkActions: archiveFileBulk(),
-    onBulkAction: (action) =>
-      runJobsBulkAction(selectedJobsFromKeys(selectedFileKeys, jobs), action, {
-        onClear: () => selectedFileKeys.clear(),
-      }).catch((err) => showToast(err.message || String(err))),
+  if (selectedBatches.length) {
+    tasks.push(
+      runBatchesBulkAction(selectedBatches, action, {
+        onClear: () => {
+          for (const batch of selectedBatches) {
+            selectedKeys.delete(`batch:${batch.id}`);
+          }
+        },
+      })
+    );
+  }
+  if (!tasks.length) {
+    return Promise.resolve();
+  }
+  return Promise.all(tasks).then(() => {
+    if (!selectedKeys.size) {
+      return;
+    }
+    renderArchive();
   });
 }
 
-function renderArchiveBatches() {
-  if (!batchesWrap) {
+export function renderArchive() {
+  if (!libraryWrap) {
     return;
   }
-  const { batches } = getLibrarySnapshot();
+  const { orphans, batches } = getLibrarySnapshot();
+  const jobs = orphans.filter(isArchivedOrphan);
   const batchList = batches.filter(isArchivedBatch);
-  pruneLibrarySelectedKeys(selectedBatchKeys, new Set(batchList.map((batch) => `batch:${batch.id}`)));
+  const validKeys = new Set([
+    ...jobs.map((job) => `job:${job.id}`),
+    ...batchList.map((batch) => `batch:${batch.id}`),
+  ]);
+  pruneLibrarySelectedKeys(selectedKeys, validKeys);
 
-  mountLibraryTable(batchesWrap, {
-    storageKey: "archive-batches",
-    jobs: [],
+  const hasAny = jobs.length > 0 || batchList.length > 0;
+  mountLibraryTable(libraryWrap, {
+    storageKey: STORAGE_KEY,
+    jobs,
     batches: batchList,
-    emptyMessage:
-      t("archive.emptyBatches"),
+    emptyMessage: hasAny ? t("libraryTable.noFilterMatch") : t("archive.emptyFiles"),
     jobStatusLabel: archivedJobStatusLabel,
     jobStatusTone: archivedJobStatusTone,
     expandedBatches,
@@ -132,21 +120,13 @@ function renderArchiveBatches() {
     onBatchClick: (batch) => toggleExpandedBatch(batch.id),
     onBatchContextMenu: (event, batch) => openBatchContextMenu(event, batch),
     selectable: true,
-    selectedKeys: selectedBatchKeys,
-    bulkActions: archiveBatchBulk(),
+    selectedKeys,
+    bulkActions: archiveBulkActions(),
     onBulkAction: (action) =>
-      runBatchesBulkAction(selectedBatchesFromKeys(selectedBatchKeys, batchList), action, {
-        onClear: () => selectedBatchKeys.clear(),
-      }).catch((err) => showToast(err.message || String(err))),
+      runArchiveBulkAction(action, jobs, batchList).catch((err) =>
+        showToast(err.message || String(err))
+      ),
   });
-}
-
-export function renderArchive() {
-  if (activeTab === "batches") {
-    renderArchiveBatches();
-  } else {
-    renderArchiveFiles();
-  }
 }
 
 export async function refreshArchive() {
@@ -161,18 +141,19 @@ export function initArchive() {
     return;
   }
   archiveBound = true;
-  filesWrap = document.getElementById("archive-files-wrap");
-  batchesWrap = document.getElementById("archive-batches-wrap");
-  document.querySelectorAll("#view-archive .legacy-tab").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      navigate("archive", { tab: btn.dataset.tab });
-    });
-  });
+  libraryWrap = document.getElementById("archive-library-wrap");
 }
 
 export function onArchiveShow(params = {}) {
-  applyArchiveTabUi(params.tab === "batches" ? "batches" : "files");
-  refreshArchive().catch((err) => reportError(t("archive.title"), err));
+  refreshArchive()
+    .then(() => {
+      if (params.tab === "batches") {
+        document
+          .querySelector("#view-archive .library-table-row--batch")
+          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    })
+    .catch((err) => reportError(t("archive.title"), err));
 }
 
 export function onArchiveHide() {}

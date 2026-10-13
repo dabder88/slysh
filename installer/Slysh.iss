@@ -5,19 +5,19 @@
 
 #define Payload "..\dist\payload"
 #ifndef AppVersion
-#define AppVersion "0.1.0"
+#define AppVersion "1.0.0"
 #endif
 #ifndef VersionInfoVersion
-#define VersionInfoVersion "0.1.0.0"
+#define VersionInfoVersion "1.0.0.0"
 #endif
 #ifndef SetupSegment
 #define SetupSegment "ru"
 #endif
 #if SetupSegment == "en"
-#define MyOutputBase "Slysh-Setup-en"
+#define MyOutputBase "Slysh-Setup-" + AppVersion + "-en"
 #define MyLicenseFile "LICENSE-EN.txt"
 #else
-#define MyOutputBase "Slysh-Setup-ru"
+#define MyOutputBase "Slysh-Setup-" + AppVersion + "-ru"
 #define MyLicenseFile "LICENSE-RU.txt"
 #endif
 #define MyAppUserModelId "Slysh.DesktopApp"
@@ -77,11 +77,7 @@ Name: "{group}\{cm:UninstallProgram,Slysh}"; Filename: "{uninstallexe}"; IconFil
 Name: "{autodesktop}\Slysh"; Filename: "{app}\Slysh.exe"; IconFilename: "{app}\slysh.ico"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Run]
-#ifexist "redist\MicrosoftEdgeWebView2RuntimeInstallerX64.exe"
-Filename: "{tmp}\MicrosoftEdgeWebView2RuntimeInstallerX64.exe"; Parameters: "/silent /install"; StatusMsg: "Microsoft Edge WebView2 Runtime…"; Check: not WebView2Installed; Flags: waituntilterminated
-#else
-Filename: "{tmp}\MicrosoftEdgeWebview2Setup.exe"; Parameters: "/silent /install"; StatusMsg: "Microsoft Edge WebView2 Runtime…"; Check: not WebView2Installed; Flags: waituntilterminated
-#endif
+; WebView2 — только InstallWebView2IfNeeded в [Code] (не [Run]: bootstrapper падает «уже установлен»).
 Filename: "{app}\Slysh.exe"; WorkingDir: "{app}"; Description: "{cm:LaunchProgram,Slysh}"; Flags: nowait postinstall skipifsilent runascurrentuser
 
 [UninstallDelete]
@@ -100,6 +96,7 @@ Type: dirifempty; Name: "{app}"
 const
   SHCNE_ASSOCCHANGED = $08000000;
   SHCNF_IDLIST = $0000;
+  WebView2ClientId = '{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}';
 
 function SHChangeNotify(lEventId, uFlags: Integer; dwItem1, dwItem2: Integer): Integer;
   external 'SHChangeNotify@shell32.dll stdcall';
@@ -168,24 +165,99 @@ begin
     False);
 end;
 
-function WebView2Installed: Boolean;
+function WebView2RegistryHasPv(RootKey: Integer; const SubKey: String): Boolean;
 var
   Ver: String;
 begin
-  if RegQueryStringValue(HKLM, 'SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}', 'pv', Ver) and (Ver <> '') and (Ver <> '0.0.0.0') then
+  Result :=
+    RegQueryStringValue(RootKey, SubKey, 'pv', Ver) and
+    (Ver <> '') and (Ver <> '0.0.0.0');
+end;
+
+function WebView2ExeOnDisk: Boolean;
+var
+  FindRec: TFindRec;
+  BasePath: String;
+begin
+  BasePath := ExpandConstant('{pf32}\Microsoft\EdgeWebView\Application');
+  if FindFirst(BasePath + '\*', FindRec) then
+  try
+    repeat
+      if (FindRec.Name <> '.') and (FindRec.Name <> '..') and
+         ((FindRec.Attributes and FILE_ATTRIBUTE_DIRECTORY) <> 0) then
+        if FileExists(BasePath + '\' + FindRec.Name + '\msedgewebview2.exe') then
+        begin
+          Result := True;
+          exit;
+        end;
+    until not FindNext(FindRec);
+  finally
+    FindClose(FindRec);
+  end;
+  Result := False;
+end;
+
+function WebView2Installed: Boolean;
+begin
+  if WebView2RegistryHasPv(HKLM, 'SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\' + WebView2ClientId) then
   begin
     Result := True;
     exit;
   end;
-  if RegQueryStringValue(HKLM, 'SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}', 'pv', Ver) and (Ver <> '') and (Ver <> '0.0.0.0') then
+  if WebView2RegistryHasPv(HKLM, 'SOFTWARE\Microsoft\EdgeUpdate\Clients\' + WebView2ClientId) then
   begin
     Result := True;
     exit;
   end;
-  if RegQueryStringValue(HKCU, 'SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}', 'pv', Ver) and (Ver <> '') and (Ver <> '0.0.0.0') then
-    Result := True
-  else
-    Result := False;
+  if WebView2RegistryHasPv(HKLM, 'SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\ClientState\' + WebView2ClientId) then
+  begin
+    Result := True;
+    exit;
+  end;
+  if WebView2RegistryHasPv(HKLM, 'SOFTWARE\Microsoft\EdgeUpdate\ClientState\' + WebView2ClientId) then
+  begin
+    Result := True;
+    exit;
+  end;
+  if WebView2RegistryHasPv(HKCU, 'SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\' + WebView2ClientId) then
+  begin
+    Result := True;
+    exit;
+  end;
+  if WebView2RegistryHasPv(HKCU, 'SOFTWARE\Microsoft\EdgeUpdate\Clients\' + WebView2ClientId) then
+  begin
+    Result := True;
+    exit;
+  end;
+  if WebView2RegistryHasPv(HKCU, 'SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\ClientState\' + WebView2ClientId) then
+  begin
+    Result := True;
+    exit;
+  end;
+  if WebView2RegistryHasPv(HKCU, 'SOFTWARE\Microsoft\EdgeUpdate\ClientState\' + WebView2ClientId) then
+  begin
+    Result := True;
+    exit;
+  end;
+  Result := WebView2ExeOnDisk;
+end;
+
+procedure InstallWebView2IfNeeded;
+var
+  ResultCode: Integer;
+  Installer: String;
+begin
+  if WebView2Installed then
+    exit;
+  Installer := ExpandConstant('{tmp}\MicrosoftEdgeWebView2RuntimeInstallerX64.exe');
+  if not FileExists(Installer) then
+    Installer := ExpandConstant('{tmp}\MicrosoftEdgeWebview2Setup.exe');
+  if not FileExists(Installer) then
+    exit;
+  WizardForm.StatusLabel.Caption := 'Microsoft Edge WebView2 Runtime…';
+  WizardForm.Update;
+  Exec(Installer, '/silent /install', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  { Не прерывать Setup: официальный bootstrapper возвращает ошибку, если runtime уже есть. }
 end;
 
 function InitializeSetup(): Boolean;
@@ -262,6 +334,7 @@ begin
     RemoveLegacyStartMenuShortcut;
   if CurStep = ssPostInstall then
   begin
+    InstallWebView2IfNeeded;
 #if SetupSegment == "en"
     if UiLocaleCombo.ItemIndex = 0 then
       SelectedUiLocale := 'en'

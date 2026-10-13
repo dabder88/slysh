@@ -6,9 +6,17 @@ param(
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 if ($SetupPaths.Count -eq 0) {
+    $pyproject = Join-Path $Root "pyproject.toml"
+    $appVer = "0.0.0"
+    if (Test-Path -LiteralPath $pyproject) {
+        $pyText = Get-Content -LiteralPath $pyproject -Raw -Encoding UTF8
+        if ($pyText -match '(?m)^version\s*=\s*"([^"]+)"') {
+            $appVer = $Matches[1]
+        }
+    }
     $SetupPaths = @(
-        (Join-Path $Root "dist\Slysh-Setup-ru.exe"),
-        (Join-Path $Root "dist\Slysh-Setup-en.exe")
+        (Join-Path $Root "dist\Slysh-Setup-$appVer-ru.exe"),
+        (Join-Path $Root "dist\Slysh-Setup-$appVer-en.exe")
     )
 }
 if (-not $OutDir) {

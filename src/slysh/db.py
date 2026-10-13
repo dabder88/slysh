@@ -674,6 +674,19 @@ class Database:
         self._conn.commit()
 
     @_locked
+    def pause_transcription(self, job_id: int) -> None:
+        """Stop an in-flight run; keep segments/progress; user can resume via start."""
+        self._conn.execute(
+            """
+            UPDATE jobs
+            SET status = ?, finished_at = NULL, run_id = run_id + 1
+            WHERE id = ?
+            """,
+            (JobStatus.IDLE.value, job_id),
+        )
+        self._conn.commit()
+
+    @_locked
     def set_last_export_path(self, job_id: int, path: str) -> None:
         self.set_last_export_paths(job_id, [path])
 
@@ -990,6 +1003,14 @@ class Database:
         self._conn.execute(
             "UPDATE jobs SET media_duration_s = ? WHERE id = ?",
             (float(seconds), job_id),
+        )
+        self._conn.commit()
+
+    @_locked
+    def set_job_source_path(self, job_id: int, source_path: str) -> None:
+        self._conn.execute(
+            "UPDATE jobs SET source_path = ? WHERE id = ?",
+            (source_path, job_id),
         )
         self._conn.commit()
 

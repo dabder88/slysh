@@ -125,8 +125,19 @@ def _turns_from_result(result) -> list[tuple[int, int, str]]:
     return turns
 
 
-def _run_diarizer(torch_mod, msdd_cls, source_path: str, audio):
+def _run_diarizer(
+    torch_mod,
+    msdd_cls,
+    source_path: str,
+    audio,
+    *,
+    on_progress: Callable[[float], None] | None = None,
+):
     from slysh.rnnt_backend import resolve_device
+
+    def _tick(value: float) -> None:
+        if on_progress:
+            on_progress(float(value))
 
     device = resolve_device()
     seconds = len(audio) / float(TARGET_SAMPLE_RATE) if len(audio) else 0
@@ -137,18 +148,22 @@ def _run_diarizer(torch_mod, msdd_cls, source_path: str, audio):
         seconds / 60.0,
     )
     try:
+        _tick(0.25)
         try:
             diarizer = msdd_cls(device=device)
         except TypeError:
             diarizer = msdd_cls(device)
+        _tick(0.30)
         waveform = torch_mod.from_numpy(audio)
         if waveform.ndim == 1:
             waveform = waveform.unsqueeze(0)
         with _hide_cuda_from_torch(torch_mod, device):
             try:
-                return diarizer.diarize(waveform)
+                result = diarizer.diarize(waveform)
             except TypeError:
-                return diarizer.diarize(source_path)
+                result = diarizer.diarize(source_path)
+        _tick(0.88)
+        return result
     except Exception as exc:
         raise RuntimeError(f"диаризация не удалась: {exc}") from exc
 
@@ -160,6 +175,7 @@ class MsddSpeakersBackend:
         segments: list[Segment],
         *,
         cancelled: Callable[[], bool] | None = None,
+        on_progress: Callable[[float], None] | None = None,
     ) -> list[Segment]:
         from slysh.speakers import SpeakerCancelledError
 
@@ -167,14 +183,29 @@ class MsddSpeakersBackend:
             if cancelled and cancelled():
                 raise SpeakerCancelledError()
 
+        def _tick(value: float) -> None:
+            if on_progress:
+                on_progress(float(value))
+
+        _tick(0.05)
         torch_mod, msdd_cls = _import_msdd_deps()
         try:
             _check()
+            _tick(0.12)
             audio = _load_audio(source_path)
             _check()
-            result = _run_diarizer(torch_mod, msdd_cls, source_path, audio)
+            _tick(0.18)
+            result = _run_diarizer(
+                torch_mod,
+                msdd_cls,
+                source_path,
+                audio,
+                on_progress=on_progress,
+            )
             _check()
-            return _map_by_overlap(segments, _turns_from_result(result))
+            labeled = _map_by_overlap(segments, _turns_from_result(result))
+            _tick(0.95)
+            return labeled
         except SpeakerCancelledError:
             raise
         except RuntimeError:

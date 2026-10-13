@@ -21,7 +21,12 @@ def test_inno_script_has_finish_wizard_options():
     assert "Slysh.exe" in text
     assert '{app}\Slysh.exe' in text or "{app}\\Slysh.exe" in text
     assert "runascurrentuser" in text
-    assert "{cmd}" not in text.split("[Run]")[1].split("[UninstallDelete]")[0]
+    run_section = text.split("[Run]")[1].split("[UninstallDelete]")[0]
+    assert "{cmd}" not in run_section
+    assert "MicrosoftEdgeWebview2Setup.exe" not in run_section
+    assert "InstallWebView2IfNeeded" in text
+    assert "msedgewebview2.exe" in text
+    assert r"EdgeUpdate\ClientState" in text
 
 
 def test_launcher_isolates_models_catalog_env():
@@ -42,12 +47,51 @@ def test_launcher_isolates_models_catalog_env():
     assert "/utf-8" in script
 
 
+def test_launcher_splash_respects_ui_locale():
+    src = (ROOT / "launcher" / "Slysh.c").read_text(encoding="utf-8")
+    assert "init_splash_ui_locale" in src
+    assert ".install-ui-locale" in src
+    assert "settings.json" in src
+    assert "ui_locale" in src
+    assert "SPLASH_STRINGS_EN" in src
+
+
+def test_launcher_post_setup_pip_sync_when_locale_seed():
+    src = (ROOT / "launcher" / "Slysh.c").read_text(encoding="utf-8")
+    assert "install_ui_locale_seed_pending" in src
+    assert "run_uv_pip_sync_only" in src
+    assert "ensure_post_setup_venv_sync" in src
+    assert "post-setup pip sync" in src
+    seed_idx = src.index("read_install_ui_locale_seed(install_root)")
+    settings_idx = src.index("parse_settings_ui_locale(settings_path)")
+    assert seed_idx < settings_idx
+
+
 def test_shell_shows_model_download_controls_without_engine_gate():
     shell = (ROOT / "web" / "js" / "shell.js").read_text(encoding="utf-8")
     assert "asr-model-ready-badge" in shell
     assert "showBtn" in shell
     assert "enginePackages" in shell
     assert "btnEnabled = showBtn && enginePackages" in shell
+
+
+def test_settings_system_installed_actions_dom():
+    html = (ROOT / "web" / "index.html").read_text(encoding="utf-8")
+    assert 'id="settings-dev-tools"' in html
+    assert 'id="settings-installed-actions"' in html
+    assert "btn-settings-check-updates" in html
+    assert "btn-settings-about" in html
+    assert "btn-settings-support" in html
+    shell = (ROOT / "web" / "js" / "shell.js").read_text(encoding="utf-8")
+    assert "syncSystemSettingsActions" in shell
+    assert "install_kind" in shell
+
+
+def test_brand_exclamation_in_sidebar_markup():
+    html = (ROOT / "web" / "index.html").read_text(encoding="utf-8")
+    assert "brand-excl-mark" in html
+    css = (ROOT / "web" / "styles" / "input.css").read_text(encoding="utf-8")
+    assert "#5060ec" in css.lower()
 
 
 def test_inno_script_excludes_staging_venv_from_install():

@@ -1,4 +1,4 @@
-﻿import { navigate, getRoute, getEditorJobId } from "./router.js";
+import { navigate, getRoute, getEditorJobId } from "./router.js";
 import { mountLibraryTable } from "./library-table.js";
 import {
   isLibraryOrphan,
@@ -11,6 +11,7 @@ import {
   isProgressIndeterminate,
   orderedSpeakerKeys,
   speakerDisplayName,
+  speakerRenameLabel,
   speakerKeysForRename,
 } from "./library-utils.js";
 import { api, showToast, jobDisplayName, isYoutubeJob } from "./api.js";
@@ -244,6 +245,14 @@ function switchLegacyTab(name) {
   if (batchesChrome) {
     batchesChrome.hidden = name !== "batches";
   }
+  const filesHint = document.getElementById("files-hint");
+  const batchesHint = document.getElementById("batches-hint");
+  if (filesHint) {
+    filesHint.hidden = name !== "files";
+  }
+  if (batchesHint) {
+    batchesHint.hidden = name !== "batches";
+  }
   if (legacyFilesWrap) {
     legacyFilesWrap.hidden = name !== "files";
   }
@@ -262,8 +271,8 @@ function selectedBatchLabel(batchId = selectedBatchId) {
   return batch ? batch.name : t("queue.batchLabel");
 }
 
-/** File/folder intake target: null if none selected or YouTube batch is selected. */
-function fileBatchTargetId() {
+/** Selected batch for explicit batch intake (dashboard drop, batches tab). */
+function explicitBatchTargetId() {
   const id = getSelectedBatchId();
   if (id == null) {
     return null;
@@ -273,6 +282,14 @@ function fileBatchTargetId() {
     return null;
   }
   return id;
+}
+
+/** File/folder intake on legacy «Файлы»: only when «Пакеты» tab is active. */
+function fileBatchTargetId() {
+  if (activeMainTab !== "batches") {
+    return null;
+  }
+  return explicitBatchTargetId();
 }
 
 function syncBatchTargetSelect() {
@@ -315,7 +332,7 @@ function syncBatchesChrome() {
   const youtube = batch && isYoutubeBatch(batch);
   const addFiles = document.getElementById("btn-batch-add-files");
   const addFolder = document.getElementById("btn-batch-add-folder");
-  const hint = document.querySelector("#batches-chrome .hint");
+  const hint = document.getElementById("batches-hint");
   if (addFiles) {
     addFiles.disabled = Boolean(youtube);
     addFiles.title = youtube
@@ -1363,7 +1380,7 @@ function renderSpeakerRename(keys, names = {}) {
   speakerRenameEl.hidden = false;
   for (const key of keys) {
     const label = document.createElement("label");
-    label.textContent = speakerDisplayName(key, names[key]);
+    label.textContent = speakerRenameLabel(key);
     const input = document.createElement("input");
     input.dataset.speakerKey = key;
     input.value = names[key] || "";
@@ -1714,8 +1731,7 @@ async function addFolder() {
   if (!folder) {
     return;
   }
-  const targetId = fileBatchTargetId();
-  await openFolderAddModal([folder], targetId);
+  await openFolderAddModal([folder], null);
 }
 
 async function createEmptyBatch() {
@@ -2084,7 +2100,11 @@ function refreshLibraryViews() {
   } else if (route === "archive") {
     import("./archive.js").then((m) => m.renderArchive());
   } else if (route === "queue") {
-    import("./queue.js").then((m) => m.renderQueue());
+    import("./queue.js").then((m) => {
+      if (!m.isQueueInitialRefreshPending?.()) {
+        m.renderQueue();
+      }
+    });
   }
 }
 
@@ -2659,11 +2679,18 @@ async function retranscribeSelected() {
   await refreshJobs();
 }
 
+export async function cancelJob(jobId) {
+  if (jobId == null) {
+    return;
+  }
+  await api(`/api/jobs/${jobId}/cancel`, { method: "POST" });
+}
+
 async function cancelSelected() {
   if (selectedId == null) {
     return;
   }
-  await api(`/api/jobs/${selectedId}/cancel`, { method: "POST" });
+  await cancelJob(selectedId);
   await refreshJobs();
   if (selectedId != null) {
     await selectJob(selectedId);
@@ -2882,7 +2909,12 @@ function bindLegacyEvents() {
   saveBtn?.addEventListener("click", () =>
     saveSegments().catch((err) => showToast(err.message || String(err)))
   );
-  transcriptEl?.addEventListener("click", () => seekFromTranscriptClick());
+  transcriptEl?.addEventListener("click", () => {
+    if (getRoute() === "editor") {
+      return;
+    }
+    seekFromTranscriptClick();
+  });
 
   document.getElementById("export-close")?.addEventListener("click", () => closeExportModal());
   document.getElementById("export-cancel")?.addEventListener("click", () => closeExportModal());
@@ -3128,11 +3160,7 @@ export function initLegacyWorkspace() {
       confirmUploadAsBatch().catch((err) => showToast(err.message || String(err)))
     );
     document.getElementById("upload-target-cancel")?.addEventListener("click", closeUploadTargetModal);
-    uploadTargetModal.addEventListener("click", (event) => {
-      if (event.target === uploadTargetModal) {
-        closeUploadTargetModal();
-      }
-    });
+    document.getElementById("upload-target-close")?.addEventListener("click", closeUploadTargetModal);
   }
 
   if (batchRulesModal) {
@@ -3193,7 +3221,8 @@ export async function addPathsForDashboard(target, paths) {
   }
   const onlyFolders = unique.every(pathLooksLikeFolder);
   if (onlyFolders) {
-    await openFolderAddModal(unique, fileBatchTargetId());
+    const targetId = target === "batch" ? explicitBatchTargetId() : fileBatchTargetId();
+    await openFolderAddModal(unique, targetId);
     return;
   }
   if (unique.some(pathLooksLikeFolder)) {
@@ -3201,7 +3230,7 @@ export async function addPathsForDashboard(target, paths) {
     return;
   }
   if (target === "batch") {
-    const targetId = fileBatchTargetId();
+    const targetId = explicitBatchTargetId();
     if (targetId == null) {
       await createBatchNamed(defaultBatchName(unique), unique);
       return;

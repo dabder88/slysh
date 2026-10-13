@@ -1,4 +1,11 @@
-﻿import { api, showToast, formatDuration, jobDisplayName, isYoutubeJob } from "./api.js";
+﻿import {
+  api,
+  showToast,
+  formatDuration,
+  jobDisplayName,
+  isYoutubeJob,
+  translateKnownApiError,
+} from "./api.js";
 import { reportError } from "./errors.js";
 import { getLibrarySnapshot, jobStatusLabel, patchBatchName } from "./library-store.js";
 import { refreshLibrary } from "./legacy.js";
@@ -8,8 +15,11 @@ import { batchProgressItemLabel } from "./batch-kind.js";
 import { t } from "./i18n.js";
 import {
   isJobActive,
+  isJobInQueue,
+  isJobPausedInQueue,
   isJobWaiting,
   isBatchActive,
+  isBatchPaused,
   batchFileCount,
   batchDoneCount,
   formatBatchCountsSummary,
@@ -23,6 +33,72 @@ import {
 
 let queueBound = false;
 let queuePollTimer = null;
+let queueInitialRefreshPending = false;
+
+export function isQueueInitialRefreshPending() {
+  return queueInitialRefreshPending;
+}
+
+function orphanQueueHasWork(orphans) {
+  return orphans.some((j) => isJobActive(j) || j.status === "queued");
+}
+
+function isBulkEndpointMissing(err) {
+  const status = err?.status;
+  return status === 404 || status === 405;
+}
+
+function orphansNeedingPause(orphans) {
+  return orphans.filter((j) => isJobActive(j) || j.status === "queued");
+}
+
+function orphansNeedingCancel(orphans) {
+  return orphans.filter((j) => isJobActive(j) || j.status === "queued");
+}
+
+async function pauseOrphansBulk(orphans) {
+  try {
+    await api("/api/queue/pause-orphans", { method: "POST" });
+  } catch (err) {
+    if (!isBulkEndpointMissing(err)) {
+      throw err;
+    }
+    for (const job of orphansNeedingPause(orphans)) {
+      await pauseJob(job.id, { toast: false });
+    }
+  }
+}
+
+async function cancelOrphansBulk(orphans) {
+  try {
+    await api("/api/queue/cancel-orphans", { method: "POST" });
+  } catch (err) {
+    if (!isBulkEndpointMissing(err)) {
+      throw err;
+    }
+    for (const job of orphansNeedingCancel(orphans)) {
+      await cancelJob(job.id);
+    }
+  }
+}
+
+async function cancelActiveBatchesBulk(batches) {
+  const running = batches.filter((b) => b.running);
+  if (!running.length) {
+    return;
+  }
+  try {
+    await api("/api/queue/cancel-batches", { method: "POST" });
+  } catch (err) {
+    if (!isBulkEndpointMissing(err)) {
+      throw err;
+    }
+    for (const batch of running) {
+      await cancelBatch(batch.id);
+    }
+  }
+}
+
 const expandedBatches = new Set();
 
 function mediaIconName(job) {
@@ -32,10 +108,14 @@ function mediaIconName(job) {
   return /\.(mp4|mov|mkv|avi|webm)$/i.test(String(job?.source_path || "")) ? "video_file" : "audio_file";
 }
 
-function computeMetrics(jobs, batches) {
-  const batchMap = new Map(batches.map((b) => [b.id, b]));
+function computeMetrics(jobs, batches, batchMap) {
   const active = jobs.filter(isJobActive).length;
-  const queued = jobs.filter((j) => isJobWaiting(j, batchMap)).length;
+  const queued = jobs.filter(
+    (j) => isJobWaiting(j, batchMap) && !isJobPausedInQueue(j, batchMap)
+  ).length;
+  const paused = jobs.filter(
+    (j) => isJobPausedInQueue(j, batchMap) && !isJobActive(j) && !isJobWaiting(j, batchMap)
+  ).length;
   const today = new Date().toDateString();
   const completedToday = jobs.filter(
     (j) => j.status === "completed" && new Date(j.created_at).toDateString() === today
@@ -47,7 +127,7 @@ function computeMetrics(jobs, batches) {
           completed.reduce((sum, j) => sum + Number(j.duration_s || 0), 0) / completed.length
         )
       : t("common.dash");
-  return { active, queued, completedToday, avgDuration };
+  return { active, queued, paused, completedToday, avgDuration };
 }
 
 function iconButton(icon, title, className = "") {
@@ -140,12 +220,19 @@ function renderActiveJobCard(job) {
   stats.innerHTML = `<div class="queue-active-pct">${jobProgressPctLabel(job)}</div><div class="hint">${jobStatusLabel(job)}</div>`;
   const actions = document.createElement("div");
   actions.className = "queue-active-actions";
+  const pauseBtn = iconButton("pause", t("queue.pauseAfterFile"));
+  pauseBtn.title = t("queue.pauseAfterCurrent");
+  pauseBtn.addEventListener("click", (event) => {
+    event.stopPropagation();
+    pauseJob(job.id).catch((err) => showToast(err.message || String(err)));
+  });
   const cancelBtn = iconButton("stop_circle", t("queue.abortTranscription"), "icon-btn--danger");
   cancelBtn.title = t("common.stop");
   cancelBtn.addEventListener("click", (event) => {
     event.stopPropagation();
     cancelJob(job.id).catch((err) => showToast(err.message || String(err)));
   });
+  actions.appendChild(pauseBtn);
   actions.appendChild(cancelBtn);
   trailing.appendChild(stats);
   trailing.appendChild(actions);
@@ -202,6 +289,15 @@ function renderBatchSubItem(job) {
 
   const trailing = document.createElement("div");
   trailing.className = "queue-batch-item-trailing";
+  if (isJobActive(job) && job.batch_id != null) {
+    const pauseBtn = iconButton("pause", t("queue.pauseAfterCurrent"));
+    pauseBtn.classList.add("queue-batch-item-pause");
+    pauseBtn.addEventListener("click", (event) => {
+      event.stopPropagation();
+      pauseJob(job.id).catch((err) => showToast(err.message || String(err)));
+    });
+    trailing.appendChild(pauseBtn);
+  }
   if (isJobActive(job)) {
     const pct = jobProgressPct(job);
     trailing.appendChild(renderProgressBar(pct, "primary", isProgressIndeterminate(job)));
@@ -354,25 +450,112 @@ function renderActiveBatchCard(batch) {
   return card;
 }
 
+function renderPausedJobRow(job) {
+  const row = document.createElement("div");
+  row.className = "queue-paused-row";
+  row.dataset.queuePausedJob = String(job.id);
+  const leading = document.createElement("span");
+  leading.className = "queue-paused-name";
+  leading.textContent = jobDisplayName(job);
+  const actions = document.createElement("div");
+  actions.className = "queue-paused-actions";
+  const resumeBtn = iconButton("play_arrow", t("queue.resume"));
+  resumeBtn.addEventListener("click", (event) => {
+    event.stopPropagation();
+    resumeJob(job.id).catch((err) => showToast(err.message || String(err)));
+  });
+  const stopBtn = iconButton("close", t("queue.abortTranscription"), "icon-btn--danger");
+  stopBtn.addEventListener("click", (event) => {
+    event.stopPropagation();
+    cancelJob(job.id).catch((err) => showToast(err.message || String(err)));
+  });
+  actions.appendChild(resumeBtn);
+  actions.appendChild(stopBtn);
+  const status = document.createElement("span");
+  status.className = "hint queue-paused-status";
+  status.textContent = t("queue.paused");
+  row.appendChild(leading);
+  row.appendChild(status);
+  row.appendChild(actions);
+  return row;
+}
+
+function renderPausedBatchRow(batch) {
+  const row = document.createElement("div");
+  row.className = "queue-paused-row queue-paused-row--batch";
+  row.dataset.queuePausedBatch = String(batch.id);
+  const leading = document.createElement("span");
+  leading.className = "queue-paused-name";
+  leading.textContent = batch.name || t("queue.batchLabel", { id: batch.id });
+  const actions = document.createElement("div");
+  actions.className = "queue-paused-actions";
+  const resumeBtn = iconButton("play_arrow", t("queue.resume"));
+  resumeBtn.addEventListener("click", (event) => {
+    event.stopPropagation();
+    startBatch(batch.id).catch((err) => showToast(err.message || String(err)));
+  });
+  const stopBtn = iconButton("close", t("queue.stopBatch"), "icon-btn--danger");
+  stopBtn.addEventListener("click", (event) => {
+    event.stopPropagation();
+    cancelBatch(batch.id).catch((err) => showToast(err.message || String(err)));
+  });
+  actions.appendChild(resumeBtn);
+  actions.appendChild(stopBtn);
+  const status = document.createElement("span");
+  status.className = "hint queue-paused-status";
+  status.textContent = t("queue.paused");
+  row.appendChild(leading);
+  row.appendChild(status);
+  row.appendChild(actions);
+  return row;
+}
+
+function renderWaitingJobRow(job) {
+  const row = document.createElement("button");
+  row.type = "button";
+  row.className = "queue-waiting-row";
+  row.dataset.queueWaitingJob = String(job.id);
+  const leading = document.createElement("span");
+  leading.className = "queue-waiting-name";
+  leading.textContent = jobDisplayName(job);
+  const status = document.createElement("span");
+  status.className = "hint queue-waiting-status";
+  status.textContent = job.status === "queued" ? t("queue.inQueue") : t("common.waiting");
+  row.appendChild(leading);
+  row.appendChild(status);
+  row.addEventListener("click", () => navigate("editor", { jobId: job.id }));
+  return row;
+}
+
 export function renderQueue() {
   const metricsEl = document.getElementById("queue-metrics");
   const activeEl = document.getElementById("queue-active-list");
+  const waitingEl = document.getElementById("queue-waiting-list");
+  const waitingTitle = document.getElementById("queue-waiting-section-title");
+  const pausedEl = document.getElementById("queue-paused-list");
+  const pausedTitle = document.getElementById("queue-paused-section-title");
+  const resumeAllBtn = document.getElementById("btn-queue-resume-all");
   if (!metricsEl || !activeEl) {
     return;
   }
 
-  const { jobs, batches, orphans } = getLibrarySnapshot();
+  const { batches, orphans } = getLibrarySnapshot();
   const batchMap = new Map(batches.map((b) => [b.id, b]));
-  const metrics = computeMetrics(jobs, batches);
+  const queueOrphans = orphans.filter((j) => isJobInQueue(j, batchMap));
+  const queueBatchJobs = batches.flatMap((b) =>
+    (b.jobs || []).filter((j) => isJobInQueue(j, batchMap))
+  );
+  const metrics = computeMetrics([...queueOrphans, ...queueBatchJobs], batches, batchMap);
 
   metricsEl.replaceChildren(
     renderMetricCard(t("queue.active"), metrics.active, "sync", "queue-metric-icon--primary"),
     renderMetricCard(t("queue.inQueue"), metrics.queued, "hourglass_empty"),
+    renderMetricCard(t("queue.pausedMetric"), metrics.paused, "pause_circle"),
     renderMetricCard(t("queue.today"), metrics.completedToday, "check_circle", "queue-metric-icon--secondary"),
     renderMetricCard(t("queue.avgTime"), metrics.avgDuration, "timer")
   );
 
-  const activeOrphans = orphans.filter(isJobActive);
+  const activeOrphans = queueOrphans.filter(isJobActive);
   const activeBatches = batches.filter(isBatchActive);
   const orphanIds = new Set(activeOrphans.map((j) => j.id));
   const batchIds = new Set(activeBatches.map((b) => b.id));
@@ -391,11 +574,23 @@ export function renderQueue() {
   }
   activeEl.querySelector(".queue-active-empty")?.remove();
 
+  const pausedOrphans = queueOrphans.filter(
+    (j) =>
+      isJobPausedInQueue(j, batchMap) && !isJobActive(j) && !isJobWaiting(j, batchMap)
+  );
+  const pausedBatches = batches.filter(isBatchPaused);
+  const hasPaused = pausedOrphans.length > 0 || pausedBatches.length > 0;
+  if (resumeAllBtn) {
+    resumeAllBtn.hidden = !hasPaused;
+  }
+
   if (!activeOrphans.length && !activeBatches.length) {
-    const empty = document.createElement("p");
-    empty.className = "hint queue-active-empty";
-    empty.textContent = t("queue.empty");
-    activeEl.appendChild(empty);
+    if (!hasPaused) {
+      const empty = document.createElement("p");
+      empty.className = "hint queue-active-empty";
+      empty.textContent = t("queue.empty");
+      activeEl.appendChild(empty);
+    }
   } else {
     for (const job of activeOrphans) {
       let card = activeEl.querySelector(`[data-queue-active-job="${job.id}"]`);
@@ -414,7 +609,32 @@ export function renderQueue() {
     }
   }
 
-  syncQueuePoll(jobs, batches);
+  const waitingOrphans = queueOrphans.filter(
+    (j) => isJobWaiting(j, batchMap) && !isJobActive(j) && !isJobPausedInQueue(j, batchMap)
+  );
+  if (waitingEl && waitingTitle) {
+    waitingEl.replaceChildren();
+    const showWaiting = waitingOrphans.length > 0;
+    waitingEl.hidden = !showWaiting;
+    waitingTitle.hidden = !showWaiting;
+    for (const job of waitingOrphans) {
+      waitingEl.appendChild(renderWaitingJobRow(job));
+    }
+  }
+
+  if (pausedEl && pausedTitle) {
+    pausedEl.replaceChildren();
+    pausedTitle.hidden = !hasPaused;
+    pausedEl.hidden = !hasPaused;
+    for (const batch of pausedBatches) {
+      pausedEl.appendChild(renderPausedBatchRow(batch));
+    }
+    for (const job of pausedOrphans) {
+      pausedEl.appendChild(renderPausedJobRow(job));
+    }
+  }
+
+  syncQueuePoll([...queueOrphans, ...queueBatchJobs], batches);
 }
 
 async function refreshQueue() {
@@ -455,6 +675,23 @@ async function startBatch(batchId) {
 async function pauseBatch(batchId) {
   await api(`/api/batches/${batchId}/pause`, { method: "POST" });
   await refreshQueue();
+  showToast("libraryStore.pauseAfterFile");
+}
+
+async function pauseJob(jobId, { toast = true } = {}) {
+  await api(`/api/jobs/${jobId}/pause`, { method: "POST" });
+  await refreshQueue();
+  if (toast) {
+    showToast("libraryStore.pauseAfterFile");
+  }
+}
+
+async function resumeJob(jobId, { toast = true } = {}) {
+  await api(`/api/jobs/${jobId}/start`, { method: "POST" });
+  await refreshQueue();
+  if (toast) {
+    showToast("queue.resumed");
+  }
 }
 
 async function cancelBatch(batchId) {
@@ -462,18 +699,83 @@ async function cancelBatch(batchId) {
   await refreshQueue();
 }
 
-async function pauseAllBatches() {
-  const { batches } = getLibrarySnapshot();
-  const running = batches.filter((b) => b.running);
-  if (!running.length) {
-    showToast("queue.noActiveBatches");
+async function pauseAllActive() {
+  const { batches, orphans } = getLibrarySnapshot();
+  const activeBatches = batches.filter(isBatchActive);
+  const hasOrphans = orphanQueueHasWork(orphans);
+  const hasRunningBatches = activeBatches.some((b) => b.running);
+  if (!hasOrphans && !hasRunningBatches) {
+    showToast("queue.noActive");
     return;
   }
-  for (const batch of running) {
-    await api(`/api/batches/${batch.id}/pause`, { method: "POST" });
+  try {
+    if (hasOrphans) {
+      await pauseOrphansBulk(orphans);
+    }
+    for (const batch of activeBatches) {
+      if (batch.running) {
+        await api(`/api/batches/${batch.id}/pause`, { method: "POST" });
+      }
+    }
+    await refreshQueue();
+    showToast("queue.pauseAll");
+  } catch (err) {
+    const msg = translateKnownApiError(err.message, err.status) || String(err);
+    showToast(msg);
   }
-  await refreshQueue();
-  showToast("queue.pauseAll");
+}
+
+async function resumeAllPaused() {
+  const { batches, orphans } = getLibrarySnapshot();
+  const batchMap = new Map(batches.map((b) => [b.id, b]));
+  const pausedOrphans = orphans.filter(
+    (j) =>
+      isJobPausedInQueue(j, batchMap) && !isJobActive(j) && !isJobWaiting(j, batchMap)
+  );
+  const pausedBatches = batches.filter(isBatchPaused);
+  if (!pausedOrphans.length && !pausedBatches.length) {
+    showToast("queue.noPaused");
+    return;
+  }
+  try {
+    for (const batch of pausedBatches) {
+      await startBatch(batch.id);
+    }
+    for (const job of pausedOrphans) {
+      await resumeJob(job.id, { toast: false });
+    }
+    await refreshQueue();
+    showToast("queue.resumeAllDone");
+  } catch (err) {
+    const msg = translateKnownApiError(err.message, err.status) || String(err);
+    showToast(msg);
+  }
+}
+
+async function stopAllActive() {
+  const { batches, orphans } = getLibrarySnapshot();
+  const activeBatches = batches.filter((b) => b.running || isBatchActive(b));
+  const hasOrphans = orphanQueueHasWork(orphans);
+  if (!hasOrphans && !activeBatches.length) {
+    showToast("queue.noActive");
+    return;
+  }
+  if (!window.confirm(t("queue.stopAllConfirm"))) {
+    return;
+  }
+  try {
+    if (hasOrphans) {
+      await cancelOrphansBulk(orphans);
+    }
+    if (activeBatches.some((b) => b.running)) {
+      await cancelActiveBatchesBulk(activeBatches);
+    }
+    await refreshQueue();
+    showToast("queue.stopAllDone");
+  } catch (err) {
+    const msg = translateKnownApiError(err.message, err.status) || String(err);
+    showToast(msg);
+  }
 }
 
 export function initQueue() {
@@ -482,12 +784,23 @@ export function initQueue() {
   }
   queueBound = true;
   document.getElementById("btn-queue-pause-all")?.addEventListener("click", () => {
-    pauseAllBatches().catch((err) => showToast(err.message || String(err)));
+    pauseAllActive().catch((err) => showToast(err.message || String(err)));
+  });
+  document.getElementById("btn-queue-stop-all")?.addEventListener("click", () => {
+    stopAllActive().catch((err) => showToast(err.message || String(err)));
+  });
+  document.getElementById("btn-queue-resume-all")?.addEventListener("click", () => {
+    resumeAllPaused().catch((err) => showToast(err.message || String(err)));
   });
 }
 
 export function onQueueShow() {
-  refreshQueue().catch((err) => reportError(t("queue.title"), err));
+  queueInitialRefreshPending = true;
+  refreshQueue()
+    .catch((err) => reportError(t("queue.title"), err))
+    .finally(() => {
+      queueInitialRefreshPending = false;
+    });
 }
 
 export function onQueueHide() {

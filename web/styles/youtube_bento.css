@@ -1,0 +1,653 @@
+/* ==========================================================================
+   Slysh — Стили для раздела «YouTube» (Modern Pro Bento)
+   Согласовано с дизайн-токенами tokens.css и шрифтовой сеткой 12-15px Segoe UI
+   ========================================================================== */
+
+/* 1. Главный контейнер панели YouTube */
+.youtube-bento-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  max-width: 820px;
+  margin: 0;
+  padding: 20px 24px 32px;
+  font-family: var(--font-sans, "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif);
+  color: var(--on-surface, #121c2c);
+  box-sizing: border-box;
+}
+
+/* 2. Верхний информационный бейдж (Lead-карточка) */
+.youtube-bento-lead-card {
+  background: var(--surface-container-lowest, #ffffff);
+  border: 1px solid var(--outline-variant, #e2e8f0);
+  border-radius: var(--radius-lg, 12px);
+  padding: 10px 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.youtube-bento-lead-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.youtube-bento-lead-chips {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.youtube-bento-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm, 4px);
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+  letter-spacing: 0.02em;
+}
+
+.youtube-bento-chip-red {
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+}
+
+.youtube-bento-lead-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--on-surface, #121c2c);
+}
+
+.youtube-bento-lead-tags {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.youtube-badge-mono {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #dbeafe;
+  color: #000666;
+  border: 1px solid #bfdbfe;
+}
+
+.youtube-badge-mono-subtle {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+/* 3. Главная карточка рабочей области */
+.youtube-bento-main-card {
+  background: var(--surface-container-lowest, #ffffff);
+  border: 1px solid var(--outline-variant, #e2e8f0);
+  border-radius: var(--radius-lg, 12px);
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Переключатель режимов: Одно видео / Пакет (шрифт 13px) */
+.youtube-mode-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface-container-low, #f0f3ff);
+  padding: 4px;
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid #e2e8f0;
+  align-self: flex-start;
+}
+
+.youtube-mode-tab {
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--on-surface-variant, #454652);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.youtube-mode-tab:hover {
+  color: var(--on-surface, #121c2c);
+}
+
+.youtube-mode-tab.is-active {
+  background: var(--primary, #000666);
+  color: #ffffff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+/* Поле ссылки на видео: Label 13px, Input 15px */
+.youtube-url-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.youtube-url-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--on-surface, #121c2c);
+}
+
+.youtube-url-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: var(--radius-md, 8px);
+  background: var(--surface-container-low, #f0f3ff);
+  padding: 0 12px;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+
+.youtube-url-wrap:focus-within {
+  border-color: var(--primary, #000666);
+  background: #ffffff;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 14%, transparent);
+}
+
+.youtube-url-svg-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  color: #64748b;
+}
+
+.youtube-url-input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--on-surface, #121c2c);
+  padding: 10px 0;
+  font-size: 15px;
+  outline: none;
+  font-family: inherit;
+}
+
+.youtube-url-input::placeholder {
+  color: #94a3b8;
+  font-size: 14px;
+}
+
+/* 4. Пакетная панель */
+.youtube-batch-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.youtube-batch-source {
+  border: 1px solid #e2e8f0;
+  background: var(--surface-container-low, #f0f3ff);
+  border-radius: var(--radius-md, 8px);
+  padding: 10px 14px;
+  margin: 0;
+}
+
+.youtube-batch-source legend {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--on-surface, #121c2c);
+  padding: 0 4px;
+}
+
+.youtube-batch-source-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  margin-top: 4px;
+}
+
+.youtube-batch-source-option,
+.youtube-batch-option {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--on-surface, #121c2c);
+}
+
+.youtube-batch-source-option input[type="radio"],
+.youtube-batch-option input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  flex-shrink: 0;
+  accent-color: var(--primary, #000666);
+}
+
+.youtube-field-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.youtube-bento-panel .field-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--on-surface, #121c2c);
+}
+
+.youtube-batch-textarea {
+  width: 100%;
+  min-height: 120px;
+  font-family: var(--font-mono, monospace);
+  font-size: 13px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  outline: none;
+  resize: vertical;
+  box-sizing: border-box;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+
+.youtube-batch-textarea:focus {
+  background: #ffffff;
+  border-color: var(--primary, #000666);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 12%, transparent);
+}
+
+/* Фильтры пакета */
+.youtube-batch-filters {
+  border: 1px solid #e2e8f0;
+  border-radius: var(--radius-md, 8px);
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.youtube-batch-filters summary {
+  padding: 10px 14px;
+  background: #f8fafc;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--on-surface, #121c2c);
+  cursor: pointer;
+  user-select: none;
+  border-bottom: 1px solid transparent;
+}
+
+.youtube-batch-filters[open] summary {
+  border-bottom-color: #e2e8f0;
+}
+
+.youtube-batch-filters-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+  padding: 12px 14px;
+}
+
+.youtube-batch-filters-grid .field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.youtube-batch-filters-grid input[type="date"],
+.youtube-batch-filters-grid input[type="number"],
+.youtube-batch-filters-grid select {
+  font-size: 13px;
+  padding: 6px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #f8fafc;
+  outline: none;
+}
+
+.youtube-batch-filters-row {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-end;
+  padding-top: 6px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.youtube-batch-start-video-field {
+  flex: 1 1 320px;
+}
+
+.youtube-batch-direction-field {
+  flex: 0 0 240px;
+}
+
+/* Правила пакета */
+.youtube-batch-rules {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md, 8px);
+  background: var(--surface-container-low, #f0f3ff);
+  border: 1px solid #e2e8f0;
+}
+
+.youtube-batch-export-options .export-favorites-spoiler {
+  margin-top: 8px;
+}
+
+.youtube-batch-export-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-left: 26px;
+  padding-top: 6px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.export-dirs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.export-dir-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.export-dir-input {
+  flex: 1;
+  font-size: 13px;
+  padding: 6px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #ffffff;
+  font-family: var(--font-mono, monospace);
+}
+
+/* 5. Способы получения (Methods) */
+.youtube-methods {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.youtube-methods legend {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--on-surface, #121c2c);
+  margin-bottom: 2px;
+}
+
+.youtube-method-card {
+  border: 1px solid #e2e8f0;
+  border-radius: var(--radius-md, 8px);
+  background: var(--surface-container-lowest, #ffffff);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+
+.youtube-method-card:has(input:checked) {
+  border-color: #cbd5e1;
+  background: var(--surface-container-low, #f0f3ff);
+  box-shadow: inset 3px 0 0 var(--primary, #000666);
+}
+
+.youtube-method-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.youtube-method-head {
+  display: inline-flex;
+  gap: 10px;
+  align-items: center;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.youtube-method-head input[type="radio"] {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  flex-shrink: 0;
+  accent-color: var(--primary, #000666);
+}
+
+.youtube-method-title {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--on-surface, #121c2c);
+}
+
+.youtube-method-details {
+  margin-left: 28px;
+  border-top: 1px solid transparent;
+}
+
+.youtube-method-card:has(input:checked) .youtube-method-details {
+  border-top-color: rgba(203, 213, 225, 0.5);
+  padding-top: 6px;
+}
+
+.youtube-method-summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--primary, #000666);
+  user-select: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.youtube-method-summary:hover {
+  text-decoration: underline;
+}
+
+.youtube-gear-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  color: var(--primary, #000666);
+}
+
+.youtube-method-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 0 4px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.youtube-method-panel p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--on-surface-variant, #454652);
+}
+
+.youtube-steps {
+  margin: 0;
+  padding-left: 1.35rem;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--on-surface-variant, #454652);
+  list-style: decimal;
+}
+
+.youtube-steps li {
+  margin-bottom: 4px;
+}
+
+.youtube-steps a {
+  color: var(--primary, #000666);
+  text-decoration: underline;
+  font-weight: 500;
+}
+
+.youtube-panel-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding-top: 4px;
+}
+
+.youtube-panel-row input {
+  flex: 1;
+  min-width: 200px;
+  font-size: 13px;
+  padding: 7px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #ffffff;
+  outline: none;
+}
+
+.youtube-panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  padding-top: 4px;
+}
+
+.mic-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--on-surface, #121c2c);
+}
+
+.mic-picker select {
+  font-size: 13px;
+  padding: 5px 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+/* 6. Чипы статусов (font-size: 12px) */
+.youtube-status-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.hidden-chips-row {
+  display: none !important;
+}
+
+.youtube-status-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--font-mono, monospace);
+  background: var(--surface-container-high, #e2e8f0);
+  color: var(--on-surface-variant, #454652);
+}
+
+.youtube-status-chip--ok {
+  background: var(--status-ok-bg, #dcfce7);
+  color: var(--status-ok-text, #15803d);
+  border: 1px solid #bbf7d0;
+}
+
+.youtube-status-chip--bad {
+  background: var(--status-bad-bg, #fee2e2);
+  color: var(--status-bad-text, #b91c1c);
+  border: 1px solid #fecaca;
+}
+
+/* 7. Кнопки действий (Buttons) */
+.youtube-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-top: 4px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.btn-primary {
+  background-color: var(--primary, #000666);
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 8px;
+  padding: 9px 18px;
+  border: 1px solid var(--primary, #000666);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: #101850;
+}
+
+.btn-outline {
+  background-color: #ffffff;
+  color: #1e293b;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 8px;
+  padding: 7px 12px;
+  border: 1px solid #cbd5e1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-outline:hover:not(:disabled) {
+  background-color: #f8fafc;
+  border-color: #94a3b8;
+}
+
+.btn-compact {
+  padding: 5px 10px;
+  font-size: 12px;
+}
+
+.youtube-ingest-status {
+  font-size: 13px;
+  font-family: var(--font-mono, monospace);
+  min-height: 1.25rem;
+}

@@ -11,6 +11,8 @@
 #include <stdio.h>
 #include <dwmapi.h>
 #include <math.h>
+#include <shlobj.h>
+#include <string.h>
 
 #pragma comment(lib, "shlwapi.lib")
 #pragma comment(lib, "user32.lib")
@@ -245,7 +247,7 @@ static void show_app_exit_error(DWORD exit_code) {
                    L"См. launch-last-error.txt в папке программы.",
                    (unsigned long)exit_code);
     }
-    show_error(L"Slysh", msg);
+    show_error(L"Slysh!", msg);
 }
 
 static int set_install_uv_env(const wchar_t *root) {
@@ -353,6 +355,127 @@ static int venv_usable(const wchar_t *root, const wchar_t **fail_reason) {
     return 1;
 }
 
+typedef struct SplashStrings {
+    const wchar_t *badge;
+    const wchar_t *starting;
+    const wchar_t *preparing;
+} SplashStrings;
+
+static const SplashStrings SPLASH_STRINGS_RU = {
+    L"Десктоп",
+    L"Запуск Slysh!…",
+    L"Подготовка окружения…",
+};
+static const SplashStrings SPLASH_STRINGS_EN = {
+    L"Desktop",
+    L"Starting Slysh!…",
+    L"Preparing environment…",
+};
+
+static int g_splash_locale_en = 0;
+
+static const SplashStrings *splash_strings(void) {
+    return g_splash_locale_en ? &SPLASH_STRINGS_EN : &SPLASH_STRINGS_RU;
+}
+
+/* Returns 1=en, 2=ru, 0=not found */
+static int parse_settings_ui_locale(const wchar_t *settings_path) {
+    char buf[65536];
+    FILE *fp = NULL;
+    size_t n;
+    char *p;
+    char *value;
+
+    if (!path_exists(settings_path))
+        return 0;
+    if (_wfopen_s(&fp, settings_path, L"rb") != 0 || fp == NULL)
+        return 0;
+    n = fread(buf, 1, sizeof(buf) - 1, fp);
+    fclose(fp);
+    if (n == 0)
+        return 0;
+    buf[n] = '\0';
+    p = strstr(buf, "ui_locale");
+    if (p == NULL)
+        return 0;
+    p = strchr(p, ':');
+    if (p == NULL)
+        return 0;
+    value = p + 1;
+    while (*value == ' ' || *value == '\t' || *value == '"')
+        value++;
+    if (_strnicmp(value, "en", 2) == 0)
+        return 1;
+    if (_strnicmp(value, "ru", 2) == 0)
+        return 2;
+    return 0;
+}
+
+static int read_install_ui_locale_seed(const wchar_t *install_root) {
+    wchar_t seed_path[MAX_PATH * 2];
+    char seed[32];
+    FILE *fp = NULL;
+    size_t n;
+    size_t i;
+
+    if (!PathCombineW(seed_path, install_root, L".install-ui-locale"))
+        return 0;
+    if (!path_exists(seed_path))
+        return 0;
+    if (_wfopen_s(&fp, seed_path, L"rb") != 0 || fp == NULL)
+        return 0;
+    n = fread(seed, 1, sizeof(seed) - 1, fp);
+    fclose(fp);
+    if (n == 0)
+        return 0;
+    seed[n] = '\0';
+    for (i = 0; i < n; i++) {
+        if (seed[i] == '\r' || seed[i] == '\n' || seed[i] == ' ' || seed[i] == '\t') {
+            seed[i] = '\0';
+            break;
+        }
+    }
+    return _stricmp(seed, "en") == 0 ? 1 : 2;
+}
+
+static int install_ui_locale_seed_pending(const wchar_t *install_root) {
+    wchar_t seed_path[MAX_PATH * 2];
+
+    if (!PathCombineW(seed_path, install_root, L".install-ui-locale"))
+        return 0;
+    return path_exists(seed_path);
+}
+
+static void init_splash_ui_locale(const wchar_t *install_root) {
+    wchar_t app_home[MAX_PATH * 2];
+    wchar_t settings_path[MAX_PATH * 2];
+    DWORD env_len;
+    int loc = 0;
+
+    env_len = GetEnvironmentVariableW(
+        L"GIGAAM_DESKTOP_HOME", app_home, (DWORD)(sizeof(app_home) / sizeof(app_home[0])));
+    if (env_len > 0 && env_len < sizeof(app_home) / sizeof(app_home[0])) {
+        if (!PathCombineW(settings_path, app_home, L"settings.json"))
+            settings_path[0] = L'\0';
+    } else {
+        wchar_t local_app[MAX_PATH];
+        if (SHGetFolderPathW(NULL, CSIDL_LOCAL_APPDATA, NULL, 0, local_app) != S_OK) {
+            settings_path[0] = L'\0';
+        } else if (!PathCombineW(app_home, local_app, L"Slysh") ||
+                   !PathCombineW(settings_path, app_home, L"settings.json")) {
+            settings_path[0] = L'\0';
+        }
+    }
+
+    loc = read_install_ui_locale_seed(install_root);
+    if (loc == 0 && settings_path[0] != L'\0')
+        loc = parse_settings_ui_locale(settings_path);
+    if (loc == 0)
+        loc = 2;
+
+    g_splash_locale_en = (loc == 1) ? 1 : 0;
+}
+
 static HWND g_splash_hwnd = NULL;
 static HICON g_splash_icon = NULL;
 static int g_splash_class_registered = 0;
@@ -361,13 +484,16 @@ static HFONT g_splash_font_badge = NULL;
 static HFONT g_splash_font_sub = NULL;
 static UINT_PTR g_splash_timer = 0;
 static DWORD g_wave_tick = 0;
-static wchar_t g_splash_status[256] = L"Запуск Slysh…";
+static wchar_t g_splash_status[256];
 
 static void splash_set_status(const wchar_t *subtitle) {
     if (subtitle != NULL && subtitle[0] != L'\0') {
         wcsncpy_s(g_splash_status, sizeof(g_splash_status) / sizeof(g_splash_status[0]), subtitle, _TRUNCATE);
     } else {
-        wcscpy_s(g_splash_status, sizeof(g_splash_status) / sizeof(g_splash_status[0]), L"Запуск Slysh…");
+        wcscpy_s(
+            g_splash_status,
+            sizeof(g_splash_status) / sizeof(g_splash_status[0]),
+            splash_strings()->starting);
     }
 }
 
@@ -469,6 +595,9 @@ static void splash_paint_content(HDC hdc, const RECT *rcClient) {
     RECT rcTitle = {84, 20, rcClient->right - 88, 42};
     RECT rcSub = {84, 44, rcClient->right - 20, 64};
     SIZE titleSize = {0, 0};
+    SIZE badgeSize = {0, 0};
+    const wchar_t *badge_text = splash_strings()->badge;
+    int badge_len;
     HFONT oldFont;
 
     splash_fill_round_rect(hdc, rcClient, 32, RGB(255, 255, 255), RGB(226, 232, 240));
@@ -480,18 +609,25 @@ static void splash_paint_content(HDC hdc, const RECT *rcClient) {
     SetBkMode(hdc, TRANSPARENT);
     SetTextColor(hdc, RGB(15, 23, 42));
     oldFont = (HFONT)SelectObject(hdc, g_splash_font_title);
-    DrawTextW(hdc, L"Slysh", -1, &rcTitle, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
-    GetTextExtentPoint32W(hdc, L"Slysh", 5, &titleSize);
+    DrawTextW(hdc, L"Slysh!", -1, &rcTitle, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+    GetTextExtentPoint32W(hdc, L"Slysh!", 6, &titleSize);
+    SelectObject(hdc, oldFont);
+
+    oldFont = (HFONT)SelectObject(hdc, g_splash_font_badge);
+    badge_len = (int)wcslen(badge_text);
+    GetTextExtentPoint32W(hdc, badge_text, badge_len, &badgeSize);
     SelectObject(hdc, oldFont);
 
     rcBadge.left = rcTitle.left + titleSize.cx + 8;
     rcBadge.top = 23;
-    rcBadge.right = rcBadge.left + 62;
+    rcBadge.right = rcBadge.left + badgeSize.cx + 16;
+    if (rcBadge.right - rcBadge.left < 48)
+        rcBadge.right = rcBadge.left + 48;
     rcBadge.bottom = 41;
     splash_fill_round_rect(hdc, &rcBadge, 6, RGB(239, 246, 255), RGB(191, 219, 254));
     SetTextColor(hdc, RGB(29, 78, 216));
     oldFont = (HFONT)SelectObject(hdc, g_splash_font_badge);
-    DrawTextW(hdc, L"Десктоп", -1, &rcBadge, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+    DrawTextW(hdc, badge_text, badge_len, &rcBadge, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
     SelectObject(hdc, oldFont);
 
     rcWavePill.left = rcClient->right - 88;
@@ -616,7 +752,7 @@ static void splash_show(const wchar_t *root, const wchar_t *subtitle) {
             -12, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS,
             CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"Segoe UI");
     }
-    swprintf_s(title, sizeof(title) / sizeof(title[0]), L"Slysh");
+    swprintf_s(title, sizeof(title) / sizeof(title[0]), L"Slysh!");
     if (GetWindowRect(GetDesktopWindow(), &desk)) {
         x = desk.left + (desk.right - desk.left - w) / 2;
         y = desk.top + (desk.bottom - desk.top - h) / 2;
@@ -747,6 +883,33 @@ static int find_bundled_python(const wchar_t *root, wchar_t *python, size_t pyth
     return 0;
 }
 
+static int run_uv_pip_sync_only(const wchar_t *root, DWORD *exit_code) {
+    wchar_t uv[MAX_PATH * 2];
+    wchar_t wheelhouse[MAX_PATH * 2];
+    wchar_t venv_py[MAX_PATH * 2];
+    wchar_t req_ui[MAX_PATH * 2];
+    wchar_t cmdline[4096];
+
+    if (!PathCombineW(uv, root, L"bin\\uv.exe") || !path_exists(uv))
+        return 0;
+    if (!wheelhouse_has_requirements_ui(root) || !wheelhouse_has_wheels(root))
+        return 0;
+    if (!PathCombineW(wheelhouse, root, L"wheelhouse"))
+        return 0;
+    if (!PathCombineW(req_ui, root, L"wheelhouse\\requirements-ui.txt"))
+        return 0;
+    if (!PathCombineW(venv_py, root, L".venv\\Scripts\\python.exe") || !path_exists(venv_py))
+        return 0;
+    swprintf_s(cmdline,
+               sizeof(cmdline) / sizeof(cmdline[0]),
+               L"\"%ls\" pip sync --python \"%ls\" --no-index --find-links \"%ls\" \"%ls\"",
+               uv,
+               venv_py,
+               wheelhouse,
+               req_ui);
+    return run_process_wait(uv, cmdline, root, exit_code, 1);
+}
+
 static int run_uv_sync(const wchar_t *root, DWORD *exit_code) {
     wchar_t uv[MAX_PATH * 2];
     wchar_t wheelhouse[MAX_PATH * 2];
@@ -840,11 +1003,11 @@ static int ensure_venv(const wchar_t *root) {
 
     write_venv_check_log(root, fail_reason != NULL ? fail_reason : L"unknown");
 
-    splash_show(root, L"Подготовка окружения…");
+    splash_show(root, splash_strings()->preparing);
 
     if (!PathCombineW(venv_dir, root, L"bin\\uv.exe") || !path_exists(venv_dir)) {
         splash_hide();
-        show_error(L"Slysh",
+        show_error(L"Slysh!",
                    L"Не найдено окружение Python (.venv).\n"
                    L"Переустановите Slysh или запустите Slysh.bat из папки программы.");
         return 0;
@@ -853,7 +1016,7 @@ static int ensure_venv(const wchar_t *root) {
     if (PathCombineW(venv_dir, root, L".venv") && path_is_directory(venv_dir)) {
         if (!remove_venv_dir(root)) {
             splash_hide();
-            show_error(L"Slysh",
+            show_error(L"Slysh!",
                        L"Не удалось сбросить повреждённое окружение (.venv).\n"
                        L"Закройте Slysh и удалите папку .venv вручную.");
             return 0;
@@ -868,11 +1031,11 @@ static int ensure_venv(const wchar_t *root) {
             0,
             wheelhouse_has_requirements_ui(root) ? L"uv venv or pip sync" : L"uv sync");
         if (wheelhouse_has_wheels(root)) {
-            show_error(L"Slysh",
+            show_error(L"Slysh!",
                        L"Не удалось восстановить окружение из локального wheelhouse.\n"
                        L"Переустановите Slysh или запустите Slysh.bat из папки программы.");
         } else {
-            show_error(L"Slysh",
+            show_error(L"Slysh!",
                        L"Не удалось восстановить окружение (uv sync).\n"
                        L"Проверьте интернет и переустановите Slysh.");
         }
@@ -884,9 +1047,33 @@ static int ensure_venv(const wchar_t *root) {
         if (fail_reason != NULL) {
             write_venv_check_log(root, fail_reason);
         }
-        show_error(L"Slysh",
+        show_error(L"Slysh!",
                    L"Окружение Python установлено, но не запускается.\n"
                    L"Переустановите Slysh.");
+        return 0;
+    }
+    splash_hide();
+    return 1;
+}
+
+static int ensure_post_setup_venv_sync(const wchar_t *root) {
+    DWORD code = 0;
+    const wchar_t *fail_reason = NULL;
+
+    if (!install_ui_locale_seed_pending(root))
+        return 1;
+    if (!venv_usable(root, &fail_reason))
+        return 1;
+    if (!set_install_uv_env(root))
+        return 0;
+
+    splash_show(root, splash_strings()->preparing);
+    if (!run_uv_pip_sync_only(root, &code) || code != 0) {
+        splash_hide();
+        write_venv_repair_error(root, code, 0, L"post-setup pip sync");
+        show_error(L"Slysh!",
+                   L"Не удалось обновить окружение после установки.\n"
+                   L"Переустановите Slysh или удалите папку .venv и запустите снова.");
         return 0;
     }
     splash_hide();
@@ -908,12 +1095,12 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
     (void)nCmdShow;
 
     if (GetModuleFileNameW(NULL, exe_path, MAX_PATH) == 0) {
-        show_error(L"Slysh", L"Не удалось определить путь к программе.");
+        show_error(L"Slysh!", L"Не удалось определить путь к программе.");
         return 1;
     }
     wcscpy_s(root, MAX_PATH, exe_path);
     if (!PathRemoveFileSpecW(root)) {
-        show_error(L"Slysh", L"Не удалось определить папку программы.");
+        show_error(L"Slysh!", L"Не удалось определить папку программы.");
         return 1;
     }
 
@@ -952,25 +1139,31 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
         goto env_fail;
 
     if (!SetCurrentDirectoryW(root)) {
-        show_error(L"Slysh", L"Не найдена папка программы.");
+        show_error(L"Slysh!", L"Не найдена папка программы.");
         return 1;
     }
+
+    init_splash_ui_locale(root);
+    splash_set_status(NULL);
 
     if (!ensure_venv(root))
         return 1;
 
+    if (!ensure_post_setup_venv_sync(root))
+        return 1;
+
     if (!PathCombineW(pythonw, root, L".venv\\Scripts\\pythonw.exe")) {
-        show_error(L"Slysh", L"Не найден pythonw.exe.");
+        show_error(L"Slysh!", L"Не найден pythonw.exe.");
         return 1;
     }
 
     swprintf_s(cmdline, sizeof(cmdline) / sizeof(cmdline[0]), L"\"%s\" -m slysh.app", pythonw);
-    splash_show(root, L"Запуск Slysh…");
+    splash_show(root, NULL);
     {
         int launched = run_process_launch(pythonw, cmdline, root, &code);
         if (launched == 0) {
             splash_hide();
-            show_error(L"Slysh", L"Не удалось запустить Slysh.");
+            show_error(L"Slysh!", L"Не удалось запустить Slysh.");
             return 1;
         }
         if (launched == 2 && code != 0) {
@@ -984,6 +1177,6 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
     return 0;
 
 env_fail:
-    show_error(L"Slysh", L"Не удалось настроить окружение.");
+    show_error(L"Slysh!", L"Не удалось настроить окружение.");
     return 1;
 }

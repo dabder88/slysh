@@ -1,6 +1,59 @@
-import { basename } from "./api.js";
+import { api, basename, showToast } from "./api.js";
 import { t } from "./i18n.js";
 import { setSelectedBatch } from "./library-store.js";
+
+function canStartJobStatus(status) {
+  return ["idle", "failed", "cancelled"].includes(String(status || ""));
+}
+
+async function startIntakeTranscription(result) {
+  const { refreshLibrary } = await import("./legacy.js");
+  if (result.kind === "batch" && result.batchId != null) {
+    await api(`/api/batches/${result.batchId}/start`, { method: "POST" });
+    await refreshLibrary();
+    return;
+  }
+  const ids = result.jobIds || [];
+  let jobsList = [];
+  try {
+    jobsList = await api("/api/jobs");
+  } catch {
+    jobsList = [];
+  }
+  const byId = new Map(jobsList.map((j) => [j.id, j]));
+  let errors = 0;
+  let started = 0;
+  let lastError = "";
+  for (const id of ids) {
+    const job = byId.get(id);
+    if (job && !canStartJobStatus(job.status)) {
+      continue;
+    }
+    try {
+      await api(`/api/jobs/${id}/start`, { method: "POST" });
+      started += 1;
+    } catch (err) {
+      errors += 1;
+      lastError = err.message || String(err);
+    }
+  }
+  if (errors && !started && lastError) {
+    showToast(lastError);
+  }
+  await refreshLibrary();
+}
+
+async function navigateAfterIntakeStart(result, navigate) {
+  const count = result.fileCount ?? result.jobIds?.length ?? 0;
+  if (result.kind === "batch" || count > 1) {
+    navigate("queue");
+    return;
+  }
+  const id = result.primaryJobId ?? result.jobIds[0];
+  if (id != null) {
+    navigate("editor", { jobId: id });
+  }
+}
 
 /** @typedef {{ kind: "orphans", jobIds: number[], primaryJobId?: number, fileName?: string, fileCount?: number }} OrphansIntakeResult */
 /** @typedef {{ kind: "batch", batchId: number, jobIds: number[], fileCount?: number }} BatchIntakeResult */
@@ -114,17 +167,13 @@ async function applyFollowupChoice(result, choice) {
     }
     return;
   }
+  await startIntakeTranscription(result);
   if (result.kind === "batch" && result.batchId != null) {
     const { expandLegacyBatch } = await import("./legacy.js");
     setSelectedBatch(result.batchId);
     expandLegacyBatch(result.batchId);
-    navigate("legacy", { tab: "batches", batchId: result.batchId });
-    return;
   }
-  const id = result.primaryJobId ?? result.jobIds[0];
-  if (id != null) {
-    navigate("editor", { jobId: id });
-  }
+  await navigateAfterIntakeStart(result, navigate);
 }
 
 function bindIntakeFollowupModal() {
@@ -142,10 +191,8 @@ function bindIntakeFollowupModal() {
   document.getElementById("intake-followup-later")?.addEventListener("click", () => {
     finishIntakeFollowup("later");
   });
-  modal.addEventListener("click", (event) => {
-    if (event.target === modal) {
-      closeIntakeFollowupModal();
-    }
+  document.getElementById("intake-followup-close")?.addEventListener("click", () => {
+    closeIntakeFollowupModal();
   });
 }
 

@@ -1,9 +1,36 @@
-﻿import { api, showToast, reloadAppInterface } from "./api.js";
+import { api, showToast, reloadAppInterface } from "./api.js";
 import { reportError } from "./errors.js";
 import { SELECTED_BATCH_KEY } from "./library-store.js";
 import { getLocale, setLocale, t, onLocaleChange } from "./i18n.js";
+import { resolveMarketingUrlsFromApi } from "./marketing-urls.js";
 import { bindSecretInput, readSecretForSave } from "./secret-field.js";
 import { updateAsrContextBar } from "./asr-context-bar.js";
+import {
+  addExportDirRowToList,
+  collectDirsFromList,
+  fetchExportFavoriteDirs,
+  fillExportDirsList,
+  saveExportFavoriteDirs,
+} from "./export-favorites.js";
+import { bindPanelResizer } from "./panel-resize.js";
+
+const GIGAAM_MODEL_ID = "gigaam";
+
+/** EN UI: hide GigaAM download row; keep installed weights. */
+export function filterLocalModelsForUi(items, locale = getLocale()) {
+  const list = items || [];
+  if (locale !== "en") {
+    return list;
+  }
+  return list.filter(
+    (item) =>
+      !(
+        item.id === GIGAAM_MODEL_ID &&
+        item.ready === false &&
+        item.downloadable === true
+      ),
+  );
+}
 
 function applyProviderSecretField(input, provider) {
   if (!input) {
@@ -238,6 +265,9 @@ export function openSettingsModal(spoilerId = "") {
     restoreSettingsBentoTab();
   }
   refreshSettingsCloudTabMeta();
+  refreshExportFavoriteDirsSettings().catch((err) =>
+    reportError(t("settings.exportFavoriteDirsTitle"), err)
+  );
   const refresh = window.refreshSetupAndDownloadUi;
   if (typeof refresh === "function") {
     refresh().catch((err) => reportError(t("nav.settings"), err));
@@ -267,7 +297,7 @@ function settingsTabForSpoiler(spoilerId) {
   return SETTINGS_SPOILER_TAB[key] || "cloud";
 }
 
-function setSettingsBentoTab(tabId, options = {}) {
+export function setSettingsBentoTab(tabId, options = {}) {
   const tab = String(tabId || SETTINGS_BENTO_DEFAULT_TAB);
   const panes = document.querySelectorAll(".settings-bento-pane");
   const buttons = document.querySelectorAll(".settings-bento-tab");
@@ -613,10 +643,61 @@ function initAppUpdates() {
     }
   }
 
+  const devToolsBlock = document.getElementById("settings-dev-tools");
+  const installedActionsBlock = document.getElementById("settings-installed-actions");
+  const settingsCheckUpdatesBtn = document.getElementById("btn-settings-check-updates");
+  const settingsAboutBtn = document.getElementById("btn-settings-about");
+  const settingsSupportBtn = document.getElementById("btn-settings-support");
+  let aboutUrl = "";
+  let supportUrl = "";
+
+  function syncSystemSettingsActions(info) {
+    const installed = info?.install_kind === "installed";
+    if (devToolsBlock) {
+      devToolsBlock.hidden = installed;
+    }
+    if (installedActionsBlock) {
+      installedActionsBlock.hidden = !installed;
+    }
+    if (settingsCheckUpdatesBtn) {
+      settingsCheckUpdatesBtn.disabled = !info?.updates_enabled;
+    }
+    if (settingsAboutBtn) {
+      settingsAboutBtn.disabled = !aboutUrl;
+      settingsAboutBtn.setAttribute("aria-disabled", aboutUrl ? "false" : "true");
+    }
+    if (settingsSupportBtn) {
+      settingsSupportBtn.disabled = !supportUrl;
+      settingsSupportBtn.setAttribute("aria-disabled", supportUrl ? "false" : "true");
+    }
+  }
+
+  async function openExternalUrl(url, titleKey) {
+    const trimmed = String(url || "").trim();
+    if (!trimmed || trimmed === "#") {
+      return;
+    }
+    const bridge = window.pywebview?.api;
+    if (bridge?.open_url) {
+      try {
+        await bridge.open_url(trimmed);
+        return;
+      } catch (err) {
+        reportError(t(titleKey), err);
+        return;
+      }
+    }
+    window.open(trimmed, "_blank", "noopener");
+  }
+
   async function bootstrapInfo() {
     try {
-      const info = await api("/api/app/info");
+      const loc = getLocale();
+      const info = await api(`/api/app/info?ui_locale=${encodeURIComponent(loc)}`);
       releasesUrl = info.releases_url || "";
+      const marketing = resolveMarketingUrlsFromApi(info, loc);
+      aboutUrl = marketing.about;
+      supportUrl = marketing.support;
       if (wrap && openBtn) {
         wrap.hidden = !info.updates_enabled;
       }
@@ -628,8 +709,9 @@ function initAppUpdates() {
         sidebarVersion.hidden = false;
         sidebarVersion.textContent = t("common.appVersionShort", { version: info.version });
       }
-      wireExternalNavLink(aboutLink, info.about_url);
-      wireExternalNavLink(supportLink, info.support_url);
+      wireExternalNavLink(aboutLink, aboutUrl);
+      wireExternalNavLink(supportLink, supportUrl);
+      syncSystemSettingsActions(info);
     } catch (err) {
       console.error(err);
     }
@@ -637,6 +719,15 @@ function initAppUpdates() {
 
   openBtn?.addEventListener("click", () => {
     runCheck().catch((err) => reportError(t("updates.title"), err));
+  });
+  settingsCheckUpdatesBtn?.addEventListener("click", () => {
+    runCheck().catch((err) => reportError(t("updates.title"), err));
+  });
+  settingsAboutBtn?.addEventListener("click", () => {
+    openExternalUrl(aboutUrl, "nav.about");
+  });
+  settingsSupportBtn?.addEventListener("click", () => {
+    openExternalUrl(supportUrl, "nav.supportThanks");
   });
   closeBtn?.addEventListener("click", () => closeModal());
   modal?.addEventListener("click", (event) => {
@@ -689,6 +780,10 @@ function initAppUpdates() {
   bindExternalNavClick(aboutLink, "nav.about");
   bindExternalNavClick(supportLink, "nav.supportThanks");
 
+  onLocaleChange(() => {
+    bootstrapInfo();
+  });
+
   bootstrapInfo();
 }
 
@@ -697,6 +792,7 @@ export function initShell() {
     refreshLocaleSettingsUi();
   });
   initSidebarToggle();
+  initSidebarResize();
   initLocaleSettings();
   initSettingsBentoTabs();
   initAppUpdates();
@@ -741,6 +837,62 @@ export function initShell() {
   initAsrModelSettings();
   initProxySettings();
   initProvidersSettings();
+  initExportFavoriteDirsSettings();
+}
+
+async function browseSettingsExportDir(input) {
+  const bridge = window.pywebview?.api;
+  if (!bridge?.pick_folder) {
+    showToast("settings.exportFavoriteDirsDesktopOnly");
+    return;
+  }
+  const folder = await bridge.pick_folder(input?.value || "");
+  if (folder && input) {
+    input.value = folder;
+  }
+}
+
+function updateSettingsExportFavoritesCount() {
+  const badge = document.getElementById("settings-export-favorites-count");
+  const list = document.getElementById("settings-export-favorite-dirs");
+  if (!badge || !list) {
+    return;
+  }
+  badge.textContent = String(list.querySelectorAll(".export-dir-row").length);
+}
+
+async function refreshExportFavoriteDirsSettings() {
+  const list = document.getElementById("settings-export-favorite-dirs");
+  if (!list) {
+    return;
+  }
+  const dirs = await fetchExportFavoriteDirs({ fresh: true });
+  fillExportDirsList(list, dirs.length ? dirs : [""], {
+    onBrowse: browseSettingsExportDir,
+  });
+  updateSettingsExportFavoritesCount();
+}
+
+function initExportFavoriteDirsSettings() {
+  const list = document.getElementById("settings-export-favorite-dirs");
+  const addBtn = document.getElementById("settings-export-favorite-add");
+  const saveBtn = document.getElementById("settings-export-favorite-save");
+  if (!list || !saveBtn) {
+    return;
+  }
+  const observer = new MutationObserver(() => updateSettingsExportFavoritesCount());
+  observer.observe(list, { childList: true });
+  addBtn?.addEventListener("click", () => {
+    addExportDirRowToList(list, "", { onBrowse: browseSettingsExportDir });
+    list.querySelector(".export-dir-row:last-child .export-dir-input")?.focus();
+    updateSettingsExportFavoritesCount();
+  });
+  saveBtn.addEventListener("click", () => {
+    const dirs = collectDirsFromList(list);
+    saveExportFavoriteDirs(dirs)
+      .then(() => showToast("settings.exportFavoriteDirsSaved"))
+      .catch((err) => reportError(t("settings.exportFavoriteDirsTitle"), err));
+  });
 }
 
 function providerShortLabel(label) {
@@ -1230,7 +1382,7 @@ function initAsrModelSettings() {
   function renderModels(data) {
     lastModelsData = data;
     const items = data.items || [];
-    const localItems = items.filter((item) => item.kind === "local");
+    const localItems = filterLocalModelsForUi(items.filter((item) => item.kind === "local"));
     const cloudOnly = Boolean(data.cloud_only);
     applyCloudOnlyUi(cloudOnly);
     let source = data.source === "provider" ? "provider" : "local";
@@ -1394,7 +1546,9 @@ function initAsrModelSettings() {
     if (!lastModelsData || !localSelect) {
       return;
     }
-    const localItems = (lastModelsData.items || []).filter((item) => item.kind === "local");
+    const localItems = filterLocalModelsForUi(
+      (lastModelsData.items || []).filter((item) => item.kind === "local"),
+    );
     const selected =
       localSelect.value || lastModelsData.selected_local || lastModelsData.selected || "";
     fillModelSelect(localSelect, localItems, selected, localModelPicker);
@@ -2723,9 +2877,10 @@ function initModelSetup() {
   }
 
   function downloadableOptions(items) {
-    return (items || []).filter(
-      (item) =>
-        item.kind === "local" && item.downloadable && !item.ready,
+    return filterLocalModelsForUi(
+      (items || []).filter(
+        (item) => item.kind === "local" && item.downloadable && !item.ready,
+      ),
     );
   }
 
@@ -2739,9 +2894,12 @@ function initModelSetup() {
       opt.textContent = item.label || item.id;
       select.appendChild(opt);
     }
-    const preferred = options.find((item) => item.id === "gigaam");
+    const preferred =
+      getLocale() === "en"
+        ? options.find((item) => String(item.id || "").startsWith("whisper:"))
+        : options.find((item) => item.id === GIGAAM_MODEL_ID);
     if (preferred) {
-      select.value = "gigaam";
+      select.value = preferred.id;
     } else if (options[0]) {
       select.value = options[0].id;
     }
@@ -2930,6 +3088,67 @@ function initModelSetup() {
 }
 
 const SIDEBAR_COLLAPSED_KEY = "sidebar-collapsed";
+const SIDEBAR_WIDTH_KEY = "sidebar-user-width";
+const SIDEBAR_WIDTH_MIN = 200;
+const SIDEBAR_WIDTH_MAX = 480;
+const SIDEBAR_WIDTH_DEFAULT = 270;
+
+function clampSidebarWidth(px) {
+  return Math.min(SIDEBAR_WIDTH_MAX, Math.max(SIDEBAR_WIDTH_MIN, px));
+}
+
+function readSidebarWidth() {
+  const raw = localStorage.getItem(SIDEBAR_WIDTH_KEY);
+  const parsed = raw != null ? Number.parseInt(raw, 10) : Number.NaN;
+  if (Number.isFinite(parsed)) {
+    return clampSidebarWidth(parsed);
+  }
+  return SIDEBAR_WIDTH_DEFAULT;
+}
+
+function applySidebarWidth(px, persist = true) {
+  const shell = document.getElementById("app-shell");
+  if (!shell) {
+    return;
+  }
+  const width = clampSidebarWidth(px);
+  shell.style.setProperty("--sidebar-user-width", `${width}px`);
+  if (persist) {
+    localStorage.setItem(SIDEBAR_WIDTH_KEY, String(width));
+  }
+}
+
+function initSidebarResize() {
+  const shell = document.getElementById("app-shell");
+  const sidebar = document.getElementById("sidebar");
+  const resizer = document.getElementById("sidebar-resizer");
+  if (!shell || !sidebar || !resizer) {
+    return;
+  }
+
+  applySidebarWidth(readSidebarWidth(), false);
+
+  const syncResizerLabels = () => {
+    const label = t("sidebar.resizeWidth");
+    resizer.title = label;
+    resizer.setAttribute("aria-label", label);
+  };
+  syncResizerLabels();
+  onLocaleChange(syncResizerLabels);
+
+  bindPanelResizer(resizer, (delta) => {
+    if (shell.classList.contains("is-sidebar-collapsed")) {
+      return;
+    }
+    const next = clampSidebarWidth(sidebar.offsetWidth + delta);
+    applySidebarWidth(next);
+  });
+
+  resizer.addEventListener("dblclick", () => {
+    shell.style.removeProperty("--sidebar-user-width");
+    localStorage.removeItem(SIDEBAR_WIDTH_KEY);
+  });
+}
 
 function initSidebarToggle() {
   const shell = document.getElementById("app-shell");

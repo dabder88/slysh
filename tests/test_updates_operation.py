@@ -98,8 +98,8 @@ def test_check_during_download_preserves_phase(monkeypatch):
         "html_url": "https://github.com/o/r/releases/tag/v2.0.0",
         "assets": [
             {
-                "name": updates.SETUP_ASSET_NAME,
-                "browser_download_url": "https://github.com/o/r/releases/download/v2.0.0/Slysh-Setup.exe",
+                "name": updates.SETUP_ASSET_NAME_RU,
+                "browser_download_url": "https://github.com/o/r/releases/download/v2.0.0/Slysh-Setup-ru.exe",
                 "size": 9,
             }
         ],

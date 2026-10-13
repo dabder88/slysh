@@ -56,6 +56,21 @@ def test_refresh_media_duration_persists(tmp_path):
     assert stored["media_duration_s"] == 45.0
 
 
+def test_decorate_path_does_not_require_file_probe(tmp_path, monkeypatch):
+    from slysh.decode import DecodeError
+
+    def boom(_path):
+        raise DecodeError("probe should not run")
+
+    monkeypatch.setattr("slysh.decode.media_duration_ms", boom)
+    job = {
+        "id": 1,
+        "kind": JobKind.FILE.value,
+        "source_path": str(tmp_path / "missing.wav"),
+    }
+    assert job_media_duration_s(job, allow_file_probe=False) is None
+
+
 def test_segment_max_end_ms_on_list_jobs(tmp_path):
     db = Database(tmp_path / "app.db")
     job_id = db.create_job(JobKind.FILE, str(tmp_path / "x.wav"))

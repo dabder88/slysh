@@ -2,9 +2,9 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8">
-  <title>Slysh</title>
+  <title>Slysh!</title>
   <link rel="icon" href="/branding/favicon-32.png" type="image/png" sizes="32x32">
-  <link rel="stylesheet" href="/app.css?v=141">
+  <link rel="stylesheet" href="/app.css?v=152">
   <style>
     .boot-error {
       position: fixed;
@@ -29,7 +29,7 @@
         </div>
         <div class="boot-splash-copy">
           <div class="boot-splash-heading">
-            <p class="boot-splash-title">Slysh</p>
+            <p class="boot-splash-title">Slysh<span class="brand-excl-mark" aria-hidden="true">!</span></p>
             <span class="boot-splash-badge" data-i18n="firstRun.bootBadge">Десктоп</span>
             <div class="boot-splash-wave" aria-hidden="true">
               <span></span><span></span><span></span><span></span><span></span><span></span>
@@ -41,6 +41,22 @@
       <div class="boot-splash-progress" aria-hidden="true"><span></span></div>
     </div>
   </div>
+  <script>
+    /* Sync strings with web/locales firstRun.bootBadge / bootLoading */
+    (function () {
+      var loc = new URLSearchParams(window.location.search).get("ui_locale") === "en" ? "en" : "ru";
+      var L = {
+        ru: { badge: "Десктоп", loading: "Запуск Slysh!…", lang: "ru-RU" },
+        en: { badge: "Desktop", loading: "Starting Slysh!…", lang: "en-US" },
+      };
+      var t = L[loc] || L.ru;
+      document.documentElement.lang = t.lang;
+      var badge = document.querySelector(".boot-splash-badge");
+      var text = document.querySelector(".boot-splash-text");
+      if (badge) badge.textContent = t.badge;
+      if (text) text.textContent = t.loading;
+    })();
+  </script>
   <div id="app-shell" class="app-shell">
     <nav id="sidebar" class="sidebar" aria-label="Главная навигация">
       <div class="sidebar-brand">
@@ -48,7 +64,7 @@
           <img class="sidebar-logo-img" src="/branding/slysh-mark-48.png" alt="" width="40" height="40" decoding="async">
         </div>
         <div class="sidebar-brand-text">
-          <h1 class="sidebar-title">Slysh</h1>
+          <h1 class="sidebar-title">Slysh<span class="brand-excl-mark" aria-hidden="true">!</span></h1>
           <p class="sidebar-subtitle" data-i18n="page.a7253df3bd26">Транскрибатор</p>
         </div>
         <button type="button" id="btn-sidebar-toggle" class="sidebar-toggle icon-btn" title="Свернуть меню" aria-expanded="true" aria-controls="sidebar">
@@ -153,6 +169,14 @@
         </ul>
         <p id="sidebar-app-version" class="hint sidebar-app-version" hidden></p>
       </div>
+      <div
+        id="sidebar-resizer"
+        class="sidebar-resizer"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Изменить ширину меню"
+        tabindex="0"
+      ></div>
     </nav>
 
     <div class="main-area">
@@ -185,6 +209,14 @@
           <button type="button" id="btn-queue-pause-all" class="btn-outline btn-compact" hidden>
             <span class="material-symbols-outlined" aria-hidden="true">pause_circle</span>
             <span data-i18n="page.2bdcc8f6264f">Пауза всех</span>
+          </button>
+          <button type="button" id="btn-queue-resume-all" class="btn-outline btn-compact" hidden>
+            <span class="material-symbols-outlined" aria-hidden="true">play_circle</span>
+            <span data-i18n="queue.resumeAll">Возобновить все</span>
+          </button>
+          <button type="button" id="btn-queue-stop-all" class="btn-outline btn-compact" hidden>
+            <span class="material-symbols-outlined" aria-hidden="true">stop_circle</span>
+            <span data-i18n="queue.stopAll">Остановить все</span>
           </button>
           <button type="button" id="btn-topbar-transcribe" class="btn-primary btn-compact" hidden>
             <span class="material-symbols-outlined" aria-hidden="true">graphic_eq</span>
@@ -283,18 +315,23 @@
             <span data-i18n="queue.activeTranscriptions">Активные расшифровки</span>
           </h3>
           <div id="queue-active-list" class="queue-active-list"></div>
+
+          <h3 id="queue-waiting-section-title" class="queue-section-title queue-waiting-section" hidden>
+            <span data-i18n="queue.waitingTranscriptions">В очереди на расшифровку</span>
+          </h3>
+          <div id="queue-waiting-list" class="queue-waiting-list" hidden></div>
+
+          <h3 id="queue-paused-section-title" class="queue-section-title queue-paused-section" hidden>
+            <span data-i18n="queue.pausedSection">На паузе</span>
+          </h3>
+          <div id="queue-paused-list" class="queue-paused-list" hidden></div>
         </section>
 
         <!-- Transcripts -->
         <section id="view-transcripts" class="view transcripts-view">
           <div class="transcripts-page archive-page">
-            <div class="legacy-tabs">
-              <button type="button" class="legacy-tab is-active" data-tab="files" data-i18n="legacy.tabFiles">Файлы</button>
-              <button type="button" class="legacy-tab" data-tab="batches" data-i18n="legacy.tabBatches">Пакеты</button>
-            </div>
             <p class="hint archive-lead" data-i18n="transcripts.lead">Готовые расшифровки: одиночные файлы и пакеты с хотя бы одной готовой записью.</p>
-            <div id="transcripts-files-wrap" class="archive-singles-wrap"></div>
-            <div id="transcripts-batches-wrap" class="archive-singles-wrap" hidden></div>
+            <div id="transcripts-library-wrap" class="archive-singles-wrap"></div>
           </div>
         </section>
 
@@ -485,13 +522,8 @@
         <!-- Archive -->
         <section id="view-archive" class="view archive-view">
           <div class="archive-page">
-            <div class="legacy-tabs">
-              <button type="button" class="legacy-tab is-active" data-tab="files" data-i18n="legacy.tabFiles">Файлы</button>
-              <button type="button" class="legacy-tab" data-tab="batches" data-i18n="legacy.tabBatches">Пакеты</button>
-            </div>
             <p class="hint archive-lead" data-i18n="archive.lead">Архивные расшифровки: одиночные файлы и пакеты, перенесённые сюда из раздела «Расшифровки».</p>
-            <div id="archive-files-wrap" class="archive-singles-wrap"></div>
-            <div id="archive-batches-wrap" class="archive-singles-wrap" hidden></div>
+            <div id="archive-library-wrap" class="archive-singles-wrap"></div>
           </div>
         </section>
 
@@ -513,12 +545,12 @@
             <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
             <line x1="12" y1="19" x2="12" y2="22"/>
           </svg>
-          <span>Живая речь</span>
+          <span data-i18n="live.bentoChipLiveSpeech">Живая речь</span>
         </span>
-        <span class="live-bento-lead-title">Быстрое надиктовывание текста с микрофона и редактирование заметок</span>
+        <span class="live-bento-lead-title" data-i18n="live.bentoLeadTitle">Быстрое надиктовывание текста с микрофона и редактирование заметок</span>
       </div>
       <div class="live-bento-lead-tags">
-        <span class="live-badge-mono">ЛОКАЛЬНО</span>
+        <span class="live-badge-mono" data-i18n="live.bentoLocalBadge">ЛОКАЛЬНО</span>
         <span class="live-badge-mono-subtle">Whisper</span>
       </div>
     </div>
@@ -538,13 +570,13 @@
           </svg>
           <span data-i18n="live.micLabel">Микрофон</span>
         </label>
-        <span class="live-source-status-badge">Активен</span>
+        <span class="live-source-status-badge" data-i18n="live.sourceActive">Активен</span>
       </div>
 
       <!-- Селект микрофона + кнопка обновления -->
       <div class="live-mic-select-row">
         <div class="live-select-wrap">
-          <select id="mic-select" class="live-device-select" aria-label="Микрофон"></select>
+          <select id="mic-select" class="live-device-select" data-i18n-aria-label="live.micLabel" aria-label="Микрофон"></select>
           <div class="live-select-arrow" aria-hidden="true">
             <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="6 9 12 15 18 9"/>
@@ -563,7 +595,7 @@
       <!-- Встроенный VU-метр сигнала микрофона -->
       <div class="live-meter-integrated">
         <div class="live-meter-meta">
-          <span class="hint">Уровень сигнала</span>
+          <span class="hint" data-i18n="live.signalLevel">Уровень сигнала</span>
           <span id="live-meter-db" class="live-meter-db">-24 dB</span>
         </div>
         <div class="meter" aria-hidden="true">
@@ -579,11 +611,11 @@
     <div class="live-bento-card live-bento-session-card">
       <div class="live-bento-card-header">
         <div class="live-session-title-wrap">
-          <span class="live-session-title">Управление сессией</span>
+          <span class="live-session-title" data-i18n="live.sessionControlTitle">Управление сессией</span>
         </div>
         <div id="live-session-badge" class="live-session-badge-idle">
           <span class="live-session-badge-dot"></span>
-          <span id="live-session-badge-text">Ожидание</span>
+          <span id="live-session-badge-text" data-i18n="live.bentoStatusIdle">Ожидание</span>
         </div>
       </div>
 
@@ -615,6 +647,13 @@
           <span id="lbl-live-timer">00:00</span>
         </div>
       </div>
+
+      <div class="meeting-view-options live-view-options">
+        <label class="meeting-timestamps-toggle">
+          <input type="checkbox" id="live-save-audio" checked>
+          <span data-i18n="live.saveAudio">Сохранять аудиозапись</span>
+        </label>
+      </div>
     </div>
 
   </div>
@@ -628,8 +667,8 @@
         <svg class="w-4 h-4 text-blue-600 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/>
         </svg>
-        <span class="live-editor-title">Текст надиктованного сообщения</span>
-        <span class="live-editor-subtitle">(Редактируемое поле)</span>
+        <span class="live-editor-title" data-i18n="live.editorTitle">Текст надиктованного сообщения</span>
+        <span class="live-editor-subtitle" data-i18n="live.editorSubtitle">(Редактируемое поле)</span>
       </div>
 
       <!-- Действия с текстом: Копировать, Экспорт, Очистить -->
@@ -672,25 +711,39 @@
     <div id="live-transcript-wait" class="meeting-transcript-wait live-transcript-wait" hidden>
       <div class="live-wait-spinner" aria-hidden="true"></div>
       <span class="live-wait-text" data-i18n="page.2ff84cb662e9">Распознаём речь…</span>
-      <span class="live-wait-meta">Whisper · автосохранение</span>
+      <span class="live-wait-meta" data-i18n="live.waitMeta">Whisper · автосохранение</span>
     </div>
 
     <!-- Редактируемое поле стенограммы (Нативный textarea с сохранением автосейва 600мс) -->
-    <textarea id="live-transcript" class="live-transcript live-transcript-field" rows="14" spellcheck="true" placeholder="Говорите в микрофон — распознанный текст появится здесь автоматически... Вы можете вносить любые правки руками прямо во время или после записи."></textarea>
+    <textarea id="live-transcript" class="live-transcript live-transcript-field" rows="14" spellcheck="true" data-i18n-placeholder="live.transcriptPlaceholder" placeholder="Говорите в микрофон — распознанный текст появится здесь автоматически... Вы можете вносить любые правки руками прямо во время или после записи."></textarea>
 
     <!-- Подвал редактора со статистикой и индикатором автосохранения -->
     <div class="live-editor-footer">
       <div class="live-footer-stats">
-        <span id="live-counter-stats" class="live-counter-text">0 слов · 0 символов</span>
+        <span id="live-counter-stats" class="live-counter-text" data-i18n="live.counterStatsZero">0 слов · 0 символов</span>
       </div>
       <div class="live-footer-autosave">
         <svg class="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <polyline points="20 6 9 17 4 12"/>
         </svg>
-        <span class="live-autosave-text">Правки сохраняются автоматически</span>
+        <span class="live-autosave-text" data-i18n="live.autosaveNote">Правки сохраняются автоматически</span>
       </div>
     </div>
 
+  </div>
+
+  <div id="live-recording-actions" class="meeting-recording-actions meeting-export-actions export-actions" hidden>
+    <span id="live-recording-path" class="hint"></span>
+    <div class="export-actions-row">
+      <button type="button" id="btn-live-open-recording" class="btn-primary btn-compact">
+        <span class="material-symbols-outlined" aria-hidden="true">audio_file</span>
+        <span data-i18n="live.openRecording">Открыть запись</span>
+      </button>
+      <button type="button" id="btn-live-open-recording-folder" class="btn-outline btn-compact">
+        <span class="material-symbols-outlined" aria-hidden="true">folder_open</span>
+        <span data-i18n="live.openRecordingFolder">Папка с записью</span>
+      </button>
+    </div>
   </div>
 
 </section>
@@ -714,10 +767,10 @@
           </svg>
           <span>Zoom · Meet · Teams</span>
         </span>
-        <span class="meeting-bento-lead-title">Запись системного звука Windows и микрофона без бота</span>
+        <span class="meeting-bento-lead-title" data-i18n="meeting.bentoLeadTitle">Запись системного звука Windows и микрофона без бота</span>
       </div>
       <button type="button" id="btn-meeting-lead-toggle" class="meeting-bento-lead-toggle-btn" aria-expanded="false">
-        <span id="lbl-meeting-lead-toggle">Подробнее</span>
+        <span id="lbl-meeting-lead-toggle" data-i18n="meeting.leadToggleMore">Подробнее</span>
         <svg id="icon-meeting-lead-toggle" class="w-3.5 h-3.5 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <polyline points="6 9 12 15 18 9"/>
         </svg>
@@ -743,13 +796,13 @@
             <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
           </svg>
           <span data-i18n="meeting.outputDevice">Выход</span>
-          <span class="text-slate-400 font-normal text-[12px]">(Собеседники)</span>
+          <span class="text-slate-400 font-normal text-[12px]" data-i18n="meeting.outputParticipantsSuffix">(Собеседники)</span>
         </label>
         <span class="meeting-bento-badge-mono">WASAPI</span>
       </div>
 
       <div class="meeting-select-wrap">
-        <select id="meeting-output-select" class="meeting-device-select" aria-label="Устройство вывода"></select>
+        <select id="meeting-output-select" class="meeting-device-select" data-i18n-aria-label="meeting.outputDevice" aria-label="Устройство вывода"></select>
         <div class="meeting-select-arrow" aria-hidden="true">
           <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="6 9 12 15 18 9"/>
@@ -787,7 +840,7 @@
 
       <div class="meeting-mic-select-row">
         <div class="meeting-select-wrap flex-1">
-          <select id="meeting-mic-select" class="meeting-device-select" aria-label="Микрофон"></select>
+          <select id="meeting-mic-select" class="meeting-device-select" data-i18n-aria-label="meeting.microphoneDevice" aria-label="Микрофон"></select>
           <div class="meeting-select-arrow" aria-hidden="true">
             <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="6 9 12 15 18 9"/>
@@ -826,12 +879,15 @@
       </button>
 
       <!-- Пауза -->
-      <button type="button" id="btn-meeting-pause" class="btn-outline btn-compact" disabled>
+      <button type="button" id="btn-meeting-pause" class="btn-outline btn-compact live-pause-btn" disabled>
         <span id="btn-meeting-pause-label" data-i18n="page.03498e395a43">Пауза</span>
       </button>
 
       <!-- Стоп -->
-      <button type="button" id="btn-meeting-stop" class="btn-outline btn-compact" disabled>
+      <button type="button" id="btn-meeting-stop" class="btn-outline btn-compact live-stop-btn" disabled>
+        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <rect x="5" y="5" width="14" height="14" rx="2"/>
+        </svg>
         <span data-i18n="page.6d714e833d40">Стоп</span>
       </button>
 
@@ -857,6 +913,10 @@
         <input type="checkbox" id="meeting-auto-speakers">
         <span data-i18n="meeting.autoSpeakersAfterRec">Определять спикеров после записи</span>
       </label>
+      <label class="meeting-timestamps-toggle">
+        <input type="checkbox" id="meeting-save-audio" checked>
+        <span data-i18n="meeting.saveAudio">Сохранять аудиозапись</span>
+      </label>
     </div>
   </div>
 
@@ -866,32 +926,32 @@
     <!-- Верхний тулбар результатов -->
     <div class="meeting-transcript-topbar">
       <div class="meeting-transcript-title-group">
-        <span class="meeting-transcript-heading">Стенограмма встречи</span>
-        <span id="meeting-status-badge" class="meeting-status-badge">Ожидание</span>
+        <span class="meeting-transcript-heading" data-i18n="meeting.transcriptHeading">Стенограмма встречи</span>
+        <span class="live-editor-subtitle" data-i18n="live.editorSubtitle">(Редактируемое поле)</span>
+        <span id="meeting-status-badge" class="meeting-status-badge" data-i18n="meeting.bentoStatusIdle">Ожидание</span>
       </div>
 
       <div class="meeting-transcript-actions-group">
-        <!-- Кнопки копирования и экспорта (показываются после записи) -->
-        <div id="meeting-post-actions" class="meeting-post-actions" hidden>
-          <button type="button" id="btn-meeting-copy" class="btn-outline btn-compact">
-            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-            </svg>
-            <span data-i18n="page.4a05d8619ded">Копировать</span>
-          </button>
-          <button type="button" id="btn-meeting-export" class="btn-outline btn-compact btn-export-highlight">
-            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-            </svg>
-            <span data-i18n="page.dd5016c82982">Экспорт</span>
-          </button>
-        </div>
-
-        <!-- Кнопка очистки -->
-        <div id="meeting-results-bar" class="meeting-results-bar" hidden>
-          <button type="button" id="btn-meeting-clear" class="btn-outline btn-compact btn-clear-text" data-i18n="page.4db06830676a">
-            Очистить экран
-          </button>
+        <div id="meeting-transcript-actions" class="meeting-transcript-actions">
+          <div id="meeting-post-actions" class="meeting-post-actions" hidden>
+            <button type="button" id="btn-meeting-copy" class="btn-outline btn-compact">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+              </svg>
+              <span data-i18n="page.4a05d8619ded">Копировать</span>
+            </button>
+            <button type="button" id="btn-meeting-export" class="btn-outline btn-compact btn-export-highlight">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              <span data-i18n="page.dd5016c82982">Экспорт</span>
+            </button>
+          </div>
+          <div id="meeting-results-bar" class="meeting-results-bar" hidden>
+            <button type="button" id="btn-meeting-clear" class="btn-outline btn-compact btn-clear-text" data-i18n="page.4db06830676a">
+              Очистить экран
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -902,20 +962,38 @@
       <span data-i18n="page.2ff84cb662e9">Распознаём речь…</span>
     </div>
 
-    <!-- Контейнер реплик (наполняется через createSegmentParagraph в meeting.js) -->
-    <div id="meeting-transcript" class="live-transcript" tabindex="0"></div>
+    <textarea
+      id="meeting-transcript"
+      class="live-transcript live-transcript-field"
+      rows="14"
+      spellcheck="true"
+      data-i18n-placeholder="live.transcriptPlaceholder"
+      placeholder="Говорите в микрофон — распознанный текст появится здесь автоматически... Вы можете вносить любые правки руками прямо во время или после записи."
+    ></textarea>
+
+    <div class="live-editor-footer">
+      <div class="live-footer-stats">
+        <span id="meeting-counter-stats" class="live-counter-text" data-i18n="live.counterStatsZero">0 слов · 0 символов</span>
+      </div>
+      <div class="live-footer-autosave">
+        <svg class="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+        <span class="live-autosave-text" data-i18n="live.autosaveNote">Правки сохраняются автоматически</span>
+      </div>
+    </div>
 
   </div>
 
   <!-- 5. Разметка спикеров (Диаризация) -->
   <details id="meeting-speakers-details" class="meeting-speakers-details" hidden>
-    <summary data-i18n="meeting.speakersSection">
+    <summary>
       <div class="meeting-speakers-summary-content">
         <svg class="w-4 h-4 text-purple-600 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
           <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
         </svg>
-        <span>Распознавание спикеров</span>
+        <span data-i18n="meeting.speakersSection">Распознавание спикеров</span>
       </div>
     </summary>
     <div class="meeting-speakers-details-body">
@@ -926,11 +1004,30 @@
       <button type="button" id="btn-meeting-speakers" class="btn-outline btn-compact meeting-speakers-btn" hidden data-i18n="page.9e8dc1ce7821">
         Распознать спикеров
       </button>
+      <button type="button" id="btn-meeting-speakers-stop" class="btn-stop btn-compact meeting-speakers-btn" hidden>
+        <span class="material-symbols-outlined" aria-hidden="true">stop</span>
+        <span data-i18n="common.stop">Остановить</span>
+      </button>
       <div id="meeting-speaker-rename" class="speaker-rename meeting-speaker-rename" hidden></div>
     </div>
   </details>
 
-  <!-- 6. Панель успешного экспорта файлов -->
+  <!-- 6. Сохранённая аудиозапись встречи -->
+  <div id="meeting-recording-actions" class="meeting-recording-actions meeting-export-actions export-actions" hidden>
+    <span id="meeting-recording-path" class="hint"></span>
+    <div class="export-actions-row">
+      <button type="button" id="btn-meeting-open-recording" class="btn-primary btn-compact">
+        <span class="material-symbols-outlined" aria-hidden="true">audio_file</span>
+        <span data-i18n="meeting.openRecording">Открыть запись</span>
+      </button>
+      <button type="button" id="btn-meeting-open-recording-folder" class="btn-outline btn-compact">
+        <span class="material-symbols-outlined" aria-hidden="true">folder_open</span>
+        <span data-i18n="meeting.openRecordingFolder">Папка с записью</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- 7. Панель успешного экспорта файлов -->
   <div id="meeting-export-actions" class="meeting-export-actions export-actions" hidden>
     <span id="meeting-export-path" class="hint"></span>
     <div class="export-actions-row">
@@ -966,11 +1063,11 @@
           </svg>
           <span>YouTube</span>
         </span>
-        <span class="youtube-bento-lead-title">Извлечение субтитров и транскриптов без скачивания видео</span>
+        <span class="youtube-bento-lead-title" data-i18n="youtube.bentoLeadTitle">Извлечение субтитров и транскриптов без скачивания видео</span>
       </div>
       <div class="youtube-bento-lead-tags">
-        <span class="youtube-badge-mono">СУБТИТРЫ</span>
-        <span class="youtube-badge-mono-subtle">Быстро</span>
+        <span class="youtube-badge-mono" data-i18n="youtube.bentoBadgeSubtitles">СУБТИТРЫ</span>
+        <span class="youtube-badge-mono-subtle" data-i18n="youtube.bentoBadgeFast">Быстро</span>
       </div>
     </div>
     <p id="youtube-lead" class="hint youtube-lead hidden" data-i18n="page.7adfc9947822">
@@ -1274,32 +1371,54 @@
 
         <!-- Legacy workspace -->
         <section id="view-legacy" class="view legacy-workspace">
-          <div class="legacy-tabs">
-            <button type="button" class="legacy-tab is-active" data-tab="files" data-i18n="legacy.tabFiles">Файлы</button>
-            <button type="button" class="legacy-tab" data-tab="batches" data-i18n="legacy.tabBatches">Пакеты</button>
-          </div>
-
-          <div id="legacy-workspace">
-            <div id="files-chrome">
-              <div class="toolbar toolbar-add">
-                <button type="button" id="btn-add-files" class="primary" data-i18n="legacy.addFiles">+ Файлы</button>
+          <div class="legacy-command-bar">
+            <div class="legacy-command-bar-left">
+              <div class="legacy-tabs">
+                <button type="button" class="legacy-tab is-active" data-tab="files">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                  <span data-i18n="legacy.tabFiles">Файлы</span>
+                </button>
+                <button type="button" class="legacy-tab" data-tab="batches">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line></svg>
+                  <span data-i18n="legacy.tabBatches">Пакеты</span>
+                </button>
               </div>
-              <p class="hint" data-i18n="legacy.orphansHint">Все одиночные записи, кроме архива. Сортировка по столбцам, ПКМ — меню.</p>
-            </div>
-
-            <div id="batches-chrome" hidden>
-              <div class="toolbar toolbar-add">
-                <button type="button" id="btn-batch-new" class="primary" data-i18n="legacy.addBatch">+ Пакет</button>
-                <button type="button" id="btn-batch-add-files" data-i18n="legacy.addFiles">+ Файлы</button>
-                <button type="button" id="btn-batch-add-folder" data-i18n="legacy.addFolder">+ Папка</button>
-                <div class="add-target">
-                  <label for="batch-target-select" data-i18n="legacy.activeBatch">Активный пакет</label>
-                  <select id="batch-target-select" aria-label="Пакет для добавления файлов"></select>
+              <div class="legacy-toolbar-divider" aria-hidden="true"></div>
+              <div id="files-chrome" class="legacy-chrome-actions">
+                <div class="toolbar toolbar-add">
+                  <button type="button" id="btn-add-files" class="primary">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    <span data-i18n="legacy.addFilesPrimary">Добавить файлы</span>
+                  </button>
                 </div>
               </div>
-              <p class="hint" data-i18n="legacy.allBatchesHint">Все пакеты, кроме архива. Правила и запуск — через ПКМ или панель массовых действий.</p>
+              <div id="batches-chrome" class="legacy-chrome-actions" hidden>
+                <div class="toolbar toolbar-add">
+                  <button type="button" id="btn-batch-new" class="primary">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    <span data-i18n="legacy.addBatchPrimary">Создать пакет</span>
+                  </button>
+                  <button type="button" id="btn-batch-add-files" class="btn-outline">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                    <span data-i18n="legacy.addFiles">+ Файлы</span>
+                  </button>
+                  <button type="button" id="btn-batch-add-folder" class="btn-outline">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                    <span data-i18n="legacy.addFolder">+ Папка</span>
+                  </button>
+                  <div class="add-target">
+                    <label for="batch-target-select" data-i18n="legacy.batchTargetLabel">В пакет:</label>
+                    <select id="batch-target-select" aria-label="Пакет для добавления файлов"></select>
+                  </div>
+                </div>
+              </div>
             </div>
-
+          </div>
+          <div class="legacy-hints-wrap">
+            <p id="files-hint" class="hint" data-i18n="legacy.orphansHint">Все одиночные записи, кроме архива. Сортировка по столбцам, ПКМ — меню.</p>
+            <p id="batches-hint" class="hint" data-i18n="legacy.allBatchesHint" hidden>Все пакеты, кроме архива. Правила и запуск — через ПКМ или панель массовых действий.</p>
+          </div>
+          <div id="legacy-workspace">
             <div id="legacy-files-wrap"></div>
             <div id="legacy-batches-wrap" hidden></div>
           </div>
@@ -1767,9 +1886,9 @@
       <div id="engine-setup-settings" class="settings-engine-block settings-bento-tile" hidden>
         <p class="hint" data-i18n="page.45f3f70c1225">Пакеты расшифровки (torch, GigaAM) ещё не установлены.</p>
         <p id="engine-setup-settings-error" class="hint settings-engine-error" hidden aria-live="polite"></p>
-        <button type="button" id="btn-install-engine" class="btn-outline settings-reload-btn" title="Скачать пакеты расшифровки">
+        <button type="button" id="btn-install-engine" class="btn-outline settings-reload-btn" data-i18n-title="settings.downloadEnginePackages" title="Скачать пакеты расшифровки">
           <span class="material-symbols-outlined" aria-hidden="true">download</span>
-          Скачать пакеты расшифровки
+          <span data-i18n="settings.downloadEnginePackages">Скачать пакеты расшифровки</span>
         </button>
         <pre id="engine-setup-settings-log" class="engine-setup-log" hidden></pre>
       </div>
@@ -1807,12 +1926,12 @@
         <div class="settings-bento-proxy-fields">
           <span class="settings-bento-field-label" data-i18n="settings.proxyConnectionLabel">Параметры подключения</span>
           <div class="settings-compact-row proxy-connection-row settings-bento-proxy-host-row">
-            <input id="proxy-host" type="text" autocomplete="off" spellcheck="false" placeholder="хост" aria-label="Хост прокси">
-            <input id="proxy-port" type="number" min="1" max="65535" placeholder="порт" aria-label="Порт прокси" class="proxy-port-input">
+            <input id="proxy-host" type="text" autocomplete="off" spellcheck="false" data-i18n-placeholder="settings.proxyHostPh" data-i18n-aria-label="settings.proxyHostAria" placeholder="хост" aria-label="Хост прокси">
+            <input id="proxy-port" type="number" min="1" max="65535" data-i18n-placeholder="settings.proxyPortPh" data-i18n-aria-label="settings.proxyPortAria" placeholder="порт" aria-label="Порт прокси" class="proxy-port-input">
           </div>
           <div class="settings-compact-row proxy-connection-row settings-bento-proxy-auth-row">
-            <input id="proxy-username" type="text" autocomplete="off" spellcheck="false" placeholder="логин (необязательно)" aria-label="Логин прокси">
-            <input id="proxy-password" type="password" autocomplete="off" spellcheck="false" placeholder="пароль (необязательно)" aria-label="Пароль прокси">
+            <input id="proxy-username" type="text" autocomplete="off" spellcheck="false" data-i18n-placeholder="settings.proxyUserPh" data-i18n-aria-label="settings.proxyUserAria" placeholder="логин (необязательно)" aria-label="Логин прокси">
+            <input id="proxy-password" type="password" autocomplete="off" spellcheck="false" data-i18n-placeholder="settings.proxyPassPh" data-i18n-aria-label="settings.proxyPassAria" placeholder="пароль (необязательно)" aria-label="Пароль прокси">
           </div>
           <p id="proxy-password-hint" class="hint"></p>
           <fieldset class="proxy-targets-fieldset">
@@ -1823,7 +1942,7 @@
               <label><input type="checkbox" data-proxy-target="openai" /> OpenAI</label>
               <label><input type="checkbox" data-proxy-target="gladia" /> Gladia</label>
               <label><input type="checkbox" data-proxy-target="deepgram" /> Deepgram</label>
-              <label><input type="checkbox" data-proxy-target="custom" /> Кастомные HTTP</label>
+              <label><input type="checkbox" data-proxy-target="custom" /> <span data-i18n="page.b1367e82ca7f">Кастомные HTTP</span></label>
               <label><input type="checkbox" data-proxy-target="gemini" /> Gemini CLI</label>
               <label><input type="checkbox" data-proxy-target="youtube" /> YouTube</label>
             </div>
@@ -2040,7 +2159,7 @@
           </div>
         </div>
       </details>
-      <div class="settings-reload-block settings-bento-tile settings-system-tile">
+      <div id="settings-dev-tools" class="settings-reload-block settings-bento-tile settings-system-tile">
         <p class="hint settings-reload-hint" data-i18n="page.62ec01817f96">После правок в файлах интерфейса перезагрузите окно, чтобы подтянуть изменения.</p>
         <div class="settings-reload-btns-row">
           <button type="button" id="btn-reload-ui" class="settings-reload-btn settings-system-action-btn" data-i18n-title="settings.reloadUiTitle" title="Перезагрузить окно приложения">
@@ -2050,6 +2169,22 @@
           <button type="button" id="btn-reset-ui-cache" class="settings-reload-btn settings-system-action-btn" data-i18n-title="settings.resetUiCacheTitle" title="Очистить сохранённое состояние интерфейса">
             <span class="material-symbols-outlined" aria-hidden="true">delete_sweep</span>
             <span data-i18n="settings.resetUiCache">Сбросить кэш интерфейса</span>
+          </button>
+        </div>
+      </div>
+      <div id="settings-installed-actions" class="settings-reload-block settings-bento-tile settings-system-tile" hidden>
+        <div class="settings-reload-btns-row">
+          <button type="button" id="btn-settings-check-updates" class="settings-reload-btn settings-system-action-btn">
+            <span class="material-symbols-outlined" aria-hidden="true">system_update</span>
+            <span data-i18n="updates.checkMenu">Проверить обновления</span>
+          </button>
+          <button type="button" id="btn-settings-about" class="settings-reload-btn settings-system-action-btn">
+            <span class="material-symbols-outlined" aria-hidden="true">info</span>
+            <span data-i18n="nav.about">О программе</span>
+          </button>
+          <button type="button" id="btn-settings-support" class="settings-reload-btn settings-system-action-btn">
+            <span class="material-symbols-outlined" aria-hidden="true">volunteer_activism</span>
+            <span data-i18n="nav.supportThanks">Сказать спасибо</span>
           </button>
         </div>
       </div>
@@ -2106,7 +2241,12 @@
 
   <div id="intake-followup-modal" class="modal" hidden>
     <div class="modal-card" role="dialog" aria-labelledby="intake-followup-title">
-      <h2 id="intake-followup-title" data-i18n="intake.followup.title">Файлы загружены</h2>
+      <div class="modal-card-header">
+        <h2 id="intake-followup-title" data-i18n="intake.followup.title">Файлы загружены</h2>
+        <button type="button" id="intake-followup-close" class="modal-card-close icon-btn" data-i18n-title="page.4ae50d30739d" title="Закрыть" aria-label="Закрыть">
+          <span class="material-symbols-outlined" aria-hidden="true">close</span>
+        </button>
+      </div>
       <p id="intake-followup-body" class="hint"></p>
       <div class="modal-actions">
         <button type="button" id="intake-followup-now" class="btn-primary" data-i18n="intake.followup.now">Расшифровать сейчас</button>
@@ -2117,7 +2257,12 @@
 
   <div id="upload-target-modal" class="modal" hidden>
     <div class="modal-card" role="dialog" aria-labelledby="upload-target-title">
-      <h2 id="upload-target-title" data-i18n="page.d172188dc6a7">Куда добавить файлы?</h2>
+      <div class="modal-card-header">
+        <h2 id="upload-target-title" data-i18n="page.d172188dc6a7">Куда добавить файлы?</h2>
+        <button type="button" id="upload-target-close" class="modal-card-close icon-btn" data-i18n-title="page.4ae50d30739d" title="Закрыть" aria-label="Закрыть">
+          <span class="material-symbols-outlined" aria-hidden="true">close</span>
+        </button>
+      </div>
       <p id="upload-target-count" class="hint"></p>
       <div id="upload-target-choice" class="upload-target-choice">
         <button type="button" id="upload-target-orphans" class="btn-outline upload-target-btn" data-i18n="page.48ef3e1b7da9">Отдельные файлы</button>
@@ -2363,43 +2508,44 @@
   {
     "imports": {
       "/js/api.js": "/js/api.js?v=51",
-      "/js/app-exit.js": "/js/app-exit.js?v=3",
+      "/js/app-exit.js": "/js/app-exit.js?v=4",
       "/js/ui-session.js": "/js/ui-session.js?v=2",
-      "/js/archive.js": "/js/archive.js?v=46",
+      "/js/archive.js": "/js/archive.js?v=49",
       "/js/batch-panel.js": "/js/batch-panel.js?v=47",
       "/js/batch-kind.js": "/js/batch-kind.js?v=45",
       "/js/dashboard.js": "/js/dashboard.js?v=46",
-      "/js/editor.js": "/js/editor.js?v=63",
+      "/js/editor.js": "/js/editor.js?v=66",
+      "/js/panel-resize.js": "/js/panel-resize.js?v=1",
       "/js/transcript-format.js": "/js/transcript-format.js?v=1",
       "/js/errors.js": "/js/errors.js?v=45",
-      "/js/i18n.js": "/js/i18n.js?v=56",
+      "/js/i18n.js": "/js/i18n.js?v=61",
       "/js/icons.js": "/js/icons.js?v=45",
       "/js/intake-duplicate.js": "/js/intake-duplicate.js?v=45",
-      "/js/intake-followup.js": "/js/intake-followup.js?v=1",
-      "/js/legacy.js": "/js/legacy.js?v=77",
+      "/js/intake-followup.js": "/js/intake-followup.js?v=3",
+      "/js/legacy.js": "/js/legacy.js?v=82",
       "/js/export-favorites.js": "/js/export-favorites.js?v=8",
       "/js/media-time.js": "/js/media-time.js?v=45",
       "/js/library-store.js": "/js/library-store.js?v=48",
       "/js/job-source.js": "/js/job-source.js?v=45",
-      "/js/library-table-filters.js": "/js/library-table-filters.js?v=45",
-      "/js/library-table.js": "/js/library-table.js?v=45",
-      "/js/library-utils.js": "/js/library-utils.js?v=52",
-      "/js/live.js": "/js/live.js?v=51",
-      "/js/meeting.js": "/js/meeting.js?v=52",
+      "/js/library-table-filters.js": "/js/library-table-filters.js?v=47",
+      "/js/library-table.js": "/js/library-table.js?v=46",
+      "/js/library-utils.js": "/js/library-utils.js?v=54",
+      "/js/live.js": "/js/live.js?v=52",
+      "/js/meeting.js": "/js/meeting.js?v=57",
       "/js/asr-context-bar.js": "/js/asr-context-bar.js?v=1",
-      "/js/main.js": "/js/main.js?v=60",
+      "/js/main.js": "/js/main.js?v=63",
       "/js/secret-field.js": "/js/secret-field.js?v=46",
       "/js/orphan-files-table.js": "/js/orphan-files-table.js?v=46",
-      "/js/queue.js": "/js/queue.js?v=47",
-      "/js/router.js": "/js/router.js?v=51",
-      "/js/shell.js": "/js/shell.js?v=89",
+      "/js/queue.js": "/js/queue.js?v=52",
+      "/js/router.js": "/js/router.js?v=53",
+      "/js/shell.js": "/js/shell.js?v=95",
       "/js/state.js": "/js/state.js?v=45",
-      "/js/transcripts.js": "/js/transcripts.js?v=45",
+      "/js/transcripts.js": "/js/transcripts.js?v=48",
       "/js/version.js": "/js/version.js?v=45",
-      "/js/youtube.js": "/js/youtube.js?v=52"
+      "/js/youtube.js": "/js/youtube.js?v=53"
     }
   }
   </script>
-  <script type="module" src="/js/main.js?v=60"></script>
+  <script type="module" src="/js/main.js?v=63"></script>
 </body>
 </html>

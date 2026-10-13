@@ -4,7 +4,7 @@ import importlib
 import json
 import logging
 from collections.abc import Callable
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, contextmanager
 import os
 import secrets
 import subprocess
@@ -45,7 +45,13 @@ from slysh.batch_runner import (
     pause_batch,
     start_batch,
 )
-from slysh.chunking import SAMPLE_RATE, offset_segments, slice_pcm_range
+from slysh.chunking import (
+    SAMPLE_RATE,
+    live_chunk_samples_for_backend,
+    live_chunk_seconds_for_backend,
+    offset_segments,
+    slice_pcm_range,
+)
 from slysh.asr_coordinator import (
     AsrCoordinator,
     job_run_active,
@@ -261,12 +267,14 @@ class ExportPathsBody(BaseModel):
 
 class LiveStartBody(BaseModel):
     device_id: int | None = None
+    save_audio: bool = True
 
 
 class MeetingStartBody(BaseModel):
     output_device_id: int | str | None = None
     mic_device_id: int | None = None
     include_mic: bool = True
+    save_audio: bool = True
 
 
 class ComputeBody(BaseModel):
@@ -641,14 +649,25 @@ def _ensure_engine_url(app: FastAPI) -> str:
             if skip or not auto_start:
                 raise HTTPException(status_code=400, detail="Движок не запущен.")
             app.state.engine_starting = True
+            app.state.engine_starting_job_id = None
             try:
                 _spawn_engine(app)
             finally:
                 app.state.engine_starting = False
+                app.state.engine_starting_job_id = None
     url = getattr(app.state, "engine_url", None)
     if not url:
         raise HTTPException(status_code=500, detail="engine unavailable")
     return url
+
+
+def _job_engine_starting(app: FastAPI, job_id: int) -> bool:
+    if not getattr(app.state, "engine_starting", False):
+        return False
+    starting_id = getattr(app.state, "engine_starting_job_id", None)
+    if starting_id is None:
+        return False
+    return int(job_id) == int(starting_id)
 
 
 def _capture_finalize_active(app: FastAPI, job_id: int) -> bool:
@@ -670,7 +689,7 @@ def _decorate_job(
     errors = getattr(app.state, "speaker_errors", {})
     started = getattr(app.state, "speaker_started", {})
     payload["speakers_running"] = running.get(job["id"]) == "running"
-    payload["engine_starting"] = bool(getattr(app.state, "engine_starting", False))
+    payload["engine_starting"] = _job_engine_starting(app, int(job["id"]))
     started_at = started.get(job["id"])
     if payload["speakers_running"] and started_at:
         payload["speakers_elapsed_s"] = round(time.monotonic() - started_at, 1)
@@ -1065,6 +1084,7 @@ def _stop_engine(app: FastAPI) -> None:
     app.state.engine_proc = None
     app.state.engine_url = None
     app.state.engine_starting = False
+    app.state.engine_starting_job_id = None
 
 
 def shutdown_ui_runtime(app: FastAPI) -> None:
@@ -1188,6 +1208,8 @@ def _run_engine_job(
                 cancelled=decode_cancelled,
             )
         except DecodeCancelledError:
+            if not job_run_active(db, job_id, run_id):
+                return
             if _engine_job_cancelled(db, job_id):
                 return
             db.set_status(job_id, JobStatus.CANCELLED)
@@ -1261,7 +1283,27 @@ def _engine_needs_start(app: FastAPI) -> bool:
     return _engine_status(app) == "down"
 
 
+@contextmanager
+def _suppress_asr_pump(app: FastAPI):
+    suppressed = int(getattr(app.state, "asr_pump_suppressed", 0) or 0)
+    app.state.asr_pump_suppressed = suppressed + 1
+    try:
+        yield
+    finally:
+        app.state.asr_pump_suppressed = max(0, int(app.state.asr_pump_suppressed or 0) - 1)
+
+
+def _orphan_jobs_in_active_statuses(db: Database) -> list[dict]:
+    jobs: list[dict] = []
+    for job in db.list_orphan_jobs():
+        if job.get("status") in _JOB_ACTIVE_STATUSES:
+            jobs.append(job)
+    return jobs
+
+
 def _pump_asr_queues(app: FastAPI, db: Database) -> None:
+    if int(getattr(app.state, "asr_pump_suppressed", 0) or 0) > 0:
+        return
     pump_local_queued(
         app,
         db,
@@ -1315,6 +1357,7 @@ def _start_engine_job(
                         db.set_status(job_id, JobStatus.FAILED)
                         return
                     app.state.engine_starting = True
+                    app.state.engine_starting_job_id = int(job_id)
                     try:
                         _spawn_engine(app)
                     except HTTPException as exc:
@@ -1323,6 +1366,7 @@ def _start_engine_job(
                         return
                     finally:
                         app.state.engine_starting = False
+                        app.state.engine_starting_job_id = None
             url = getattr(app.state, "engine_url", None)
             if not url:
                 db.set_error(
@@ -1667,6 +1711,16 @@ def _live_mic_callback(app: FastAPI, capture_rate: int):
     return _on_audio
 
 
+def _capture_live_session(wav_path: Path, backend: str) -> tuple[LiveSession, float]:
+    key = (backend or "").strip().lower()
+    chunk_seconds = live_chunk_seconds_for_backend(key)
+    session = LiveSession(
+        wav_path,
+        chunk_samples=live_chunk_samples_for_backend(key),
+    )
+    return session, chunk_seconds
+
+
 def _live_status_payload(app: FastAPI, db: Database, state: dict) -> dict:
     session = state.get("session")
     session_active = _live_session_active(state)
@@ -1682,7 +1736,11 @@ def _live_status_payload(app: FastAPI, db: Database, state: dict) -> dict:
         "remaining_s": remaining,
         "rms": float(state.get("rms") or 0.0) if capturing else 0.0,
         "job_id": state.get("job_id"),
+        "save_audio": bool(state.get("save_audio", True)),
     }
+    chunk_s = state.get("live_chunk_seconds")
+    if chunk_s is not None:
+        payload["live_chunk_seconds"] = float(chunk_s)
     job_id = state.get("job_id")
     if job_id is not None:
         jid = int(job_id)
@@ -1691,6 +1749,8 @@ def _live_status_payload(app: FastAPI, db: Database, state: dict) -> dict:
         payload["segments"] = _segments_payload(
             segs, speaker_names=db.list_speaker_names(jid)
         )
+        if not session_active:
+            payload["recording_path"] = _meeting_recording_path(db, jid)
     if state.get("error"):
         payload["error"] = state["error"]
     return payload
@@ -1713,6 +1773,7 @@ def _empty_meeting_state() -> dict:
         "paused_at": None,
         "total_paused_s": 0.0,
         "include_mic": True,
+        "save_audio": True,
         "kind": "meeting",
     }
 
@@ -1733,6 +1794,59 @@ def _meeting_elapsed_s(state: dict) -> float:
     return max(0.0, now - float(started) - total_paused)
 
 
+def _meeting_recording_path(db: Database, job_id: int) -> str | None:
+    job = db.get_job(job_id) or {}
+    raw = str(job.get("source_path") or "").strip()
+    if not raw:
+        return None
+    path = Path(raw)
+    if path.is_file():
+        return str(path)
+    return None
+
+
+def _apply_capture_save_audio_preference(db: Database, state: dict, job_id: int) -> None:
+    if state.get("kind") not in ("meeting", "live"):
+        return
+    if bool(state.get("save_audio", True)):
+        return
+    candidates: list[Path] = []
+    session = state.get("session")
+    if session is not None:
+        candidates.append(Path(session.wav_path))
+    job = db.get_job(job_id) or {}
+    sp = str(job.get("source_path") or "").strip()
+    if sp:
+        candidates.append(Path(sp))
+    seen: set[str] = set()
+    for path in candidates:
+        key = str(path)
+        if key in seen:
+            continue
+        seen.add(key)
+        if path.is_file():
+            try:
+                path.unlink()
+            except OSError:
+                pass
+    db.set_job_source_path(job_id, "")
+
+
+def _enrich_recording_payload(db: Database, payload: dict) -> dict:
+    kind = str(payload.get("kind") or "")
+    if kind not in ("meeting", "live"):
+        return payload
+    job_id = payload.get("id")
+    if job_id is None:
+        return payload
+    payload["recording_path"] = _meeting_recording_path(db, int(job_id))
+    return payload
+
+
+def _enrich_meeting_payload(db: Database, payload: dict) -> dict:
+    return _enrich_recording_payload(db, payload)
+
+
 def _meeting_status_payload(app: FastAPI, db: Database, state: dict) -> dict:
     session = state.get("session")
     session_active = _meeting_session_active(state)
@@ -1751,7 +1865,11 @@ def _meeting_status_payload(app: FastAPI, db: Database, state: dict) -> dict:
         "rms_system": float(state.get("rms_system") or 0.0),
         "job_id": state.get("job_id"),
         "include_mic": bool(state.get("include_mic", True)),
+        "save_audio": bool(state.get("save_audio", True)),
     }
+    chunk_s = state.get("live_chunk_seconds")
+    if chunk_s is not None:
+        payload["live_chunk_seconds"] = float(chunk_s)
     job_id = state.get("job_id")
     if job_id is not None:
         jid = int(job_id)
@@ -1760,6 +1878,8 @@ def _meeting_status_payload(app: FastAPI, db: Database, state: dict) -> dict:
         payload["segments"] = _segments_payload(
             segs, speaker_names=db.list_speaker_names(jid)
         )
+        if not session_active:
+            payload["recording_path"] = _meeting_recording_path(db, jid)
     if state.get("error"):
         payload["error"] = state["error"]
     return payload
@@ -2125,6 +2245,8 @@ def _complete_capture_stop(
     err = str(state.get("error") or "").strip()
     if err:
         asr_state["error"] = err
+    if job_id is not None and screen in ("meeting", "live"):
+        _apply_capture_save_audio_preference(db, state, int(job_id))
     reset_state()
     if job_id is None:
         return None
@@ -2133,7 +2255,7 @@ def _complete_capture_stop(
     screen_state["job_id"] = jid
     _start_capture_finalize(app, db, jid, asr_state, pcm_chunks)
     names = db.list_speaker_names(jid)
-    payload = _job_payload(_require_job(db, jid))
+    payload = _enrich_meeting_payload(db, _job_payload(_require_job(db, jid)))
     payload["segments"] = _segments_payload(db.list_segments(jid), speaker_names=names)
     return payload
 
@@ -2283,6 +2405,7 @@ def create_ui_app(
     app.state.auto_start_engine = auto_start_engine
     app.state.engine_lock = threading.Lock()
     app.state.engine_starting = False
+    app.state.engine_starting_job_id = None
     app.state.remote_cancels = {}
     app.state.youtube_cancels = {}
     app.state.live = _empty_live_state()
@@ -2296,6 +2419,7 @@ def create_ui_app(
     app.state.speaker_ytdlp_procs = {}
     app.state.batch_runner = None
     app.state.asr_coordinator = AsrCoordinator()
+    app.state.asr_pump_suppressed = 0
     apply_preference(load_preference())
 
     @app.get("/api/library")
@@ -2510,7 +2634,7 @@ def create_ui_app(
         job["speaker_names"] = names
         job["segments"] = _segments_payload(segments, speaker_names=names)
         job["transcript"] = format_transcript(_display_segments(db, job_id, segments))
-        return job
+        return _enrich_meeting_payload(db, job)
 
     @app.patch("/api/jobs/{job_id}")
     def patch_job(job_id: int, body: JobPatchBody) -> dict:
@@ -2657,9 +2781,31 @@ def create_ui_app(
             raise HTTPException(status_code=404, detail="job not found")
         return {"ok": True}
 
-    @app.post("/api/jobs/{job_id}/cancel")
-    def cancel_job(job_id: int) -> dict:
-        job = _require_job(db, job_id)
+    def _interrupt_running_job(app: FastAPI, db: Database, job_id: int, job: dict) -> None:
+        url = getattr(app.state, "engine_url", None)
+        coord: AsrCoordinator = app.state.asr_coordinator
+        finalize_threads: dict = getattr(app.state, "capture_finalize_threads", None) or {}
+        fin_thread = finalize_threads.get(job_id)
+        on_local = coord.local_job_id() == job_id
+        on_finalize = fin_thread is not None and fin_thread.is_alive()
+        if url and job["status"] in (
+            JobStatus.RUNNING.value,
+            JobStatus.FINALIZING.value,
+        ) and (on_local or on_finalize):
+            try:
+                engine_cancel(url)
+            except Exception:
+                logging.exception("engine cancel failed for job %s", job_id)
+        cancel_event = getattr(app.state, "remote_cancels", {}).get(job_id)
+        if cancel_event is not None:
+            cancel_event.set()
+        youtube_cancel = getattr(app.state, "youtube_cancels", {}).get(job_id)
+        if youtube_cancel is not None:
+            youtube_cancel.set()
+        coord.end_local(job_id)
+        coord.end_remote(job_id)
+
+    def _cancel_job_impl(job_id: int, job: dict, *, pump_if_was_queued: bool) -> None:
         logging.info("cancel requested for job %s status=%s", job_id, job.get("status"))
         queue = getattr(app.state, "queue", None)
         if queue is not None:
@@ -2706,8 +2852,84 @@ def create_ui_app(
         was_queued = job.get("status") == JobStatus.QUEUED.value
         if job["status"] in _JOB_ACTIVE_STATUSES:
             db.set_status(job_id, JobStatus.CANCELLED)
-        if was_queued:
+        if pump_if_was_queued and was_queued:
             _pump_asr_queues(app, db)
+
+    @app.post("/api/queue/pause-orphans")
+    def pause_orphan_queue() -> dict:
+        paused = 0
+        with _suppress_asr_pump(app):
+            jobs = _orphan_jobs_in_active_statuses(db)
+            for job in jobs:
+                jid = int(job["id"])
+                status = str(job.get("status") or "")
+                if status in (JobStatus.RUNNING.value, JobStatus.FINALIZING.value):
+                    _interrupt_running_job(app, db, jid, job)
+            for job in jobs:
+                jid = int(job["id"])
+                current = db.get_job(jid) or job
+                status = str(current.get("status") or "")
+                if status not in _JOB_ACTIVE_STATUSES:
+                    continue
+                db.pause_transcription(jid)
+                paused += 1
+        return {"ok": True, "paused_count": paused}
+
+    @app.post("/api/queue/cancel-orphans")
+    def cancel_orphan_queue() -> dict:
+        cancelled = 0
+        with _suppress_asr_pump(app):
+            jobs = _orphan_jobs_in_active_statuses(db)
+            for job in jobs:
+                jid = int(job["id"])
+                current = db.get_job(jid) or job
+                _cancel_job_impl(jid, current, pump_if_was_queued=False)
+                cancelled += 1
+        return {"ok": True, "cancelled_count": cancelled}
+
+    @app.post("/api/queue/cancel-batches")
+    def cancel_active_batches() -> dict:
+        url = getattr(app.state, "engine_url", None)
+        cancelled = 0
+        with _suppress_asr_pump(app):
+            for batch in db.list_batches():
+                batch_id = int(batch["id"])
+                if not is_batch_active(app, batch_id):
+                    continue
+                if cancel_batch(
+                    app,
+                    db,
+                    batch_id,
+                    engine_url=url,
+                    engine_cancel_fn=engine_cancel,
+                ):
+                    cancelled += 1
+        return {"ok": True, "cancelled_batches": cancelled}
+
+    @app.post("/api/jobs/{job_id}/pause")
+    def pause_job(job_id: int) -> dict:
+        job = _require_job(db, job_id)
+        batch_id = job.get("batch_id")
+        if batch_id is not None and is_batch_active(app, int(batch_id)):
+            if not pause_batch(app, int(batch_id)):
+                raise HTTPException(status_code=400, detail="Пакет не выполняется.")
+            return {"ok": True, "batch_pause": True}
+        status = str(job.get("status") or "")
+        if status not in (
+            JobStatus.RUNNING.value,
+            JobStatus.FINALIZING.value,
+            JobStatus.QUEUED.value,
+        ):
+            return {"ok": True, "noop": True}
+        if status in (JobStatus.RUNNING.value, JobStatus.FINALIZING.value):
+            _interrupt_running_job(app, db, job_id, job)
+        db.pause_transcription(job_id)
+        return {"ok": True}
+
+    @app.post("/api/jobs/{job_id}/cancel")
+    def cancel_job(job_id: int) -> dict:
+        job = _require_job(db, job_id)
+        _cancel_job_impl(job_id, job, pump_if_was_queued=True)
         return {"ok": True}
 
     @app.post("/api/jobs/{job_id}/speakers")
@@ -2816,8 +3038,8 @@ def create_ui_app(
         return {"ok": True, "speaker_names": db.list_speaker_names(job_id)}
 
     @app.get("/api/app/info")
-    def get_app_info() -> dict:
-        return app_info()
+    def get_app_info(ui_locale: str | None = None) -> dict:
+        return app_info(ui_locale_hint=ui_locale)
 
     @app.post("/api/updates/check")
     def post_updates_check() -> dict:
@@ -2860,6 +3082,10 @@ def create_ui_app(
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         schedule_process_exit()
         return result
+
+    @app.get("/api/capabilities")
+    def capabilities() -> dict:
+        return {"job_pause": True, "queue_bulk": True}
 
     @app.get("/api/status")
     def status() -> dict:
@@ -3251,7 +3477,8 @@ def create_ui_app(
         if not mics:
             raise HTTPException(status_code=400, detail=NO_MIC_HINT)
         wav_path = recordings_dir() / datetime.now().strftime("live-%Y%m%d-%H%M%S.wav")
-        session = LiveSession(wav_path=wav_path)
+        backend = (selected.backend if selected else "") or ""
+        session, chunk_seconds = _capture_live_session(wav_path, backend)
         job_id = db.create_job(JobKind.LIVE, str(wav_path))
         db.set_status(job_id, JobStatus.RUNNING)
         stop_event = threading.Event()
@@ -3271,6 +3498,8 @@ def create_ui_app(
             "paused_at": None,
             "total_paused_s": 0.0,
             "kind": "live",
+            "save_audio": bool(body.save_audio),
+            "live_chunk_seconds": chunk_seconds,
         }
         _ensure_live_ingest(app.state.live)
 
@@ -3449,7 +3678,8 @@ def create_ui_app(
             if not mics:
                 raise HTTPException(status_code=400, detail=NO_MIC_HINT)
         wav_path = recordings_dir() / datetime.now().strftime("meeting-%Y%m%d-%H%M%S.wav")
-        session = LiveSession(wav_path=wav_path)
+        backend = (selected.backend if selected else "") or ""
+        session, chunk_seconds = _capture_live_session(wav_path, backend)
         job_id = db.create_job(JobKind.MEETING, str(wav_path))
         db.set_status(job_id, JobStatus.RUNNING)
         stop_event = threading.Event()
@@ -3469,7 +3699,9 @@ def create_ui_app(
             "paused_at": None,
             "total_paused_s": 0.0,
             "include_mic": include_mic,
+            "save_audio": bool(body.save_audio),
             "kind": "meeting",
+            "live_chunk_seconds": chunk_seconds,
         }
         capture = MeetingCapture(
             session=session,
@@ -3592,10 +3824,16 @@ def create_ui_app(
         return {"ok": True}
 
     @app.get("/api/youtube/status")
-    def youtube_get_status() -> dict:
+    def youtube_get_status(request: Request) -> dict:
+        from slysh.provider_reveal import enrich_providers_payload, should_reveal_provider_secrets
+
         payload = youtube_status()
         payload["cookies"] = cookies_status()
-        payload["apify"] = public_apify()
+        reveal = should_reveal_provider_secrets(request, app)
+        payload["apify"] = enrich_providers_payload(
+            {"apify": public_apify()},
+            reveal=reveal,
+        )["apify"]
         payload["batch_api"] = True
         payload["batch_resolve_api"] = True
         return payload

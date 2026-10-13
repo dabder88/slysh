@@ -22,6 +22,26 @@ import {
   setPage,
 } from "./library-table-filters.js";
 
+const SORT_ICON_IDLE =
+  '<svg class="library-sort-svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M8 9l4-4 4 4"/><path d="M8 15l4 4 4-4"/></svg>';
+const SORT_ICON_ASC =
+  '<svg class="library-sort-svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M8 15l4-4 4 4"/></svg>';
+const SORT_ICON_DESC =
+  '<svg class="library-sort-svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M8 9l4 4 4-4"/></svg>';
+
+function appendSortIndicator(parent, colKey, sort) {
+  const indicator = document.createElement("span");
+  indicator.className = "library-sort-indicator";
+  if (sort.key === colKey) {
+    indicator.classList.add("is-active");
+    indicator.innerHTML = sort.dir === "asc" ? SORT_ICON_ASC : SORT_ICON_DESC;
+  } else {
+    indicator.classList.add("is-muted");
+    indicator.innerHTML = SORT_ICON_IDLE;
+  }
+  parent.appendChild(indicator);
+}
+
 function tableColumns() {
   return [
     { key: "name", label: t("common.name"), min: 120, default: 260 },
@@ -734,16 +754,20 @@ function renderLibraryTableDynamic(dynamic, options) {
     const th = document.createElement("th");
     th.dataset.colKey = col.key;
     th.className = "library-th-sort";
+    if (sort.key === col.key) {
+      th.classList.add("library-th-sorted");
+      th.setAttribute("aria-sort", sort.dir === "asc" ? "ascending" : "descending");
+    } else {
+      th.setAttribute("aria-sort", "none");
+    }
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "library-th-sort-btn";
-    btn.textContent = col.label;
-    if (sort.key === col.key) {
-      const arrow = document.createElement("span");
-      arrow.className = "library-sort-arrow";
-      arrow.textContent = sort.dir === "asc" ? "↑" : "↓";
-      btn.appendChild(arrow);
-    }
+    const label = document.createElement("span");
+    label.className = "library-th-label";
+    label.textContent = col.label;
+    btn.appendChild(label);
+    appendSortIndicator(btn, col.key, sort);
     btn.addEventListener("click", (event) => {
       event.stopPropagation();
       saveSort(storageKey, nextSort(sort, col.key));

@@ -67,6 +67,8 @@ def transcribe_pcm_chunks(
             on_progress((i + 1) / n)
     if cancelled():
         return ("cancelled", segs)
+    if on_progress is not None:
+        on_progress(1.0)
     return ("completed", segs)
 
 

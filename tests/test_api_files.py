@@ -32,11 +32,10 @@ def _use_local_engine_asr(monkeypatch) -> None:
 
 def _patch_streaming_pcm(monkeypatch, chunks: int = 1) -> np.ndarray:
     pcm = np.zeros(CHUNK_SAMPLES * chunks, dtype=np.float32)
-    monkeypatch.setattr(
-        api_mod,
-        "decode_pcm_16k_mono",
-        lambda path: (pcm, SAMPLE_RATE),
-    )
+    def _fake_decode(path, *, start_ms=None, end_ms=None, cancelled=None):
+        return pcm, SAMPLE_RATE
+
+    monkeypatch.setattr(api_mod, "decode_pcm_16k_mono", _fake_decode)
     return pcm
 
 
@@ -220,6 +219,7 @@ def test_job_streaming_progress_and_segments(tmp_path, monkeypatch):
         time.sleep(0.05)
     assert job["status"] == "completed"
     assert len(job["segments"]) == 2
+    assert float(job.get("progress") or 0) >= 1.0
 
 
 def test_job_runs_when_engine_url_set(tmp_path, monkeypatch):
@@ -254,6 +254,34 @@ def test_job_runs_when_engine_url_set(tmp_path, monkeypatch):
     assert job["progress"] == 1
     assert job["segments"][0]["text"] == "привет"
     assert job.get("duration_s") is not None
+
+
+def test_library_list_does_not_probe_media_files(tmp_path, monkeypatch):
+    from slysh.decode import DecodeError
+
+    def boom(_path):
+        raise DecodeError("probe should not run on library list")
+
+    monkeypatch.setattr("slysh.decode.media_duration_ms", boom)
+    db = Database(tmp_path / "app.db")
+    job_id = db.create_job(JobKind.FILE, str(tmp_path / "talk.wav"))
+    app = create_ui_app(db=db, engine=None)
+    client = TestClient(app)
+    assert client.get("/api/library").status_code == 200
+
+
+def test_library_job_has_transcript_flag(tmp_path):
+    db = Database(tmp_path / "app.db")
+    job_id = db.create_job(JobKind.FILE, str(tmp_path / "talk.wav"))
+    db.replace_segments(job_id, [Segment(0, 1000, "текст")])
+    db.set_status(job_id, JobStatus.COMPLETED)
+    app = create_ui_app(db=db, engine=None)
+    client = TestClient(app)
+    lib = client.get("/api/library").json()
+    orphans = lib.get("orphans") or []
+    job = next((j for j in orphans if j["id"] == job_id), None)
+    assert job is not None
+    assert job.get("has_transcript") is True
 
 
 def test_job_api_duration_s_is_media_processing_s_is_wall_clock(tmp_path):

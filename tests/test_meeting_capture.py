@@ -237,6 +237,56 @@ def test_meeting_start_without_outputs_returns_400(tmp_path, monkeypatch):
     assert "выход" in r.json()["detail"].lower()
 
 
+def test_meeting_start_save_audio_default_keeps_wav(tmp_path, monkeypatch):
+    monkeypatch.setenv("GIGAAM_DESKTOP_HOME", str(tmp_path / "home"))
+    monkeypatch.setattr(api_mod, "loopback_supported", lambda: True)
+    monkeypatch.setattr(api_mod, "list_output_devices", lambda: [{"id": 3, "name": "Speakers"}])
+    monkeypatch.setattr(api_mod, "_list_input_mics", lambda app=None, force=False: [{"id": 0, "name": "Mic"}])
+    monkeypatch.setattr(api_mod, "MeetingCapture", _FakeCapture)
+    db = Database(tmp_path / "app.db")
+    app = create_ui_app(db=db, engine=None, auto_start_engine=False)
+    client = TestClient(app)
+    started = client.post("/api/meeting/start", json={"include_mic": False, "output_device_id": 3})
+    assert started.status_code == 200
+    wav = Path(started.json()["source_path"])
+    stopped = client.post("/api/meeting/stop")
+    assert stopped.status_code == 200
+    body = stopped.json()
+    assert body["status"] == "completed"
+    assert body.get("recording_path")
+    assert Path(body["recording_path"]).is_file()
+    job = client.get(f"/api/jobs/{body['id']}").json()
+    assert job["source_path"] == str(wav)
+    assert job.get("recording_path") == str(wav)
+
+
+def test_meeting_start_save_audio_false_removes_wav(tmp_path, monkeypatch):
+    monkeypatch.setenv("GIGAAM_DESKTOP_HOME", str(tmp_path / "home"))
+    monkeypatch.setattr(api_mod, "loopback_supported", lambda: True)
+    monkeypatch.setattr(api_mod, "list_output_devices", lambda: [{"id": 3, "name": "Speakers"}])
+    monkeypatch.setattr(api_mod, "_list_input_mics", lambda app=None, force=False: [{"id": 0, "name": "Mic"}])
+    monkeypatch.setattr(api_mod, "MeetingCapture", _FakeCapture)
+    db = Database(tmp_path / "app.db")
+    app = create_ui_app(db=db, engine=None, auto_start_engine=False)
+    client = TestClient(app)
+    started = client.post(
+        "/api/meeting/start",
+        json={"include_mic": False, "output_device_id": 3, "save_audio": False},
+    )
+    assert started.status_code == 200
+    wav = Path(started.json()["source_path"])
+    assert wav.is_file()
+    stopped = client.post("/api/meeting/stop")
+    assert stopped.status_code == 200
+    body = stopped.json()
+    assert body["status"] == "completed"
+    assert body.get("recording_path") in (None, "")
+    assert not wav.is_file()
+    job = client.get(f"/api/jobs/{body['id']}").json()
+    assert str(job.get("source_path") or "") == ""
+    assert job.get("recording_path") in (None, "")
+
+
 def test_meeting_start_creates_job_and_wav(tmp_path, monkeypatch):
     monkeypatch.setenv("GIGAAM_DESKTOP_HOME", str(tmp_path / "home"))
     monkeypatch.setattr(api_mod, "loopback_supported", lambda: True)

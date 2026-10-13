@@ -1,7 +1,15 @@
-﻿import { api, showToast } from "./api.js";
+import { api, showToast } from "./api.js";
 import { reportError } from "./errors.js";
-import { openJobExportModal, openLocalPath, refreshLibrary, startSpeakers, uniqueSpeakers, waitForSpeakers } from "./legacy.js";
-import { speakerDisplayName, speakerKeysForRename } from "./library-utils.js";
+import {
+  cancelJob,
+  openJobExportModal,
+  openLocalPath,
+  refreshLibrary,
+  startSpeakers,
+  uniqueSpeakers,
+  waitForSpeakers,
+} from "./legacy.js";
+import { speakerKeysForRename, speakerRenameLabel } from "./library-utils.js";
 import { formatMsClock } from "./media-time.js";
 import { t } from "./i18n.js";
 
@@ -9,19 +17,43 @@ const NO_OUTPUT_HINT =
   t("meeting.k4303073");
 const TIMESTAMPS_KEY = "meeting-show-timestamps";
 const AUTO_SPEAKERS_KEY = "meeting-auto-speakers";
+const SAVE_AUDIO_KEY = "meeting-save-audio";
 
 let meetingInitialized = false;
 let meetingPollTimer = null;
 let meetingJobId = null;
 let meetingStarting = false;
-let meetingRenderedCount = 0;
-let meetingRenderedJobId = null;
 let meetingLastSegments = [];
+let meetingEditDirty = false;
+let meetingSaveTimer = null;
+let meetingTranscriptJobId = null;
 let meetingLastExportPath = "";
+let meetingLastRecordingPath = "";
 let meetingLastSpeakersError = null;
 let meetingSpeakerKeys = [];
 let meetingEnginePackagesOk = true;
 let meetingAwaitingTranscript = false;
+let meetingSessionActiveFlag = false;
+
+function setButtonLabelText(buttonEl, labelId, text) {
+  const labelEl = labelId ? document.getElementById(labelId) : null;
+  if (labelEl) {
+    labelEl.textContent = text;
+    return;
+  }
+  if (buttonEl) {
+    buttonEl.textContent = text;
+  }
+}
+
+function formatMeterDbLabel(rms) {
+  const value = Number(rms) || 0;
+  if (value <= 0.0001) {
+    return "-∞ dB";
+  }
+  const db = 20 * Math.log10(Math.min(1, value * 2.5));
+  return `${db >= -0.05 ? 0 : db.toFixed(0)} dB`;
+}
 
 function formatElapsed(seconds) {
   const total = Math.max(0, Math.floor(Number(seconds) || 0));
@@ -67,6 +99,36 @@ function saveAutoSpeakersPreference() {
   localStorage.setItem(AUTO_SPEAKERS_KEY, el.checked ? "1" : "0");
 }
 
+function loadSaveAudioPreference() {
+  const el = document.getElementById("meeting-save-audio");
+  if (!el) {
+    return;
+  }
+  el.checked = localStorage.getItem(SAVE_AUDIO_KEY) !== "0";
+}
+
+function saveSaveAudioPreference() {
+  const el = document.getElementById("meeting-save-audio");
+  if (!el) {
+    return;
+  }
+  localStorage.setItem(SAVE_AUDIO_KEY, el.checked ? "1" : "0");
+}
+
+function syncMeetingRecordingActions(path) {
+  const panel = document.getElementById("meeting-recording-actions");
+  const pathEl = document.getElementById("meeting-recording-path");
+  if (!panel) {
+    return;
+  }
+  const normalized = String(path || "").trim();
+  meetingLastRecordingPath = normalized;
+  panel.hidden = !normalized;
+  if (pathEl) {
+    pathEl.textContent = normalized ? t("meeting.recordingSaved", { path: normalized }) : "";
+  }
+}
+
 async function loadMeetingSetupStatus() {
   try {
     const setup = await api("/api/setup");
@@ -99,31 +161,93 @@ function formatSegmentLine(seg, showTimestamps) {
   return body;
 }
 
+function meetingTranscriptEl() {
+  return document.getElementById("meeting-transcript");
+}
+
 function hasMeetingTranscriptText(segments) {
+  if (meetingEditDirty) {
+    return Boolean(meetingTranscriptText());
+  }
   return (segments || []).some((seg) => Boolean(formatSegmentBody(seg)));
 }
 
-function createSegmentParagraph(seg, showTimestamps) {
-  const p = document.createElement("p");
-  const line = formatSegmentLine(seg, showTimestamps);
-  if (!line) {
-    return p;
+function meetingTranscriptText() {
+  const el = meetingTranscriptEl();
+  if (meetingEditDirty && el) {
+    return String(el.value || "").trim();
   }
-  if (showTimestamps && seg.start_ms != null) {
-    const time = document.createElement("span");
-    time.className = "seg-time";
-    time.textContent = `[${formatMsClock(seg.start_ms)}]`;
-    p.appendChild(time);
-    p.appendChild(document.createTextNode(formatSegmentBody(seg)));
-  } else {
-    p.textContent = line;
-  }
-  return p;
+  return buildMeetingCopyText(meetingLastSegments);
 }
 
-function hasTextSelection() {
-  const sel = window.getSelection();
-  return Boolean(sel && sel.toString().trim());
+function updateMeetingCounterStats() {
+  const counterEl = document.getElementById("meeting-counter-stats");
+  const el = meetingTranscriptEl();
+  if (!counterEl || !el) {
+    return;
+  }
+  const val = String(el.value || "").trim();
+  const words = val ? val.split(/\s+/).filter(Boolean).length : 0;
+  counterEl.textContent = t("live.counterStats", { words, chars: val.length });
+}
+
+function syncMeetingTranscriptFromSegments(segments, { force = false, jobId = null } = {}) {
+  const el = meetingTranscriptEl();
+  if (!el) {
+    return;
+  }
+  if (jobId != null && meetingTranscriptJobId !== jobId) {
+    meetingTranscriptJobId = jobId;
+    force = true;
+  }
+  meetingLastSegments = segments || [];
+  if (!meetingEditDirty || force) {
+    el.value = buildMeetingCopyText(meetingLastSegments);
+    if (force) {
+      meetingEditDirty = false;
+    }
+    updateMeetingCounterStats();
+    if (document.activeElement !== el) {
+      el.scrollTop = el.scrollHeight;
+    }
+  }
+}
+
+async function saveMeetingTranscript() {
+  if (meetingJobId == null) {
+    return;
+  }
+  const el = meetingTranscriptEl();
+  if (!el) {
+    return;
+  }
+  const transcript = String(el.value || "");
+  try {
+    await api(`/api/jobs/${meetingJobId}/segments`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ transcript }),
+    });
+    meetingEditDirty = false;
+    const job = await api(`/api/jobs/${meetingJobId}`);
+    meetingLastSegments = job.segments || [];
+    updateMeetingCounterStats();
+  } catch (err) {
+    if (err.status === 409) {
+      return;
+    }
+    reportError(t("jobSource.meeting.label"), err);
+  }
+}
+
+function scheduleMeetingTranscriptSave() {
+  if (meetingSaveTimer) {
+    clearTimeout(meetingSaveTimer);
+  }
+  meetingSaveTimer = setTimeout(() => {
+    meetingSaveTimer = null;
+    saveMeetingTranscript().catch(() => {});
+  }, 600);
 }
 
 function syncMeetingTranscriptWait({ sessionActive, segments, jobStatus, captureFinalizing }) {
@@ -205,7 +329,7 @@ function renderMeetingSpeakerRename(keys, names = {}) {
     row.className = "meeting-speaker-row";
     const badge = document.createElement("span");
     badge.className = "meeting-speaker-key";
-    badge.textContent = speakerDisplayName(key, names[key]);
+    badge.textContent = speakerRenameLabel(key);
     const input = document.createElement("input");
     input.type = "text";
     input.className = "meeting-speaker-input";
@@ -230,8 +354,11 @@ function syncMeetingAutoSpeakersOption(sessionActive) {
   }
 }
 
+const SPEAKER_CANCELLED_RU = "Остановлено пользователем";
+
 function syncMeetingSpeakersUi(job, { sessionActive, segments } = {}) {
   const btn = document.getElementById("btn-meeting-speakers");
+  const stopBtn = document.getElementById("btn-meeting-speakers-stop");
   const wait = document.getElementById("meeting-speakers-wait");
   const details = document.getElementById("meeting-speakers-details");
   const items = segments || job?.segments || [];
@@ -249,13 +376,16 @@ function syncMeetingSpeakersUi(job, { sessionActive, segments } = {}) {
     }
   }
   if (btn) {
-    btn.hidden = Boolean(sessionActive) || !hasText || !completed;
+    btn.hidden = Boolean(sessionActive) || !hasText || !completed || running;
     btn.disabled = running || !meetingEnginePackagesOk;
     if (!meetingEnginePackagesOk) {
       btn.title = t("meeting.k607940");
     } else {
       btn.removeAttribute("title");
     }
+  }
+  if (stopBtn) {
+    stopBtn.hidden = Boolean(sessionActive) || !hasText || !completed || !running;
   }
   if (wait) {
     wait.hidden = !running;
@@ -270,7 +400,9 @@ function syncMeetingSpeakersUi(job, { sessionActive, segments } = {}) {
   }
   if (job?.speakers_error && job.speakers_error !== meetingLastSpeakersError) {
     meetingLastSpeakersError = job.speakers_error;
-    showToast(job.speakers_error);
+    if (job.speakers_error !== SPEAKER_CANCELLED_RU) {
+      showToast(job.speakers_error);
+    }
   }
   if (!sessionActive && hasSpeakers) {
     const keys = meetingSpeakerKeys.length ? meetingSpeakerKeys : speakerKeysForRename(items);
@@ -305,7 +437,7 @@ async function saveMeetingSpeakerNames() {
   });
   const job = await api(`/api/jobs/${meetingJobId}`);
   meetingSpeakerKeys = speakerKeysForRename(job.segments || []);
-  renderMeetingTranscript(job.segments || [], meetingJobId);
+  syncMeetingTranscriptFromSegments(job.segments || [], { jobId: meetingJobId });
   syncMeetingSpeakersUi(job, { sessionActive: false, segments: job.segments || [] });
 }
 
@@ -321,6 +453,19 @@ async function waitForMeetingCaptureFinalize(jobId) {
   return api(`/api/jobs/${jobId}`);
 }
 
+async function cancelMeetingSpeakers() {
+  if (meetingJobId == null) {
+    return;
+  }
+  try {
+    await cancelJob(meetingJobId);
+    const job = await api(`/api/jobs/${meetingJobId}`);
+    syncMeetingSpeakersUi(job, { sessionActive: false, segments: job.segments || meetingLastSegments });
+  } catch (err) {
+    reportError(t("meeting.k3909903"), err);
+  }
+}
+
 async function runMeetingSpeakers() {
   if (meetingJobId == null) {
     showToast("meeting.k7306115");
@@ -334,10 +479,11 @@ async function runMeetingSpeakers() {
       intervalMs: 1000,
       onUpdate: (updated) => {
         syncMeetingSpeakersUi(updated, { sessionActive: false, segments: updated.segments || [] });
+        syncMeetingTranscriptFromSegments(updated.segments || [], { jobId: meetingJobId });
       },
     });
     meetingSpeakerKeys = speakerKeysForRename(job.segments || []);
-    renderMeetingTranscript(job.segments || [], meetingJobId);
+    syncMeetingTranscriptFromSegments(job.segments || [], { jobId: meetingJobId });
     syncMeetingSpeakersUi(job, { sessionActive: false, segments: job.segments || [] });
   } catch (err) {
     reportError(t("meeting.k3909903"), err);
@@ -353,7 +499,7 @@ function buildMeetingCopyText(segments) {
 }
 
 async function copyMeetingTranscript() {
-  const text = buildMeetingCopyText(meetingLastSegments);
+  const text = meetingTranscriptText();
   if (!text) {
     showToast("meeting.k3160222");
     return;
@@ -384,7 +530,7 @@ async function exportMeetingTranscript() {
     return;
   }
   const job = await api(`/api/jobs/${meetingJobId}`);
-  openJobExportModal(job);
+  await openJobExportModal(job);
 }
 
 async function clearMeetingView() {
@@ -473,13 +619,21 @@ function setRecordingChrome(
   panel?.classList.toggle("is-paused", Boolean(sessionActive) && paused);
   if (recBtn) {
     recBtn.classList.toggle("is-recording", capturing || starting);
-    recBtn.textContent = starting ? t("meeting.k9356652") : capturing ? t("meeting.k8798649") : t("meeting.k6860718");
+    setButtonLabelText(
+      recBtn,
+      "btn-meeting-rec-label",
+      starting ? t("meeting.k9356652") : capturing ? t("meeting.k8798649") : t("meeting.k6860718")
+    );
   }
   if (pauseBtn) {
-    pauseBtn.textContent = paused ? t("meeting.k1581071") : t("batch_panel.k1098111");
+    setButtonLabelText(
+      pauseBtn,
+      "btn-meeting-pause-label",
+      paused ? t("meeting.k1581071") : t("batch_panel.k1098111")
+    );
   }
   if (stopBtn) {
-    stopBtn.classList.toggle("btn-danger", Boolean(sessionActive));
+    stopBtn.classList.toggle("is-active-recording", Boolean(sessionActive));
   }
   if (banner) {
     banner.hidden = !active;
@@ -503,6 +657,7 @@ function setRecordingChrome(
       countdown.textContent = "";
     }
   }
+  syncMeetingStatusBadge({ sessionActive, paused, starting });
 }
 
 async function loadDevices({ refresh = false } = {}) {
@@ -520,7 +675,7 @@ async function loadDevices({ refresh = false } = {}) {
   const prevMicName = selectedOptionName(micSelect);
   if (refresh && refreshBtn) {
     refreshBtn.disabled = true;
-    refreshBtn.textContent = t("meeting.k1772502");
+    setButtonLabelText(refreshBtn, "btn-meeting-refresh-label", t("meeting.k1772502"));
   }
   let payload = { outputs: [], mics: [], loopback_supported: true, default_output_id: null };
   try {
@@ -530,7 +685,7 @@ async function loadDevices({ refresh = false } = {}) {
   } finally {
     if (refreshBtn) {
       refreshBtn.disabled = false;
-      refreshBtn.textContent = t("meeting.k9872870");
+      setButtonLabelText(refreshBtn, "btn-meeting-refresh-label", t("meeting.k9872870"));
     }
   }
   const outputs = payload.outputs || [];
@@ -562,15 +717,16 @@ async function loadDevices({ refresh = false } = {}) {
 }
 
 function resetMeetingTranscript() {
-  const box = document.getElementById("meeting-transcript");
-  if (box) {
-    box.innerHTML = "";
+  meetingEditDirty = false;
+  meetingTranscriptJobId = null;
+  if (meetingSaveTimer) {
+    clearTimeout(meetingSaveTimer);
+    meetingSaveTimer = null;
   }
-  meetingRenderedCount = 0;
-  meetingRenderedJobId = null;
   meetingLastSegments = [];
   meetingSpeakerKeys = [];
   meetingLastSpeakersError = null;
+  syncMeetingTranscriptFromSegments([], { force: true });
   syncMeetingPostActions({ sessionActive: false, segments: [] });
   syncMeetingTranscriptWait({ sessionActive: false, segments: [] });
   syncMeetingExportActions("");
@@ -578,70 +734,35 @@ function resetMeetingTranscript() {
   renderMeetingSpeakerRename([]);
 }
 
-function renderMeetingTranscript(segments, jobId) {
-  const box = document.getElementById("meeting-transcript");
-  if (!box) {
-    return;
-  }
-  if (jobId != null && meetingRenderedJobId !== jobId) {
-    box.innerHTML = "";
-    meetingRenderedCount = 0;
-    meetingRenderedJobId = jobId;
-  }
-  const items = segments || [];
-  meetingLastSegments = items;
-  const showTimestamps = showMeetingTimestamps();
-  box.innerHTML = "";
-  for (const seg of items) {
-    const p = createSegmentParagraph(seg, showTimestamps);
-    if (p.textContent || p.childNodes.length) {
-      box.appendChild(p);
-    }
-  }
-  meetingRenderedCount = items.length;
-  if (!hasTextSelection()) {
-    box.scrollTop = box.scrollHeight;
-  }
-}
-
-function appendMeetingSegments(segments, jobId) {
-  const box = document.getElementById("meeting-transcript");
-  if (!box) {
-    return;
-  }
-  if (jobId != null && meetingRenderedJobId !== jobId) {
-    box.innerHTML = "";
-    meetingRenderedCount = 0;
-    meetingRenderedJobId = jobId;
-  }
-  const items = segments || [];
-  meetingLastSegments = items;
-  const showTimestamps = showMeetingTimestamps();
-  if (items.length < meetingRenderedCount) {
-    renderMeetingTranscript(items, jobId);
-    return;
-  }
-  if (items.length === meetingRenderedCount) {
-    return;
-  }
-  for (let i = meetingRenderedCount; i < items.length; i += 1) {
-    const p = createSegmentParagraph(items[i], showTimestamps);
-    if (p.textContent || p.childNodes.length) {
-      box.appendChild(p);
-    }
-  }
-  meetingRenderedCount = items.length;
-  if (!hasTextSelection()) {
-    box.scrollTop = box.scrollHeight;
-  }
-}
-
-function setMeter(id, rms) {
+function setMeter(id, rms, dbLabelId = null) {
   const el = document.getElementById(id);
   if (!el) {
     return;
   }
-  el.style.width = `${Math.min(100, Math.round((Number(rms) || 0) * 400))}%`;
+  const level = Number(rms) || 0;
+  el.style.width = `${Math.min(100, Math.round(level * 400))}%`;
+  if (dbLabelId) {
+    const dbEl = document.getElementById(dbLabelId);
+    if (dbEl) {
+      dbEl.textContent = formatMeterDbLabel(level);
+    }
+  }
+}
+
+function syncMeetingStatusBadge({ sessionActive, paused, starting }) {
+  const badge = document.getElementById("meeting-status-badge");
+  if (!badge) {
+    return;
+  }
+  if (starting) {
+    badge.textContent = t("meeting.bentoStatusStarting");
+  } else if (sessionActive && paused) {
+    badge.textContent = t("meeting.bentoStatusPaused");
+  } else if (sessionActive) {
+    badge.textContent = t("meeting.bentoStatusRecording");
+  } else {
+    badge.textContent = t("meeting.bentoStatusIdle");
+  }
 }
 
 async function pollMeeting() {
@@ -656,6 +777,7 @@ async function pollMeeting() {
 
   const status = await api("/api/meeting/status");
   const sessionActive = Boolean(status.session_active);
+  meetingSessionActiveFlag = sessionActive;
   const listening = Boolean(status.listening);
   const paused = Boolean(status.paused);
   const hasOutputs = outputSelect && outputSelect.options.length > 0;
@@ -677,6 +799,10 @@ async function pollMeeting() {
   if (includeMic) {
     includeMic.disabled = sessionActive;
   }
+  const saveAudio = document.getElementById("meeting-save-audio");
+  if (saveAudio) {
+    saveAudio.disabled = sessionActive;
+  }
   if (refreshBtn) {
     refreshBtn.disabled = sessionActive || meetingStarting;
   }
@@ -687,8 +813,17 @@ async function pollMeeting() {
     elapsed: status.elapsed_s,
     remaining: status.remaining_s,
   });
-  setMeter("meeting-meter-system", listening ? status.rms_system : 0);
-  setMeter("meeting-meter-mic", listening ? status.rms_mic : 0);
+  setMeter(
+    "meeting-meter-system",
+    listening ? status.rms_system : 0,
+    "lbl-meter-system-val"
+  );
+  setMeter("meeting-meter-mic", listening ? status.rms_mic : 0, "lbl-meter-mic-val");
+  syncMeetingStatusBadge({
+    sessionActive,
+    paused,
+    starting: meetingStarting && !sessionActive,
+  });
   if (hint && status.error) {
     hint.textContent = status.error;
     hint.dataset.stickyError = "1";
@@ -710,16 +845,11 @@ async function pollMeeting() {
       if (job.last_export_path) {
         syncMeetingExportActions(job.last_export_path);
       }
+      syncMeetingRecordingActions(job.recording_path ? String(job.recording_path) : "");
       syncMeetingSpeakersUi(job, { sessionActive, segments });
-      const needsFullRender =
-        job.speakers_running || job.has_speakers || (segments || []).some((seg) => seg.speaker);
-      if (needsFullRender) {
-        renderMeetingTranscript(segments, jobId);
-      } else {
-        appendMeetingSegments(segments, jobId);
-      }
+      syncMeetingTranscriptFromSegments(segments || [], { jobId });
     } else if (segments) {
-      appendMeetingSegments(segments, jobId);
+      syncMeetingTranscriptFromSegments(segments, { jobId });
     }
     const displaySegments = segments || meetingLastSegments;
     syncMeetingTranscriptWait({
@@ -789,8 +919,10 @@ async function startMeeting() {
   if (recBtn) {
     recBtn.disabled = true;
   }
+  const saveAudioEl = document.getElementById("meeting-save-audio");
   const body = {
     include_mic: Boolean(includeMic && includeMic.checked),
+    save_audio: saveAudioEl ? Boolean(saveAudioEl.checked) : true,
   };
   const outputId = selectValue(outputSelect);
   if (outputId !== undefined) {
@@ -845,10 +977,19 @@ async function stopMeeting() {
       captureFinalizing: false,
     });
   }
-  await api("/api/meeting/stop", { method: "POST" });
+  const stopped = await api("/api/meeting/stop", { method: "POST" });
+  if (stopped?.recording_path) {
+    syncMeetingRecordingActions(stopped.recording_path);
+  } else {
+    syncMeetingRecordingActions("");
+  }
   setRecordingChrome(false);
   showToast("meeting.k5299764");
   await pollMeeting();
+  if (meetingEditDirty && meetingJobId != null) {
+    await waitForMeetingCaptureFinalize(meetingJobId);
+    await saveMeetingTranscript();
+  }
   await refreshLibrary();
   if (document.getElementById("meeting-auto-speakers")?.checked && meetingJobId != null) {
     await waitForMeetingCaptureFinalize(meetingJobId);
@@ -863,20 +1004,48 @@ export function initMeeting() {
   meetingInitialized = true;
   loadTimestampsPreference();
   loadAutoSpeakersPreference();
+  loadSaveAudioPreference();
   syncMeetingAutoSpeakersOption(false);
   loadMeetingSetupStatus().catch(() => {});
   document.getElementById("meeting-show-timestamps")?.addEventListener("change", () => {
     saveTimestampsPreference();
-    renderMeetingTranscript(meetingLastSegments, meetingRenderedJobId);
+    if (!meetingEditDirty) {
+      syncMeetingTranscriptFromSegments(meetingLastSegments, { jobId: meetingJobId });
+    }
   });
+  const transcript = meetingTranscriptEl();
+  if (transcript) {
+    transcript.setAttribute("aria-label", t("live.transcriptLabel"));
+    transcript.addEventListener("input", () => {
+      meetingEditDirty = true;
+      scheduleMeetingTranscriptSave();
+      updateMeetingCounterStats();
+      const hasText = hasMeetingTranscriptText(meetingLastSegments);
+      const panel = document.getElementById("meeting-post-actions");
+      const copyBtn = document.getElementById("btn-meeting-copy");
+      if (panel) {
+        panel.hidden = Boolean(meetingSessionActiveFlag) || !hasText;
+      }
+      if (copyBtn) {
+        copyBtn.disabled = !hasText;
+      }
+      syncMeetingClearButton({ sessionActive: meetingSessionActiveFlag, segments: meetingLastSegments });
+    });
+  }
   document.getElementById("meeting-auto-speakers")?.addEventListener("change", () => {
     saveAutoSpeakersPreference();
+  });
+  document.getElementById("meeting-save-audio")?.addEventListener("change", () => {
+    saveSaveAudioPreference();
   });
   document.getElementById("btn-meeting-clear")?.addEventListener("click", () =>
     clearMeetingView().catch((err) => reportError(t("meeting.k5445934"), err))
   );
   document.getElementById("btn-meeting-speakers")?.addEventListener("click", () =>
     runMeetingSpeakers().catch((err) => reportError(t("meeting.k3909903"), err))
+  );
+  document.getElementById("btn-meeting-speakers-stop")?.addEventListener("click", () =>
+    cancelMeetingSpeakers().catch((err) => reportError(t("meeting.k3909903"), err))
   );
   document.getElementById("btn-meeting-copy")?.addEventListener("click", () =>
     copyMeetingTranscript().catch((err) => reportError(t("meeting.k9147187"), err))
@@ -889,6 +1058,16 @@ export function initMeeting() {
   );
   document.getElementById("btn-meeting-open-export-folder")?.addEventListener("click", () =>
     openLocalPath(meetingLastExportPath, true).catch((err) => reportError(t("meeting.k864377"), err))
+  );
+  document.getElementById("btn-meeting-open-recording")?.addEventListener("click", () =>
+    openLocalPath(meetingLastRecordingPath, false).catch((err) =>
+      reportError(t("meeting.openRecording"), err)
+    )
+  );
+  document.getElementById("btn-meeting-open-recording-folder")?.addEventListener("click", () =>
+    openLocalPath(meetingLastRecordingPath, true).catch((err) =>
+      reportError(t("meeting.openRecordingFolder"), err)
+    )
   );
   window.addEventListener("gigaam:job-exported", (event) => {
     const { jobId, path } = event.detail || {};
@@ -909,7 +1088,7 @@ export function initMeeting() {
       const recBtn = document.getElementById("btn-meeting-rec");
       if (recBtn) {
         recBtn.disabled = false;
-        recBtn.textContent = t("meeting.k6860718");
+        setButtonLabelText(recBtn, "btn-meeting-rec-label", t("meeting.k6860718"));
       }
     })
   );
@@ -927,12 +1106,30 @@ export function initMeeting() {
     loadDevices({ refresh: true }).catch((err) => reportError(t("meeting.k9267804"), err));
   });
   document.getElementById("meeting-include-mic")?.addEventListener("change", () => syncMicEnabled());
+  const leadBtn = document.getElementById("btn-meeting-lead-toggle");
+  const leadP = document.getElementById("meeting-lead");
+  const leadLbl = document.getElementById("lbl-meeting-lead-toggle");
+  const leadIcon = document.getElementById("icon-meeting-lead-toggle");
+  if (leadBtn && leadP) {
+    leadBtn.addEventListener("click", () => {
+      const isHidden = leadP.classList.contains("hidden");
+      leadP.classList.toggle("hidden", !isHidden);
+      leadBtn.setAttribute("aria-expanded", String(isHidden));
+      if (leadLbl) {
+        leadLbl.textContent = isHidden ? t("meeting.leadToggleHide") : t("meeting.leadToggleMore");
+      }
+      if (leadIcon) {
+        leadIcon.style.transform = isHidden ? "rotate(180deg)" : "rotate(0deg)";
+      }
+    });
+  }
   loadDevices().catch((err) => reportError(t("meeting.k9267804"), err));
 }
 
 export async function onMeetingShow() {
   loadTimestampsPreference();
   loadAutoSpeakersPreference();
+  loadSaveAudioPreference();
   await loadMeetingSetupStatus().catch(() => {});
   await loadDevices().catch((err) => reportError(t("meeting.k9267804"), err));
   const status = await pollMeeting().catch((err) => reportError(t("jobSource.meeting.label"), err));

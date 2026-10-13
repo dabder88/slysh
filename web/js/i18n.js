@@ -1,4 +1,4 @@
-﻿let currentLocale = "ru";
+let currentLocale = "ru";
 let messages = {};
 let i18nReady = false;
 const listeners = new Set();
@@ -18,6 +18,18 @@ function browserLocaleHint() {
     }
   }
   return "ru";
+}
+
+/** Locale from WebView URL (?ui_locale=en), set by Python webview_ui_url. */
+export function localeFromUrl() {
+  const raw = new URLSearchParams(window.location.search).get("ui_locale");
+  if (raw === "en") {
+    return "en";
+  }
+  if (raw === "ru") {
+    return "ru";
+  }
+  return null;
 }
 
 function resolvePath(obj, path) {
@@ -70,7 +82,7 @@ function notifyLocaleChange() {
 }
 
 async function loadMessages(locale) {
-  const res = await fetch(`/locales/${locale}.json?v=13`, { credentials: "include" });
+  const res = await fetch(`/locales/${locale}.json?v=15`, { credentials: "include" });
   if (!res.ok) {
     throw new Error(`locale ${locale}`);
   }
@@ -204,22 +216,34 @@ export async function setLocale(locale, options = {}) {
   currentLocale = next;
   i18nReady = true;
   applyI18n();
-  notifyLocaleChange();
   if (!options.skipSave) {
     await localeApiPut("/api/locale", { ui_locale: next });
   }
+  notifyLocaleChange();
   return currentLocale;
 }
 
 export async function initI18n() {
-  const hint = browserLocaleHint();
+  const urlLocale = localeFromUrl();
+  const hint = urlLocale || browserLocaleHint();
   let data;
   try {
     data = await localeApiGet(`/api/locale?hint=${encodeURIComponent(hint)}`);
   } catch (_) {
     data = { ui_locale: hint };
   }
-  const locale = data.ui_locale === "en" ? "en" : "ru";
+  let locale = data.ui_locale === "en" ? "en" : "ru";
+  if (urlLocale) {
+    locale = urlLocale;
+  }
+  const storedLocale = data.ui_locale === "en" ? "en" : "ru";
+  if (urlLocale && urlLocale !== storedLocale) {
+    try {
+      await localeApiPut("/api/locale", { ui_locale: locale });
+    } catch (_) {
+      /* keep UI locale from WebView URL */
+    }
+  }
   await loadMessages(locale);
   currentLocale = locale;
   i18nReady = true;

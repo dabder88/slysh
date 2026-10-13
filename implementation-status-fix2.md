@@ -84,3 +84,5 @@
 ## Правило обновления
 
 После каждого Gx/Hx: строки здесь + [`wiki/log.md`](wiki/log.md); при UI/backend — Setup.
+
+**Следующий цикл:** plan-fix-3 — [`implementation-status-fix3.md`](implementation-status-fix3.md).

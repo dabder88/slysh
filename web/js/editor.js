@@ -23,6 +23,7 @@ import {
   speakerDisplayName,
 } from "./library-utils.js";
 import { parseTranscript } from "./transcript-format.js";
+import { bindPanelResizer } from "./panel-resize.js";
 
 let editorBound = false;
 let currentJobId = null;
@@ -220,13 +221,11 @@ function renderViewSegments(job) {
   }
 }
 
-function syncEditModeAvailability(job) {
+function syncEditModeAvailability(_job) {
   const editBtn = document.getElementById("editor-mode-edit");
-  const runningFile =
-    job?.kind === "file" && job?.status === "running" && !job?.speakers_running;
   if (editBtn) {
-    editBtn.disabled = Boolean(runningFile);
-    editBtn.title = runningFile ? t("editor.k5279584") : "";
+    editBtn.disabled = false;
+    editBtn.title = "";
   }
 }
 
@@ -1226,54 +1225,6 @@ function applyEditorPanelWidths() {
   layout.style.setProperty("--editor-player-width", `${width}px`);
 }
 
-function bindPanelResizer(handle, onDrag) {
-  if (!handle || handle.dataset.bound) {
-    return;
-  }
-  handle.dataset.bound = "1";
-
-  const startDrag = (clientX) => {
-    let lastX = clientX;
-    handle.classList.add("is-active");
-    document.body.classList.add("is-resizing");
-
-    const onMove = (event) => {
-      const x = event.clientX ?? lastX;
-      const delta = x - lastX;
-      lastX = x;
-      onDrag(delta);
-    };
-
-    const onUp = () => {
-      handle.classList.remove("is-active");
-      document.body.classList.remove("is-resizing");
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-    };
-
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-  };
-
-  handle.addEventListener("pointerdown", (event) => {
-    if (event.button !== 0) {
-      return;
-    }
-    event.preventDefault();
-    handle.setPointerCapture?.(event.pointerId);
-    startDrag(event.clientX);
-  });
-
-  handle.addEventListener("keydown", (event) => {
-    const step = event.shiftKey ? 24 : 8;
-    if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
-      event.preventDefault();
-      const delta = event.key === "ArrowRight" ? step : -step;
-      onDrag(delta);
-    }
-  });
-}
-
 function initEditorResizers() {
   const layout = document.getElementById("editor-layout");
   const playerPanel = document.getElementById("editor-player-panel");
@@ -1345,10 +1296,6 @@ export function initEditor() {
     }
   });
   document.getElementById("editor-mode-edit")?.addEventListener("click", () => {
-    if (currentJob && shouldPollEditorJob(currentJob)) {
-      showToast("editor.k8301628");
-      return;
-    }
     setEditorMode("edit");
     if (currentJob) {
       restoreEditorDraft(currentJob);
@@ -1408,6 +1355,9 @@ export function initEditor() {
     bumpEditorDraftGeneration();
   });
   textarea?.addEventListener("click", () => {
+    if (editorMode !== "view") {
+      return;
+    }
     const pos = textarea.selectionStart;
     const before = textarea.value.slice(0, pos);
     const lineStart = before.lastIndexOf("\n") + 1;

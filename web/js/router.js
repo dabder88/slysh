@@ -1,4 +1,4 @@
-﻿import { t } from "./i18n.js";
+import { t } from "./i18n.js";
 import { openSettingsModal } from "./shell.js";
 import { setAsrContextBarRouteVisible } from "./asr-context-bar.js";
 const routes = {
@@ -114,11 +114,17 @@ function parseHash() {
 }
 
 function setTopbar(mode, params = {}) {
+  const topbarEl = document.getElementById("topbar");
+  if (topbarEl) {
+    topbarEl.dataset.mode = mode || "";
+  }
   const tabsEl = document.getElementById("topbar-tabs");
   const actionsEl = document.getElementById("topbar-actions");
   const titleEl = document.getElementById("topbar-title");
   const backBtn = document.getElementById("btn-topbar-back");
   const pauseAllBtn = document.getElementById("btn-queue-pause-all");
+  const resumeAllBtn = document.getElementById("btn-queue-resume-all");
+  const stopAllBtn = document.getElementById("btn-queue-stop-all");
   const exportBtn = document.getElementById("btn-topbar-export");
   if (!tabsEl || !actionsEl) {
     return;
@@ -131,6 +137,12 @@ function setTopbar(mode, params = {}) {
   }
   if (pauseAllBtn) {
     pauseAllBtn.hidden = mode !== "queue";
+  }
+  if (resumeAllBtn) {
+    resumeAllBtn.hidden = mode !== "queue";
+  }
+  if (stopAllBtn) {
+    stopAllBtn.hidden = mode !== "queue";
   }
   if (exportBtn) {
     exportBtn.hidden = mode !== "editor";
@@ -145,6 +157,11 @@ function setTopbar(mode, params = {}) {
   }
   if (stopTop && mode !== "editor") {
     stopTop.hidden = true;
+  }
+  const subtitlePill = document.getElementById("topbar-subtitle-pill");
+  if (subtitlePill) {
+    subtitlePill.hidden = true;
+    subtitlePill.textContent = "";
   }
   if (titleEl) {
     if (mode === "editor" && params.jobId) {
@@ -162,9 +179,17 @@ function setTopbar(mode, params = {}) {
     } else if (mode === "live") {
       titleEl.textContent = t("live.title");
       titleEl.hidden = false;
+      if (subtitlePill) {
+        subtitlePill.textContent = t("live.topbarSubtitle");
+        subtitlePill.hidden = false;
+      }
     } else if (mode === "meeting") {
       titleEl.textContent = t("topbar.meeting");
       titleEl.hidden = false;
+      if (subtitlePill) {
+        subtitlePill.textContent = t("meeting.topbarSubtitle");
+        subtitlePill.hidden = false;
+      }
     } else if (mode === "youtube") {
       titleEl.textContent = t("topbar.youtube");
       titleEl.hidden = false;

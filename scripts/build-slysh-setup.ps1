@@ -1,4 +1,4 @@
-# Compile dist\Slysh-Setup.exe via Inno Setup (ISCC).
+# Compile dist\Slysh-Setup-ru.exe and dist\Slysh-Setup-en.exe via Inno Setup (ISCC).
 $ErrorActionPreference = "Stop"
 
 $Root = Split-Path -Parent $PSScriptRoot
@@ -62,8 +62,8 @@ foreach ($segment in @("ru", "en")) {
     }
 }
 
-$OutRu = Join-Path $Root "dist\Slysh-Setup.exe"
-$OutEn = Join-Path $Root "dist\Slysh-Setup-en.exe"
+$OutRu = Join-Path $Root "dist\Slysh-Setup-$AppVersion-ru.exe"
+$OutEn = Join-Path $Root "dist\Slysh-Setup-$AppVersion-en.exe"
 if (-not (Test-Path -LiteralPath $OutRu)) {
     throw "Expected output missing: $OutRu"
 }

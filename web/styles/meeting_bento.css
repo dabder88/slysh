@@ -1,0 +1,592 @@
+/* ==========================================================================
+   Slysh — Стили для раздела «Запись встречи» (Modern Pro Bento)
+   Согласовано с токенами tokens.css и шрифтовой сеткой 13–14px Segoe UI
+   ========================================================================== */
+
+/* 1. Общий контейнер панели */
+.meeting-bento-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  max-width: 860px;
+  margin: 0;
+  padding: 20px 24px 32px;
+  font-family: var(--font-sans, "Segoe UI", system-ui, sans-serif);
+  color: var(--on-surface, #121c2c);
+  box-sizing: border-box;
+}
+
+/* 2. Смарт-карточка вводного текста (Lead) */
+.meeting-bento-lead-card {
+  background: var(--surface-container-lowest, #ffffff);
+  border: 1px solid var(--outline-variant, #c6c5d4);
+  border-radius: var(--radius-lg, 12px);
+  padding: 12px 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.meeting-bento-lead-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.meeting-bento-lead-chips {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.meeting-bento-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm, 4px);
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--font-mono, monospace);
+  letter-spacing: 0.02em;
+}
+
+.meeting-bento-chip-blue {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+}
+
+.meeting-bento-lead-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--on-surface, #121c2c);
+}
+
+.meeting-bento-lead-toggle-btn {
+  background: transparent;
+  border: none;
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  cursor: pointer;
+  border-radius: var(--radius-sm, 4px);
+  transition: color 0.15s ease, background-color 0.15s ease;
+  flex-shrink: 0;
+}
+
+.meeting-bento-lead-toggle-btn:hover {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.meeting-bento-panel .meeting-lead {
+  margin: 10px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid #f1f5f9;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--on-surface-variant, #454652);
+}
+
+/* 3. Двухколоночная Bento-сетка источников аудио */
+.meeting-bento-sources-grid {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 14px;
+}
+
+@media (max-width: 680px) {
+  .meeting-bento-sources-grid {
+    flex-direction: column;
+  }
+}
+
+.meeting-bento-source-card {
+  background: var(--surface-container-lowest, #ffffff);
+  border: 1px solid var(--outline-variant, #c6c5d4);
+  border-radius: var(--radius-lg, 12px);
+  padding: 14px 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1 1 0;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.meeting-bento-source-card .meeting-meter-integrated {
+  margin-top: auto;
+}
+
+.meeting-bento-source-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.mic-picker-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--on-surface, #121c2c);
+}
+
+.meeting-bento-badge-mono {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm, 4px);
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+}
+
+.meeting-include-mic {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--on-surface, #121c2c);
+  cursor: pointer;
+  user-select: none;
+}
+
+.meeting-select-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.meeting-device-select {
+  width: 100%;
+  padding: 7px 30px 7px 10px;
+  border: 1px solid var(--outline-variant, #c6c5d4);
+  border-radius: var(--radius-md, 8px);
+  background: #f8fafc;
+  color: var(--on-surface, #121c2c);
+  font-size: 13px;
+  font-weight: 500;
+  appearance: none;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.meeting-device-select:hover {
+  background: #ffffff;
+  border-color: var(--outline, #767683);
+}
+
+.meeting-device-select:focus {
+  background: #ffffff;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+}
+
+.meeting-select-arrow {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: #94a3b8;
+}
+
+.meeting-mic-select-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.meeting-refresh-btn {
+  height: 35px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: var(--radius-md, 8px);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+/* 4. Встроенные VU-метры */
+.meeting-meter-integrated {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 2px;
+}
+
+.meeting-meter-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+}
+
+.meeting-meter-meta .hint {
+  font-size: 11px;
+  color: var(--on-surface-variant, #454652);
+  margin: 0;
+}
+
+.meeting-meter-db {
+  font-family: var(--font-mono, monospace);
+  font-weight: 600;
+  color: #64748b;
+  font-size: 11px;
+}
+
+.meeting-bento-panel .meter {
+  height: 8px;
+  width: 100%;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  overflow: hidden;
+  margin: 0;
+}
+
+.meeting-bento-panel .meter-bar {
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  background: #2563eb;
+  transition: width 0.15s ease-out;
+}
+
+#meeting-meter-mic.meter-bar {
+  background: #4f46e5;
+}
+
+/* 5. Карточка тулбара и параметров записи */
+.meeting-bento-toolbar-card {
+  background: var(--surface-container-lowest, #ffffff);
+  border: 1px solid var(--outline-variant, #c6c5d4);
+  border-radius: var(--radius-lg, 12px);
+  padding: 12px 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.meeting-bento-toolbar-card .meeting-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  flex-wrap: wrap;
+}
+
+/* Главная кнопка Запись */
+.meeting-rec-cta {
+  background: var(--primary, #000666);
+  color: var(--on-primary, #ffffff);
+  border: none;
+  border-radius: var(--radius-md, 8px);
+  padding: 8px 18px;
+  font-size: 14px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.08));
+  transition: opacity 0.15s ease, transform 0.1s ease, filter 0.15s ease;
+}
+
+.meeting-rec-cta:hover:not(:disabled) {
+  opacity: 0.92;
+}
+
+.meeting-rec-btn-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ef4444;
+}
+
+/* Состояние активной записи для кнопки */
+#btn-meeting-rec.is-recording {
+  background: #c62828 !important;
+  color: #ffffff !important;
+}
+
+#btn-meeting-rec.is-recording .meeting-rec-btn-dot {
+  background: #ffffff;
+  animation: meeting-rec-pulse 1.2s infinite;
+}
+
+/* Баннер записи */
+.meeting-bento-panel .meeting-rec-banner {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: var(--radius-md, 8px);
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.meeting-countdown-text {
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+  color: #64748b;
+  margin: 0;
+}
+
+/* Чекбоксы таймкодов и спикеров */
+.meeting-bento-toolbar-card .meeting-view-options {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* 6. Карточка стенограммы */
+.meeting-bento-transcript-card {
+  background: var(--surface-container-lowest, #ffffff);
+  border: 1px solid var(--outline-variant, #c6c5d4);
+  border-radius: var(--radius-lg, 12px);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 280px;
+}
+
+.meeting-transcript-topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.meeting-transcript-title-group {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.meeting-transcript-heading {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--on-surface, #121c2c);
+}
+
+.meeting-status-badge {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: var(--radius-sm, 4px);
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.meeting-transcript-actions-group {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.meeting-transcript-actions {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 6px;
+}
+
+.meeting-bento-panel .meeting-transcript-actions .meeting-post-actions,
+.meeting-bento-panel .meeting-transcript-actions .meeting-results-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+
+.meeting-transcript-actions-group .meeting-post-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+
+.meeting-bento-panel .meeting-speakers-btn.btn-stop {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  min-height: 32px;
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid var(--error, #b3261e);
+  background: var(--error, #b3261e);
+  color: var(--on-error, #ffffff);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.meeting-bento-panel .meeting-speakers-btn.btn-stop:hover {
+  filter: brightness(0.95);
+}
+
+.meeting-bento-panel .meeting-speakers-btn.btn-stop .material-symbols-outlined {
+  font-size: 18px;
+}
+
+.btn-export-highlight {
+  background: #2563eb !important;
+  color: #ffffff !important;
+  border-color: #2563eb !important;
+}
+
+.btn-export-highlight:hover {
+  background: #1d4ed8 !important;
+}
+
+.btn-clear-text {
+  color: #64748b;
+  border-color: #e2e8f0;
+}
+
+.btn-clear-text:hover {
+  background: #fff1f2;
+  color: #e11d48;
+  border-color: #fecdd3;
+}
+
+/* Контейнер параграфов стенограммы */
+.meeting-bento-panel .live-transcript {
+  border: none;
+  border-radius: 0;
+  padding: 16px 18px;
+  min-height: 220px;
+  max-height: 52vh;
+  overflow-y: auto;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--on-surface, #121c2c);
+  outline: none;
+}
+
+.meeting-bento-panel .live-transcript p {
+  margin: 0 0 10px;
+  padding: 4px 0;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.meeting-bento-panel .live-transcript p:last-child {
+  margin-bottom: 0;
+}
+
+.meeting-bento-panel .live-transcript .seg-time {
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+  font-weight: 600;
+  color: #2563eb;
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin-right: 8px;
+  user-select: none;
+}
+
+/* 7. Разметка спикеров */
+.meeting-bento-panel .meeting-speakers-details {
+  background: var(--surface-container-lowest, #ffffff);
+  border: 1px solid var(--outline-variant, #c6c5d4);
+  border-radius: var(--radius-lg, 12px);
+  padding: 12px 16px;
+  margin: 0;
+  max-width: 100%;
+}
+
+.meeting-speakers-summary-content {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--on-surface, #121c2c);
+}
+
+.meeting-bento-panel .meeting-speaker-row {
+  display: grid;
+  grid-template-columns: minmax(76px, 110px) 1fr;
+  gap: 8px;
+  align-items: center;
+  padding: 4px 0;
+}
+
+.meeting-bento-panel .meeting-speaker-key {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm, 4px);
+  background: #f3e8ff;
+  color: #7e22ce;
+  border: 1px solid #e9d5ff;
+}
+
+.meeting-bento-panel .meeting-speaker-input {
+  font-size: 13px;
+  padding: 6px 10px;
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid var(--outline-variant, #c6c5d4);
+  background: #ffffff;
+}
+
+/* 8. Панель экспорта */
+.meeting-bento-panel .meeting-export-actions {
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  border-radius: var(--radius-lg, 12px);
+  padding: 12px 16px;
+  margin: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+#meeting-export-path {
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+  font-weight: 600;
+  color: #065f46;
+}

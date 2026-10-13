@@ -20,8 +20,46 @@ from slysh.compute import _read_settings, mutate_settings
 from slysh.paths import app_dir, install_root
 from slysh.release_version import github_repo_slug, installed_app_layout, release_version
 from slysh.subprocess_win import subprocess_no_console_kwargs
+from slysh.ui_locale import UI_LOCALES, load_ui_locale
 
-SETUP_ASSET_NAME = "Slysh-Setup.exe"
+_ABOUT_URL_RU = "https://slyshai.pro/?utm_source=soft&utm_medium=ru"
+_ABOUT_URL_EN = "https://slyshai.pro/en/?utm_source=soft&utm_medium=en"
+
+
+def resolve_marketing_locale(ui_locale_hint: str | None = None) -> str:
+    if ui_locale_hint is not None:
+        token = str(ui_locale_hint).strip().lower()
+        if token in UI_LOCALES:
+            return token
+    return load_ui_locale()
+
+
+def default_about_url(ui_locale: str | None = None) -> str:
+    locale = resolve_marketing_locale(ui_locale)
+    if locale == "en":
+        return _ABOUT_URL_EN
+    return _ABOUT_URL_RU
+
+
+def default_support_url(ui_locale: str | None = None) -> str:
+    return f"{default_about_url(ui_locale)}#support"
+
+
+def is_default_slyshai_marketing_url(url: str, kind: str) -> bool:
+    trimmed = str(url or "").strip()
+    if not trimmed:
+        return False
+    base = trimmed.split("#", 1)[0]
+    if kind == "support":
+        return trimmed in (
+            f"{_ABOUT_URL_RU}#support",
+            f"{_ABOUT_URL_EN}#support",
+        )
+    return base in (_ABOUT_URL_RU, _ABOUT_URL_EN)
+
+SETUP_ASSET_NAME_RU = "Slysh-Setup-ru.exe"
+SETUP_ASSET_NAME_EN = "Slysh-Setup-en.exe"
+SETUP_ASSET_NAME_LEGACY = "Slysh-Setup.exe"
 GITHUB_API = "https://api.github.com"
 ALLOWED_DOWNLOAD_HOSTS = frozenset(
     {
@@ -50,7 +88,8 @@ def updates_enabled() -> bool:
     return installed_app_layout()
 
 
-def app_info() -> dict[str, Any]:
+def app_info(ui_locale_hint: str | None = None) -> dict[str, Any]:
+    marketing_locale = resolve_marketing_locale(ui_locale_hint)
     settings = _read_settings()
     updates = settings.get("updates")
     last_check = None
@@ -63,12 +102,16 @@ def app_info() -> dict[str, Any]:
         about_url = about_raw.strip()
     if not about_url:
         about_url = os.environ.get("SLYSH_ABOUT_URL", "").strip()
+    if not about_url:
+        about_url = default_about_url(marketing_locale)
     support_raw = settings.get("support_url")
     support_url = ""
     if isinstance(support_raw, str):
         support_url = support_raw.strip()
     if not support_url:
         support_url = os.environ.get("SLYSH_SUPPORT_URL", "").strip()
+    if not support_url:
+        support_url = default_support_url(marketing_locale)
     return {
         "version": release_version(),
         "install_kind": "installed" if installed_app_layout() else "development",
@@ -130,14 +173,55 @@ def _parse_release_version(tag: str) -> str:
     return match.group(1)
 
 
+def versioned_setup_asset_name(locale: str, version: str) -> str:
+    seg = "en" if str(locale).strip().lower() == "en" else "ru"
+    ver = str(version).strip().lstrip("v")
+    return f"Slysh-Setup-{ver}-{seg}.exe"
+
+
+def _preferred_setup_asset_names(release_version: str | None = None) -> list[str]:
+    settings = _read_settings()
+    locale = settings.get("ui_locale")
+    if not isinstance(locale, str) or not locale.strip():
+        locale = "ru"
+    locale = locale.strip().lower()
+    primary = SETUP_ASSET_NAME_EN if locale == "en" else SETUP_ASSET_NAME_RU
+    names: list[str] = []
+    if release_version:
+        names.append(versioned_setup_asset_name(locale, release_version))
+    names.append(primary)
+    if primary == SETUP_ASSET_NAME_RU:
+        names.append(SETUP_ASSET_NAME_LEGACY)
+    if SETUP_ASSET_NAME_EN not in names:
+        names.append(SETUP_ASSET_NAME_EN)
+    if SETUP_ASSET_NAME_RU not in names:
+        names.append(SETUP_ASSET_NAME_RU)
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for name in names:
+        if name in seen:
+            continue
+        seen.add(name)
+        ordered.append(name)
+    return ordered
+
+
 def _pick_setup_asset(release: dict[str, Any]) -> dict[str, Any]:
     assets = release.get("assets")
     if not isinstance(assets, list):
         raise ValueError("В релизе нет файлов")
-    for item in assets:
-        if isinstance(item, dict) and item.get("name") == SETUP_ASSET_NAME:
-            return item
-    raise ValueError(f"В релизе нет {SETUP_ASSET_NAME}")
+    tag = str(release.get("tag_name") or "")
+    release_ver: str | None = None
+    try:
+        release_ver = _parse_release_version(tag)
+    except ValueError:
+        release_ver = None
+    preferred = _preferred_setup_asset_names(release_ver)
+    for name in preferred:
+        for item in assets:
+            if isinstance(item, dict) and item.get("name") == name:
+                return item
+    raise ValueError(f"В релизе нет установщика ({', '.join(preferred)})")
 
 
 def _parse_expected_sha256(body: str) -> str | None:

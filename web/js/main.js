@@ -1,4 +1,4 @@
-﻿import { initI18n, applyI18n, onLocaleChange } from "./i18n.js";
+import { initI18n, applyI18n, onLocaleChange } from "./i18n.js";
 import { initRouter, onRouteChange, navigate, notifyCurrentRoute } from "./router.js";
 import { initShell, openSettingsModal } from "./shell.js";
 import { initAsrContextBar } from "./asr-context-bar.js";
@@ -21,10 +21,6 @@ function hideBootSplash() {
   if (splash) {
     splash.hidden = true;
   }
-}
-
-if (new URLSearchParams(window.location.search).get("skip_boot_splash") === "1") {
-  hideBootSplash();
 }
 
 function scheduleEngineSetupModal(status) {
@@ -102,8 +98,15 @@ function wireAppShell() {
 
 async function bootstrap() {
   const bootFallback = window.setTimeout(hideBootSplash, 15000);
+  initAppExit();
 
   try {
+    try {
+      await initI18n();
+    } catch (err) {
+      console.error(err);
+    }
+
     try {
       await establishUiSession();
     } catch (err) {
@@ -111,11 +114,6 @@ async function bootstrap() {
     }
 
     initSecretFields();
-    try {
-      await initI18n();
-    } catch (err) {
-      console.error(err);
-    }
     try {
       initShell();
     } catch (err) {
@@ -145,6 +143,7 @@ async function bootstrap() {
 
 bootstrap().catch((err) => {
   console.error(err);
+  initAppExit();
   wireAppShell();
   hideBootSplash();
   const banner = document.getElementById("boot-error");

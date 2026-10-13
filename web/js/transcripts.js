@@ -14,15 +14,9 @@ import { isTranscriptJob, isTranscriptBatch } from "./library-utils.js";
 import { mountLibraryTable } from "./library-table.js";
 import { t } from "./i18n.js";
 
-function transcriptsFileBulk() {
-  return [
-    ["archive", t("transcripts.toArchive")],
-    ["export", t("common.export")],
-    ["delete", t("common.delete")],
-  ];
-}
+const STORAGE_KEY = "transcripts-library";
 
-function transcriptsBatchBulk() {
+function transcriptsBulkActions() {
   return [
     ["archive", t("transcripts.toArchive")],
     ["export", t("common.export")],
@@ -31,26 +25,10 @@ function transcriptsBatchBulk() {
 }
 
 let transcriptsBound = false;
-let activeTab = "files";
 const expandedBatches = new Set();
-const selectedFileKeys = new Set();
-const selectedBatchKeys = new Set();
+const selectedKeys = new Set();
 
-let filesWrap = null;
-let batchesWrap = null;
-
-function applyTranscriptsTabUi(tab) {
-  activeTab = tab === "batches" ? "batches" : "files";
-  document.querySelectorAll("#view-transcripts .legacy-tab").forEach((btn) => {
-    btn.classList.toggle("is-active", btn.dataset.tab === activeTab);
-  });
-  if (filesWrap) {
-    filesWrap.hidden = activeTab !== "files";
-  }
-  if (batchesWrap) {
-    batchesWrap.hidden = activeTab !== "batches";
-  }
-}
+let libraryWrap = null;
 
 function toggleExpandedBatch(batchId) {
   if (expandedBatches.has(batchId)) {
@@ -69,52 +47,62 @@ function selectedBatchesFromKeys(keys, batchList) {
   return batchList.filter((batch) => keys.has(`batch:${batch.id}`));
 }
 
-function renderTranscriptsFiles() {
-  if (!filesWrap) {
-    return;
+function runTranscriptsBulkAction(action, jobs, batchList) {
+  const selectedJobs = selectedJobsFromKeys(selectedKeys, jobs);
+  const selectedBatches = selectedBatchesFromKeys(selectedKeys, batchList);
+  const tasks = [];
+  if (selectedJobs.length) {
+    tasks.push(
+      runJobsBulkAction(selectedJobs, action, {
+        onClear: () => {
+          for (const job of selectedJobs) {
+            selectedKeys.delete(`job:${job.id}`);
+          }
+        },
+      })
+    );
   }
-  const { orphans } = getLibrarySnapshot();
-  const jobs = orphans.filter(isTranscriptJob);
-  pruneLibrarySelectedKeys(selectedFileKeys, new Set(jobs.map((job) => `job:${job.id}`)));
-
-  mountLibraryTable(filesWrap, {
-    storageKey: "transcripts-files",
-    jobs,
-    batches: [],
-    emptyMessage:
-      t("transcripts.emptyFiles"),
-    jobStatusLabel,
-    jobStatusTone,
-    expandedBatches,
-    onExpandChange: () => renderTranscripts(),
-    onJobClick: (job) => navigate("editor", { jobId: job.id }),
-    onJobContextMenu: (event, job, batchId) => openContextMenu(event, job, batchId),
-    onBatchClick: () => {},
-    onBatchContextMenu: () => {},
-    selectable: true,
-    selectedKeys: selectedFileKeys,
-    bulkActions: transcriptsFileBulk(),
-    onBulkAction: (action) =>
-      runJobsBulkAction(selectedJobsFromKeys(selectedFileKeys, jobs), action, {
-        onClear: () => selectedFileKeys.clear(),
-      }).catch((err) => showToast(err.message || String(err))),
+  if (selectedBatches.length) {
+    tasks.push(
+      runBatchesBulkAction(selectedBatches, action, {
+        onClear: () => {
+          for (const batch of selectedBatches) {
+            selectedKeys.delete(`batch:${batch.id}`);
+          }
+        },
+      })
+    );
+  }
+  if (!tasks.length) {
+    return Promise.resolve();
+  }
+  return Promise.all(tasks).then(() => {
+    if (!selectedKeys.size) {
+      return;
+    }
+    renderTranscripts();
   });
 }
 
-function renderTranscriptsBatches() {
-  if (!batchesWrap) {
+export function renderTranscripts() {
+  if (!libraryWrap) {
     return;
   }
-  const { batches } = getLibrarySnapshot();
+  const { orphans, batches } = getLibrarySnapshot();
+  const jobs = orphans.filter(isTranscriptJob);
   const batchList = batches.filter(isTranscriptBatch);
-  pruneLibrarySelectedKeys(selectedBatchKeys, new Set(batchList.map((batch) => `batch:${batch.id}`)));
+  const validKeys = new Set([
+    ...jobs.map((job) => `job:${job.id}`),
+    ...batchList.map((batch) => `batch:${batch.id}`),
+  ]);
+  pruneLibrarySelectedKeys(selectedKeys, validKeys);
 
-  mountLibraryTable(batchesWrap, {
-    storageKey: "transcripts-batches",
-    jobs: [],
+  const hasAny = jobs.length > 0 || batchList.length > 0;
+  mountLibraryTable(libraryWrap, {
+    storageKey: STORAGE_KEY,
+    jobs,
     batches: batchList,
-    emptyMessage:
-      t("transcripts.emptyBatches"),
+    emptyMessage: hasAny ? t("libraryTable.noFilterMatch") : t("transcripts.emptyFiles"),
     jobStatusLabel,
     jobStatusTone,
     expandedBatches,
@@ -124,21 +112,13 @@ function renderTranscriptsBatches() {
     onBatchClick: (batch) => toggleExpandedBatch(batch.id),
     onBatchContextMenu: (event, batch) => openBatchContextMenu(event, batch),
     selectable: true,
-    selectedKeys: selectedBatchKeys,
-    bulkActions: transcriptsBatchBulk(),
+    selectedKeys,
+    bulkActions: transcriptsBulkActions(),
     onBulkAction: (action) =>
-      runBatchesBulkAction(selectedBatchesFromKeys(selectedBatchKeys, batchList), action, {
-        onClear: () => selectedBatchKeys.clear(),
-      }).catch((err) => showToast(err.message || String(err))),
+      runTranscriptsBulkAction(action, jobs, batchList).catch((err) =>
+        showToast(err.message || String(err))
+      ),
   });
-}
-
-export function renderTranscripts() {
-  if (activeTab === "batches") {
-    renderTranscriptsBatches();
-  } else {
-    renderTranscriptsFiles();
-  }
 }
 
 export async function refreshTranscripts() {
@@ -153,16 +133,17 @@ export function initTranscripts() {
     return;
   }
   transcriptsBound = true;
-  filesWrap = document.getElementById("transcripts-files-wrap");
-  batchesWrap = document.getElementById("transcripts-batches-wrap");
-  document.querySelectorAll("#view-transcripts .legacy-tab").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      navigate("transcripts", { tab: btn.dataset.tab });
-    });
-  });
+  libraryWrap = document.getElementById("transcripts-library-wrap");
 }
 
 export function onTranscriptsShow(params = {}) {
-  applyTranscriptsTabUi(params.tab === "batches" ? "batches" : "files");
-  refreshTranscripts().catch((err) => reportError(t("transcripts.title"), err));
+  refreshTranscripts()
+    .then(() => {
+      if (params.tab === "batches") {
+        document
+          .querySelector("#view-transcripts .library-table-row--batch")
+          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    })
+    .catch((err) => reportError(t("transcripts.title"), err));
 }

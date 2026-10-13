@@ -13,9 +13,13 @@ def resume_ms_from_segments(segments: list[Segment]) -> int | None:
 
 
 def should_resume_file_job(status: str | None, segments: list[Segment]) -> bool:
-    if status not in (JobStatus.CANCELLED.value, JobStatus.FAILED.value):
+    if resume_ms_from_segments(segments) is None:
         return False
-    return resume_ms_from_segments(segments) is not None
+    return status in (
+        JobStatus.CANCELLED.value,
+        JobStatus.FAILED.value,
+        JobStatus.IDLE.value,
+    )
 
 
 def apply_pcm_resume_trim(

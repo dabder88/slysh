@@ -2,6 +2,65 @@
 
 Сюда дописывать дату и что изменилось в продовой копии. Старые строки не переписывать.
 
+## 2026-10-13
+
+- Очередь: пауза сохраняет файлы в секции «На паузе» (resume/stop по файлу, «Возобновить все»); «Остановить все» — cancel как раньше; bulk pause без gate capabilities; `engine_starting` per-job; фильтр `isJobInQueue`.
+- Боковое меню: перетаскивание правого края колонки (200–480 px), ширина в `localStorage` (`sidebar-user-width`); двойной клик — сброс к умолчанию; дефолт **270 px**.
+
+## 2026-10-12
+
+- Intake/upload модали: закрытие только крестиком/кнопками, не по клику на фон.
+- Очередь: пауза одиночных файлов (`POST /api/jobs/{id}/pause`), «Пауза всех» для пакетов и orphans, кнопка «Остановить все».
+- Запись встречи: вёрстка шапки стенограммы; кнопка «Остановить» у спикеров — оформлена как danger.
+- Редактор: «Правка» всегда доступна; seek по тексту только во «Просмотре» (guard в `legacy.js`).
+- Очередь (фикс): `pause-orphans` / `cancel-orphans` / `cancel-batches`, подавление `_pump_asr_queues` при bulk; «Пауза всех» и «Остановить все» снимают и queued orphans; `GET /api/capabilities`.
+
+## 2026-10-11
+
+- Диктофон: чекбокс «Сохранять аудиозапись» (`save_audio`), панель пути WAV после Стоп (как у записи встречи).
+- Установщики: имена `Slysh-Setup-{version}-ru.exe` / `-en.exe`; обновления — приоритет версионного asset на GitHub.
+- Расшифровки и Архив: одна таблица (файлы + пакеты), один блок «Фильтры» и пагинация (`transcripts-library-wrap`, `archive-library-wrap`).
+- «О программе» / «Сказать спасибо»: ссылки slyshai.pro по **активному** языку UI (`GET /api/app/info?ui_locale=`, синхрон `?ui_locale=` при старте WebView).
+- Версия продукта **1.0.0** (`pyproject.toml`, `__init__.py`, установщик Inno Setup, `version.json` в payload).
+- Запись встречи: чекбокс «Сохранять аудиозапись» (`save_audio`, по умолчанию вкл.), панель пути к WAV после Стоп; при выкл. — только стенограмма, файл удаляется.
+- Диктофон и запись встречи: live-окно ASR по бэкенду — GigaAM ~20 с (`GIGAAM_LIVE_CHUNK_SECONDS`), Whisper ~5 с (`WHISPER_LIVE_CHUNK_SECONDS`); в status — `live_chunk_seconds`.
+- Проверка обновлений: `scripts/verify_updates_check.py`, раздел в [APP-UPDATES.md](../docs/features/APP-UPDATES.md).
+- Запись встречи: **Остановить** во время диаризации спикеров (`#btn-meeting-speakers-stop`, `cancelJob`).
+- Файлы vs пакеты: одиночный intake на вкладке «Файлы» не привязывается к выбранному пакету (`fileBatchTargetId` только на «Пакеты»); папка с «Файлы» — без автопривязки.
+- Редактор: во вкладке «Правка» клик по тексту не запускает аудио.
+- Engine (GigaAM): на Windows при старте `engine_server` — patch `subprocess.Popen` с `CREATE_NO_WINDOW` (`subprocess_win.install_subprocess_hide_console_patch`).
+- Запись встречи: редактируемая стенограмма (`textarea`, автосохранение в job после стопа — как диктофон).
+- Intake follow-up «Сейчас»: `POST /start` для orphan jobs и пакета; переход в Очередь при нескольких файлах.
+- Очередь: блок «В очереди на расшифровку» для ожидающих orphan jobs.
+- Запись встречи: читаемая кнопка «Стоп» (`live-stop-btn`, `is-active-recording`).
+
+## 2026-10-10
+
+- Экран «Файлы и пакеты»: командный тулбар в одну строку (табы + действия) — `docs/design/toolbar_redesign/`, `#view-legacy`; переключатель «Файлы/Пакеты» только там, на Расшифровках и Архиве — две таблицы друг под другом.
+- Legacy: убран `#compute-hint` (подпись GPU/CPU); Архив/Расшифровки — блок пакетов не монтируется, если пакетов нет (нет дубля «Фильтры»).
+- Таблицы библиотеки: в шапке — вертикальные разделители и иконки сортировки (неактивные ↔ / активная колонка + подсветка).
+
+## 2026-10-08
+
+- Панель «Фильтры» в таблицах библиотеки: Bento 1.1 (3 колонки, чипы источника/статуса) — `docs/design/filters_redesign/`, `library-table-filters.js`; адаптив — `flex-wrap` + `@container library-table` (без обрезания при узкой колонке).
+- Бренд **Slysh!** в UI (шапка, i18n, boot, нативный splash), README/AGENTS; «!» в шапке — `#5060EC`.
+- YouTube: «глазик» Apify — полный ключ в `/api/youtube/status` при reveal; дозагрузка `/api/providers/apify` на экране.
+- Настройки → Система: в установленной копии — проверка обновлений, «О программе», «Сказать спасибо»; dev — перезагрузка UI и сброс кэша.
+
+## 2026-10-07
+
+- Setup: WebView2 не в `[Run]` — установка только если runtime не найден (реестр ClientState + `msedgewebview2.exe`); ошибка bootstrapper «уже установлен» больше не роняет Setup.
+- Лаунчер: при `.install-ui-locale` после Setup — `uv pip sync` в существующий `.venv`; splash locale — seed раньше settings.
+- Setup: `.install-ui-locale` всегда применяется при следующем запуске (upgrade тоже), чтобы RU-установщик не оставлял English из старого `%LOCALAPPDATA%\Slysh\settings.json`.
+- Выход: ранний `initAppExit`, JS-модалка без блокировки по API; fallback `MessageBox` на Windows, если `evaluate_js` не показал диалог.
+- Нативный splash `Slysh.exe`: RU/EN по `settings.json` / `.install-ui-locale`; web `initI18n` — приоритет `?ui_locale=` из URL.
+- EN UI: скрыта только строка скачивания GigaAM; прокси/engine placeholders i18n; boot splash через `?ui_locale=` + ранний `initI18n`.
+- UI locale: EN Setup при новой установке (`.fresh-install`) перезаписывает `ui_locale` из `.install-ui-locale` даже при старом `%LOCALAPPDATA%\Slysh\settings.json`; bento Live/Meeting/YouTube — `data-i18n`; подписи «Спикер N» в форме имён не подменяются введённым именем.
+- wheelhouse: `proxy_tools` собирается в `.whl` при payload build (без sdist в offline repair).
+- plan-fix-3 **I8:** пересборка `dist\Slysh-Setup-ru.exe` / `Slysh-Setup-en.exe` (2026-10-07, git `7a7fd40`); fingerprint `dist\acceptance\setup-fingerprint-latest.json`; payload с `requirements-ui.txt`.
+- plan-fix-3 **I8 / R15:** `run_plan_fix3_gate.ps1` (JS + targeted subset, без full pytest и без `test_webview2.py` по умолчанию); `write_setup_acceptance_record` — RU+EN; `meeting_capture` в targeted tests.
+- plan-fix-3 **I7 / F3-04:** offline UI repair — `wheelhouse/requirements-ui.txt`, `uv venv` + `uv pip sync --no-index`; legacy `sync --no-dev` без requirements; payload export копирует manifest; тесты `test_offline_bootstrap.py` (+ integration idna wheel).
+
 ## 2026-10-06
 
 - plan-fix-3 **I1 / F3-01:** `Database.get_segments_snapshot`, диаризация применяет метки к текущему тексту при неизменной структуре; отказ при смене структуры/спикера во время модели; тесты в `test_speakers_cancel.py`.

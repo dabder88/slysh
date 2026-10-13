@@ -1,0 +1,400 @@
+/* ==========================================================================
+   Slysh — Стили Bento-спойлера «Избранные папки экспорта» (Вариант 1)
+   Для вставки в web/styles/input.css (или отдельный модуль styles/settings_favorites.css)
+   ========================================================================== */
+
+/* Контейнер-спойлер Bento */
+.settings-modal-card.settings-bento .settings-export-favorites-spoiler,
+.settings-bento-spoiler {
+  background: var(--surface-container-lowest, #ffffff);
+  border: 1px solid var(--outline-variant, #e2e8f0);
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  margin-bottom: 12px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.settings-modal-card.settings-bento .settings-export-favorites-spoiler[open] {
+  overflow: visible;
+}
+
+.settings-modal-card.settings-bento .settings-export-favorites-spoiler:hover,
+.settings-bento-spoiler:hover {
+  border-color: #cbd5e1;
+}
+
+/* Кликабельная шапка спойлера */
+.settings-modal-card.settings-bento .settings-export-favorites-spoiler summary,
+.settings-bento-spoiler-summary {
+  padding: 12px 14px;
+  background: var(--surface-container-low, #f8fafc);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+  transition: background-color 0.15s ease;
+}
+
+.settings-modal-card.settings-bento .settings-export-favorites-spoiler summary::-webkit-details-marker,
+.settings-bento-spoiler-summary::-webkit-details-marker {
+  display: none;
+}
+
+/* Отключаем дефолтную стрелку ▸ от .settings-spoiler > summary::before */
+.settings-modal-card.settings-bento .settings-export-favorites-spoiler > summary::before {
+  display: none !important;
+  content: "" !important;
+}
+
+.settings-modal-card.settings-bento .settings-export-favorites-spoiler summary:hover,
+.settings-bento-spoiler-summary:hover {
+  background: #f1f5f9;
+}
+
+.settings-modal-card.settings-bento .settings-export-favorites-spoiler[open] summary,
+.settings-bento-spoiler[open] .settings-bento-spoiler-summary {
+  border-bottom: 1px solid var(--outline-variant, #e2e8f0);
+}
+
+/* Левая группа элементов шапки */
+.settings-bento-spoiler-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+/* Векторный шеврон с плавной анимацией поворота */
+.settings-bento-spoiler-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  color: var(--on-surface-variant, #64748b);
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), color 0.15s ease;
+  flex-shrink: 0;
+}
+
+.settings-modal-card.settings-bento .settings-export-favorites-spoiler[open] .settings-bento-spoiler-chevron,
+.settings-bento-spoiler[open] .settings-bento-spoiler-chevron {
+  transform: rotate(90deg);
+  color: #2563eb;
+}
+
+/* Иконка избранного (золотистая звезда в бейдже) */
+.settings-bento-spoiler-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: #fef3c7;
+  color: #d97706;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.settings-bento-spoiler-icon svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* Текст заголовка */
+.settings-modal-card.settings-bento .settings-export-favorites-spoiler .spoiler-summary-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--on-surface, #0f172a);
+  line-height: 1.25;
+}
+
+/* Компактный бейдж-счётчик количества папок */
+.settings-bento-count-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 9999px;
+  background: #e2e8f0;
+  color: #475569;
+  min-width: 18px;
+  text-align: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Тело спойлера */
+.settings-modal-card.settings-bento .settings-export-favorites-spoiler .spoiler-body,
+.settings-bento-spoiler-body {
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.settings-export-favorites-hint {
+  font-size: 12px;
+  color: var(--on-surface-variant, #64748b);
+  line-height: 1.45;
+  margin: 0;
+}
+
+/* Список строк каталогов */
+.settings-modal-card.settings-bento .settings-export-favorites-spoiler .export-dirs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: min(220px, 35vh);
+  overflow-y: auto;
+  margin-bottom: 2px;
+  padding-right: 2px;
+}
+
+/* Отдельная строка каталога (карточка) */
+.settings-modal-card.settings-bento .settings-export-favorites-spoiler .export-dir-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 6px 4px 10px;
+  border-radius: 8px;
+  background: var(--surface-container-lowest, #ffffff);
+  border: 1px solid var(--outline-variant, #e2e8f0);
+  transition: all 0.15s ease;
+}
+
+.settings-modal-card.settings-bento .settings-export-favorites-spoiler .export-dir-row:hover {
+  border-color: #93c5fd;
+  background: #f8fafc;
+  box-shadow: 0 1px 4px rgba(37, 99, 235, 0.05);
+}
+
+/* Текстовое поле с путём */
+.settings-modal-card.settings-bento .settings-export-favorites-spoiler .export-dir-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--on-surface, #0f172a);
+  font-weight: 500;
+  outline: none;
+  padding: 4px 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-modal-card.settings-bento .settings-export-favorites-spoiler .export-dir-input:focus {
+  background: #ffffff;
+  border-radius: 4px;
+  box-shadow: 0 0 0 2px #bfdbfe;
+  padding: 4px 6px;
+}
+
+/* Кнопка «Обзор…» */
+.settings-modal-card.settings-bento .settings-export-favorites-spoiler .export-dir-row .btn-outline[data-act="browse"] {
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+  flex-shrink: 0;
+}
+
+.settings-modal-card.settings-bento .settings-export-favorites-spoiler .export-dir-row .btn-outline[data-act="browse"]:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+  border-color: #94a3b8;
+}
+
+.settings-modal-card.settings-bento .settings-export-favorites-spoiler .export-dir-row .btn-outline[data-act="browse"] .material-symbols-outlined {
+  font-size: 16px;
+}
+
+/* Кнопка «Удалить» */
+.settings-modal-card.settings-bento .settings-export-favorites-spoiler .export-dir-row .export-dir-remove {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  min-width: 30px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #94a3b8;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.settings-modal-card.settings-bento .settings-export-favorites-spoiler .export-dir-row .export-dir-remove:hover {
+  background: #fee2e2;
+  color: #ef4444;
+  border-color: #fca5a5;
+}
+
+.settings-modal-card.settings-bento .settings-export-favorites-spoiler .export-dir-row .export-dir-remove .material-symbols-outlined {
+  font-size: 16px;
+}
+
+/* Панель действий подвала */
+.settings-modal-card.settings-bento .settings-export-favorites-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--outline-variant, #e2e8f0);
+}
+
+/* Кнопка «+ Добавить папку» */
+.settings-modal-card.settings-bento .settings-export-favorites-actions .export-dir-add {
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px dashed #2563eb;
+  background: #f0f3ff;
+  color: #2563eb;
+  font-size: 12.5px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.settings-modal-card.settings-bento .settings-export-favorites-actions .export-dir-add:hover {
+  background: #dbeafe;
+  border-style: solid;
+}
+
+.settings-modal-card.settings-bento .settings-export-favorites-actions .export-dir-add .material-symbols-outlined {
+  font-size: 18px;
+}
+
+/* Кнопка «Сохранить» */
+.settings-modal-card.settings-bento #settings-export-favorite-save {
+  height: 34px;
+  padding: 0 16px;
+  border-radius: 8px;
+  background: #000666;
+  color: #ffffff;
+  border: none;
+  font-size: 13px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.settings-modal-card.settings-bento #settings-export-favorite-save:hover {
+  background: #00044d;
+  box-shadow: 0 2px 6px rgba(0, 6, 102, 0.25);
+}
+
+/* Вкладка «Система» — плитки как в demo.html */
+.settings-modal-card.settings-bento #settings-pane-system.settings-system-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.settings-modal-card.settings-bento #settings-pane-system .settings-system-tile,
+.settings-modal-card.settings-bento #settings-pane-system .settings-export-favorites-spoiler {
+  margin-top: 0;
+  margin-bottom: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+.settings-modal-card.settings-bento #settings-pane-system .settings-reload-block.settings-system-tile {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 12px 16px;
+  gap: 10px;
+}
+
+.settings-modal-card.settings-bento #settings-pane-system .settings-reload-btns-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.settings-modal-card.settings-bento #settings-pane-system .settings-system-action-btn {
+  width: auto;
+  min-height: 32px;
+  height: 32px;
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 6px;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #0f172a;
+  justify-content: center;
+}
+
+.settings-modal-card.settings-bento #settings-pane-system .settings-system-action-btn:hover {
+  background: #f1f5f9;
+}
+
+.settings-modal-card.settings-bento #settings-pane-system .settings-logs-block.settings-system-tile {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-direction: row;
+}
+
+.settings-modal-card.settings-bento #settings-pane-system .settings-logs-hint {
+  font-size: 12px;
+  color: #64748b;
+  margin: 0;
+  min-width: 0;
+}
+
+.settings-modal-card.settings-bento #settings-pane-system .settings-logs-hint code {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  background: #f1f5f9;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  color: #0f172a;
+  word-break: break-all;
+}
+
+.export-favorite-remove-card {
+  width: min(420px, 100%);
+}
+
+.export-favorite-remove-body {
+  word-break: break-all;
+}

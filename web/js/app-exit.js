@@ -13,11 +13,15 @@ function hideAppExitModal() {
 
 function showAppExitModal() {
   const modal = document.getElementById("app-exit-modal");
-  if (!modal || !modal.hidden) {
-    return;
+  if (!modal) {
+    return false;
+  }
+  if (!modal.hidden) {
+    return true;
   }
   modal.hidden = false;
   document.getElementById("app-exit-cancel")?.focus();
+  return true;
 }
 
 async function confirmAppExit() {
@@ -58,11 +62,10 @@ export function initAppExit() {
   bindAppExitModal();
   window.__promptAppExit = () => {
     if (window.__appExitInProgress) {
-      return;
-    }
-    if (!window.pywebview?.api?.finish_app_exit) {
-      return;
+      return false;
     }
     showAppExitModal();
+    const modal = document.getElementById("app-exit-modal");
+    return Boolean(modal && !modal.hidden);
   };
 }

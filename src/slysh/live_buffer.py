@@ -20,11 +20,19 @@ class LiveBufferOverflowError(RuntimeError):
 
 
 class LiveSession:
-    def __init__(self, wav_path: str | Path) -> None:
+    def __init__(
+        self,
+        wav_path: str | Path,
+        *,
+        chunk_samples: int | None = None,
+    ) -> None:
         self.wav_path = Path(wav_path)
         self.wav_path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
-        cap = max(LIVE_MAX_PENDING_SAMPLES, LIVE_CHUNK_SAMPLES)
+        self._chunk_samples = int(chunk_samples or LIVE_CHUNK_SAMPLES)
+        if self._chunk_samples < 1:
+            self._chunk_samples = LIVE_CHUNK_SAMPLES
+        cap = max(LIVE_MAX_PENDING_SAMPLES, self._chunk_samples)
         self._pending_cap = cap
         self._pending = np.zeros(cap, dtype=np.float32)
         self._pending_len = 0
@@ -41,8 +49,9 @@ class LiveSession:
             return int(self._pending_len)
 
     def remaining_s(self) -> float:
-        used = self.buffered_samples() % LIVE_CHUNK_SAMPLES
-        return (LIVE_CHUNK_SAMPLES - used) / SAMPLE_RATE
+        chunk = self._chunk_samples
+        used = self.buffered_samples() % chunk
+        return (chunk - used) / SAMPLE_RATE
 
     def push(self, samples: np.ndarray) -> None:
         pcm = np.asarray(samples, dtype=np.float32).reshape(-1)
@@ -65,12 +74,13 @@ class LiveSession:
     def take_ready_chunks(self) -> list[np.ndarray]:
         chunks: list[np.ndarray] = []
         with self._lock:
-            while self._pending_len >= LIVE_CHUNK_SAMPLES:
-                chunks.append(self._pending[:LIVE_CHUNK_SAMPLES].copy())
-                remain = self._pending_len - LIVE_CHUNK_SAMPLES
+            chunk = self._chunk_samples
+            while self._pending_len >= chunk:
+                chunks.append(self._pending[:chunk].copy())
+                remain = self._pending_len - chunk
                 if remain > 0:
                     self._pending[:remain] = self._pending[
-                        LIVE_CHUNK_SAMPLES : self._pending_len
+                        chunk : self._pending_len
                     ]
                 self._pending_len = remain
         return chunks

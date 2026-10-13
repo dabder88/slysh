@@ -10,20 +10,30 @@ except as stated below.
 Permitted without a separate written agreement:
 
   • Viewing the source code in this repository.
-  • Cloning and building Slysh solely for your own private, non-commercial
-    use on computers you control, without distributing binaries or source
-    to third parties.
+  • Cloning and building Slysh solely for your own private, personal,
+    non-commercial use on computers you control, without distributing
+    binaries or source to third parties.
 
 Not permitted without explicit written permission from the copyright holder:
 
+  • Use for corporate, commercial, government, or other non-personal purposes.
   • Redistributing, selling, or sublicensing Slysh or any derivative work.
   • Using the name, logos, or branding "Slysh" for another product.
   • Removing or altering copyright or license notices.
 
-End users who install official builds (e.g. Slysh-Setup.exe from GitHub
-Releases) are governed by the End User License Agreement shown during
-setup (installer/LICENSE-RU.txt or LICENSE-EN.txt depending on the installer;
-both texts are installed under licenses\).
+End users who install official builds (e.g. Slysh-Setup-ru.exe or
+Slysh-Setup-en.exe from GitHub Releases) are governed by the End User
+License Agreement shown during setup (installer/LICENSE-RU.txt or
+LICENSE-EN.txt depending on the installer; both texts are installed under
+licenses\).
+
+DISCLAIMER — USE AT YOUR OWN RISK
+
+Materials in this repository and official builds are provided "as is"
+without warranty. To the maximum extent permitted by applicable law, the
+copyright holder is not liable for any direct or indirect damage, loss of
+data, hardware or software failure, or other harm arising from use or
+inability to use Slysh. You assume all risks of use.
 
 Third-party libraries and binaries included with Slysh are licensed
 separately. See THIRD_PARTY_NOTICES.md and files under licenses\ in the

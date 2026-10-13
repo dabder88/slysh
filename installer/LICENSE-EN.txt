@@ -1,7 +1,7 @@
-﻿END USER LICENSE AGREEMENT
+END USER LICENSE AGREEMENT
 FOR THE SLYSH SOFTWARE
 
-Text version: 2026-10-03
+Text version: 2026-10-06
 
 By installing, copying, or using Slysh (the "Software"), you agree to
 this agreement. If you do not agree, do not install or use the Software.
@@ -13,10 +13,18 @@ this agreement. If you do not agree, do not install or use the Software.
 
 2. Granted rights
 
-   You receive a limited, non-exclusive, non-transferable right to install
-   and use one copy of the Software on Microsoft Windows computers that
-   you own or control, solely for personal or internal business purposes
-   (transcription of audio and video, recording, exporting results).
+   You receive a limited, non-exclusive, non-transferable, royalty-free
+   right to install and use the Software on Microsoft Windows computers that
+   you own or control solely for personal, non-commercial purposes
+   (transcription of audio and video, recording, exporting results for your
+   own needs).
+
+   Use of the Software on behalf of an organization (legal entity, sole
+   proprietor, employer, client, or other commercial or professional
+   counterparty), including on work computers, for job duties, providing
+   services to third parties, or an organization's internal needs, is not
+   personal use and requires separate written permission from the copyright
+   holder or a separate license agreement.
 
 3. Restrictions
 
@@ -24,6 +32,8 @@ this agreement. If you do not agree, do not install or use the Software.
 
    • distribute, sell, rent, or transfer copies of the Software or the
      installer to third parties;
+   • use the Software for corporate, commercial, government, or other
+     non-personal purposes without separate permission;
    • decompile, disassemble, or otherwise attempt to derive source code,
      except where expressly permitted by applicable law;
    • remove or alter copyright or license notices;
@@ -37,7 +47,7 @@ this agreement. If you do not agree, do not install or use the Software.
    devices. Public access does not mean an open-source license (MIT, GPL,
    etc.) and does not permit distribution of your builds or derivative
    products. Official distribution is through releases published by the
-   copyright holder (for example, Slysh-Setup.exe).
+   copyright holder (for example, Slysh-Setup-ru.exe, Slysh-Setup-en.exe).
 
 5. Third-party components and cloud services
 
@@ -56,19 +66,31 @@ this agreement. If you do not agree, do not install or use the Software.
    locally on your computer in the application data folder, unless your
    chosen cloud provider states otherwise.
 
-7. Disclaimer of warranties
+7. Use at your own risk; disclaimer of warranties
 
-   THE SOFTWARE IS PROVIDED "AS IS". THE COPYRIGHT HOLDER DOES NOT WARRANT
-   ERROR-FREE OPERATION, TRANSCRIPTION ACCURACY, FITNESS FOR A PARTICULAR
-   PURPOSE, OR UNINTERRUPTED AVAILABILITY. YOU ASSUME ALL RISK OF SELECTION
-   AND USE.
+   THE SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE". THE COPYRIGHT HOLDER
+   DOES NOT WARRANT ERROR-FREE OPERATION, TRANSCRIPTION ACCURACY, FITNESS
+   FOR A PARTICULAR PURPOSE, COMPATIBILITY WITH YOUR HARDWARE OR SOFTWARE
+   ENVIRONMENT, DATA INTEGRITY, OR UNINTERRUPTED AVAILABILITY.
 
-8. Limitation of liability
+   YOU USE THE SOFTWARE ENTIRELY AT YOUR OWN RISK. YOU ALONE ASSESS WHETHER
+   THE SOFTWARE IS SUITABLE, MAINTAIN BACKUPS OF IMPORTANT DATA, AND BEAR
+   ALL RISKS OF INSTALLATION, EXECUTION, AND USE.
 
-   TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THE COPYRIGHT HOLDER
-   SHALL NOT BE LIABLE FOR INDIRECT, INCIDENTAL, OR CONSEQUENTIAL DAMAGES,
-   LOSS OF DATA, LOST PROFITS, OR DAMAGES ARISING FROM USE OR INABILITY TO
-   USE THE SOFTWARE.
+8. No liability
+
+   TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THE COPYRIGHT HOLDER,
+   ITS SUCCESSORS, AND AFFILIATES SHALL NOT BE LIABLE TO YOU OR ANY THIRD
+   PARTY FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, PUNITIVE, OR
+   CONSEQUENTIAL DAMAGES OR LOSSES, INCLUDING WITHOUT LIMITATION: DAMAGE TO
+   OR FAILURE OF COMPUTERS, PERIPHERALS, STORAGE MEDIA, OR SOFTWARE; LOSS,
+   CORRUPTION, OR UNAVAILABILITY OF DATA; LOST PROFITS; BUSINESS
+   INTERRUPTION; RECOVERY COSTS; OR ANY CONSEQUENCES OF USE OR INABILITY TO
+   USE THE SOFTWARE, TRANSCRIPTION RESULTS, OR INTEGRATIONS WITH EXTERNAL
+   SERVICES.
+
+   This does not limit liability where it cannot be excluded or limited
+   under mandatory applicable law.
 
 9. Termination
 

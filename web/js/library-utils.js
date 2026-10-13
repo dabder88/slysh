@@ -1,8 +1,62 @@
-﻿import { t } from "./i18n.js";
+import { t } from "./i18n.js";
 export function isJobActive(job) {
-  return Boolean(
-    job.speakers_running || job.engine_starting || job.status === "running"
+  if (job.speakers_running) {
+    return true;
+  }
+  const status = job.status;
+  if (status === "running") {
+    return true;
+  }
+  if (job.engine_starting && (status === "running" || status === "queued")) {
+    return true;
+  }
+  return false;
+}
+
+export function jobHasQueueParticipation(job) {
+  return (
+    Boolean(job.started_at) ||
+    Boolean(job.has_transcript) ||
+    Number(job.progress) > 0
   );
+}
+
+export function isJobPausedInQueue(job, batchMap) {
+  if (job.status !== "idle") {
+    return false;
+  }
+  if (job.batch_id == null) {
+    return jobHasQueueParticipation(job);
+  }
+  const batch = batchMap.get(job.batch_id);
+  if (!batch) {
+    return jobHasQueueParticipation(job);
+  }
+  if (batch.status === "paused") {
+    return true;
+  }
+  if (batch.running || batch.active_count > 0) {
+    return true;
+  }
+  return jobHasQueueParticipation(job);
+}
+
+export function isJobInQueue(job, batchMap) {
+  const status = job.status;
+  if (status === "completed" || status === "cancelled" || status === "failed") {
+    return false;
+  }
+  if (status === "paused" || status === "finalizing") {
+    return true;
+  }
+  if (isJobPausedInQueue(job, batchMap)) {
+    return true;
+  }
+  return isJobActive(job) || isJobWaiting(job, batchMap);
+}
+
+export function isBatchPaused(batch) {
+  return batch?.status === "paused";
 }
 
 export function isJobWaiting(job, batchMap) {
@@ -179,10 +233,10 @@ export function formatBatchCountsSummary(batch, separator = " · ") {
 export function estimateSpeakerWorkSeconds(job) {
   const dur = Number(job?.duration_s);
   if (Number.isFinite(dur) && dur > 0) {
-    // NeMo MSDD often runs longer than realtime on CPU; avoid capping at 10 min for long meetings.
-    return Math.max(90, Math.min(7200, dur * 1.2));
+    // Fallback only when engine /progress is not yet available (shorter than realtime*1.2).
+    return Math.max(45, Math.min(600, dur * 0.08));
   }
-  return 180;
+  return 90;
 }
 
 export function speakersProgressOverEstimate(job) {
@@ -196,9 +250,21 @@ export function speakersProgressOverEstimate(job) {
   return elapsed > estimateSpeakerWorkSeconds(job);
 }
 
+function speakerProgressFromEngine(job) {
+  const raw = Number(job?.speakers_progress);
+  if (!job?.speakers_running || !Number.isFinite(raw)) {
+    return null;
+  }
+  return Math.min(99, Math.max(0, Math.round(raw * 100)));
+}
+
 export function speakerProgressPct(job) {
   if (!job?.speakers_running) {
     return null;
+  }
+  const enginePct = speakerProgressFromEngine(job);
+  if (enginePct != null) {
+    return enginePct;
   }
   const elapsed = Number(job.speakers_elapsed_s);
   if (!Number.isFinite(elapsed) || elapsed < 0) {
@@ -243,8 +309,15 @@ export function isProgressIndeterminate(job) {
   if (job.status === "queued" || job.engine_starting) {
     return true;
   }
-  if (job.speakers_running && speakersProgressOverEstimate(job)) {
-    return true;
+  if (job.speakers_running) {
+    if (speakersProgressOverEstimate(job)) {
+      return true;
+    }
+    const hasEngine = Number.isFinite(Number(job?.speakers_progress));
+    const elapsed = Number(job.speakers_elapsed_s);
+    if (!hasEngine && (!Number.isFinite(elapsed) || elapsed < 2)) {
+      return true;
+    }
   }
   return job.status === "running" && jobProgressPct(job) <= 0;
 }
@@ -365,6 +438,18 @@ export function speakerDisplayName(key, customName) {
   if (name) {
     return name;
   }
+  if (!key) {
+    return t("editor.k3146264");
+  }
+  const ordinal = parseSpeakerOrdinal(key);
+  if (ordinal != null) {
+    return t("editor.speakerN", { n: ordinal + 1 });
+  }
+  return String(key);
+}
+
+/** Fixed label in speaker rename UI (never the user-entered display name). */
+export function speakerRenameLabel(key) {
   if (!key) {
     return t("editor.k3146264");
   }

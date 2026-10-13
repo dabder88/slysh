@@ -4,7 +4,6 @@ import os
 
 from slysh.compute import _read_settings, mutate_settings
 from slysh.paths import install_ui_locale_seed_path
-
 UI_LOCALES = frozenset({"ru", "en"})
 DEFAULT_UI_LOCALE = "ru"
 
@@ -49,16 +48,9 @@ def save_ui_locale(locale: str) -> str:
 
 
 def consume_install_ui_locale_seed() -> str | None:
-    """Apply language chosen in Setup.exe before first WebView2 init."""
+    """Apply language chosen in Setup.exe on the next launch (incl. upgrade)."""
     path = install_ui_locale_seed_path()
     if not path.is_file():
-        return None
-    stored = str(_read_settings().get("ui_locale") or "").strip().lower()
-    if stored in UI_LOCALES:
-        try:
-            path.unlink(missing_ok=True)
-        except OSError:
-            pass
         return None
     try:
         raw = path.read_text(encoding="utf-8").strip().lower()

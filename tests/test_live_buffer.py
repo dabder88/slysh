@@ -14,6 +14,18 @@ from slysh.live_buffer import LIVE_MAX_PENDING_SAMPLES, LiveBufferOverflowError,
 from slysh.models import JobKind, JobStatus, Segment
 
 
+def test_custom_chunk_samples_emits_earlier(tmp_path):
+    short = SAMPLE_RATE * 5
+    session = LiveSession(wav_path=tmp_path / "short.wav", chunk_samples=short)
+    session.push(np.zeros(short - 1, np.float32))
+    assert session.take_ready_chunks() == []
+    assert session.remaining_s() == 1.0 / SAMPLE_RATE
+    session.push(np.ones(1, np.float32))
+    chunks = session.take_ready_chunks()
+    assert len(chunks) == 1
+    assert len(chunks[0]) == short
+
+
 def test_emits_one_chunk_after_live_window_and_flush_tail(tmp_path):
     session = LiveSession(wav_path=tmp_path / "rec.wav")
     session.push(np.zeros(LIVE_CHUNK_SAMPLES, np.float32))
@@ -142,6 +154,48 @@ def test_live_start_falls_back_when_16k_unsupported(tmp_path, monkeypatch):
     assert 48000 in attempts
     assert attempts[-1] == 48000
     client.post("/api/live/stop")
+
+
+def test_live_start_save_audio_false_removes_wav(tmp_path, monkeypatch):
+    monkeypatch.setenv("GIGAAM_DESKTOP_HOME", str(tmp_path / "home"))
+    monkeypatch.setattr(api_mod, "_list_input_mics", lambda app=None, force=False: [{"id": 0, "name": "Mic"}])
+    monkeypatch.setattr(api_mod.sd, "InputStream", _FakeStream)
+    db = Database(tmp_path / "app.db")
+    app = create_ui_app(db=db, engine=None, auto_start_engine=False)
+    client = TestClient(app)
+    started = client.post("/api/live/start", json={"save_audio": False})
+    assert started.status_code == 200
+    wav = Path(started.json()["source_path"])
+    assert wav.is_file()
+    stopped = client.post("/api/live/stop")
+    assert stopped.status_code == 200
+    body = stopped.json()
+    assert body["status"] == "completed"
+    assert body.get("recording_path") in (None, "")
+    assert not wav.is_file()
+    job = client.get(f"/api/jobs/{body['id']}").json()
+    assert str(job.get("source_path") or "") == ""
+    assert job.get("recording_path") in (None, "")
+
+
+def test_live_start_save_audio_default_keeps_wav(tmp_path, monkeypatch):
+    monkeypatch.setenv("GIGAAM_DESKTOP_HOME", str(tmp_path / "home"))
+    monkeypatch.setattr(api_mod, "_list_input_mics", lambda app=None, force=False: [{"id": 0, "name": "Mic"}])
+    monkeypatch.setattr(api_mod.sd, "InputStream", _FakeStream)
+    db = Database(tmp_path / "app.db")
+    app = create_ui_app(db=db, engine=None, auto_start_engine=False)
+    client = TestClient(app)
+    started = client.post("/api/live/start", json={})
+    assert started.status_code == 200
+    wav = Path(started.json()["source_path"])
+    stopped = client.post("/api/live/stop")
+    assert stopped.status_code == 200
+    body = stopped.json()
+    assert body.get("recording_path")
+    assert Path(body["recording_path"]).is_file()
+    job = client.get(f"/api/jobs/{body['id']}").json()
+    assert job["source_path"] == str(wav)
+    assert job.get("recording_path") == str(wav)
 
 
 def test_live_start_without_engine_creates_wav_and_job(tmp_path, monkeypatch):

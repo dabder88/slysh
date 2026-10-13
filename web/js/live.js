@@ -1,10 +1,104 @@
-﻿import { api, showToast } from "./api.js";
+import { api, showToast } from "./api.js";
 import { reportError } from "./errors.js";
-import { openJobExportModal, refreshLibrary } from "./legacy.js";
+import { openJobExportModal, openLocalPath, refreshLibrary } from "./legacy.js";
 import { t } from "./i18n.js";
+
+const SAVE_AUDIO_KEY = "live-save-audio";
+
+let liveLastRecordingPath = "";
 
 function noMicHint() {
   return t("live.noMic");
+}
+
+function loadSaveAudioPreference() {
+  const el = document.getElementById("live-save-audio");
+  if (!el) {
+    return;
+  }
+  el.checked = localStorage.getItem(SAVE_AUDIO_KEY) !== "0";
+}
+
+function saveSaveAudioPreference() {
+  const el = document.getElementById("live-save-audio");
+  if (!el) {
+    return;
+  }
+  localStorage.setItem(SAVE_AUDIO_KEY, el.checked ? "1" : "0");
+}
+
+function syncLiveRecordingActions(path) {
+  const panel = document.getElementById("live-recording-actions");
+  const pathEl = document.getElementById("live-recording-path");
+  if (!panel) {
+    return;
+  }
+  const normalized = String(path || "").trim();
+  liveLastRecordingPath = normalized;
+  panel.hidden = !normalized;
+  if (pathEl) {
+    pathEl.textContent = normalized ? t("live.recordingSaved", { path: normalized }) : "";
+  }
+}
+
+function setButtonLabelText(buttonEl, labelId, text) {
+  const labelEl = labelId ? document.getElementById(labelId) : null;
+  if (labelEl) {
+    labelEl.textContent = text;
+    return;
+  }
+  if (buttonEl) {
+    buttonEl.textContent = text;
+  }
+}
+
+function formatMeterDbLabel(rms) {
+  const value = Number(rms) || 0;
+  if (value <= 0.0001) {
+    return "-∞ dB";
+  }
+  const db = 20 * Math.log10(Math.min(1, value * 2.5));
+  return `${db >= -0.05 ? 0 : db.toFixed(0)} dB`;
+}
+
+function updateLiveCounterStats() {
+  const counterEl = document.getElementById("live-counter-stats");
+  const el = liveTranscriptEl();
+  if (!counterEl || !el) {
+    return;
+  }
+  const val = String(el.value || "").trim();
+  const words = val ? val.split(/\s+/).filter(Boolean).length : 0;
+  counterEl.textContent = t("live.counterStats", { words, chars: val.length });
+}
+
+function syncLiveSessionChrome({ sessionActive, paused, listening, rms }) {
+  const recBtn = document.getElementById("btn-rec");
+  const badge = document.getElementById("live-session-badge");
+  const badgeText = document.getElementById("live-session-badge-text");
+  const timerWrap = document.getElementById("live-rec-timer");
+  if (recBtn) {
+    recBtn.classList.toggle("is-recording", Boolean(sessionActive) && !paused);
+  }
+  if (badge && badgeText) {
+    if (sessionActive && paused) {
+      badge.className = "live-session-badge-paused";
+      badgeText.textContent = t("live.bentoStatusPaused");
+    } else if (sessionActive) {
+      badge.className = "live-session-badge-active";
+      badgeText.textContent = listening ? t("live.bentoStatusListening") : t("live.bentoStatusRecording");
+    } else {
+      badge.className = "live-session-badge-idle";
+      badgeText.textContent = t("live.bentoStatusIdle");
+    }
+  }
+  if (timerWrap) {
+    timerWrap.classList.toggle("hidden", !sessionActive);
+  }
+  const dbEl = document.getElementById("live-meter-db");
+  if (dbEl) {
+    dbEl.textContent = formatMeterDbLabel(listening ? rms : 0);
+  }
 }
 
 let liveInitialized = false;
@@ -62,6 +156,7 @@ function syncLiveTranscriptFromSegments(segments, { force = false } = {}) {
       liveEditDirty = false;
     }
   }
+  updateLiveCounterStats();
 }
 
 function syncLiveTranscriptWait({ sessionActive, segments, jobStatus, captureFinalizing }) {
@@ -200,7 +295,7 @@ async function exportLiveTranscript() {
     return;
   }
   const job = await api(`/api/jobs/${liveJobId}`);
-  openJobExportModal(job);
+  await openJobExportModal(job);
 }
 
 async function toggleLivePause() {
@@ -263,7 +358,11 @@ async function pollLive() {
   }
   if (pauseBtn) {
     pauseBtn.disabled = !sessionActive;
-    pauseBtn.textContent = paused ? t("live.resume") : t("live.pause");
+    setButtonLabelText(
+      pauseBtn,
+      "btn-live-pause-label",
+      paused ? t("live.resume") : t("live.pause")
+    );
   }
   if (stopBtn) {
     stopBtn.disabled = !sessionActive;
@@ -284,10 +383,11 @@ async function pollLive() {
       liveCountdown.textContent = "";
     }
   }
+  const rms = listening ? Number(status.rms) || 0 : 0;
   if (liveMeter) {
-    const rms = listening ? Number(status.rms) || 0 : 0;
     liveMeter.style.width = `${Math.min(100, Math.round(rms * 400))}%`;
   }
+  syncLiveSessionChrome({ sessionActive, paused, listening, rms });
   if (liveHint && status.error) {
     liveHint.textContent = status.error;
   }
@@ -301,6 +401,11 @@ async function pollLive() {
     jobStatus = job.status || "";
     captureFinalizing = captureFinalizing || Boolean(job.capture_finalizing);
     segments = Array.isArray(status.segments) ? status.segments : job.segments || [];
+    const recPath =
+      status.recording_path || job.recording_path || (!sessionActive ? job.source_path : "");
+    if (!sessionActive && recPath) {
+      syncLiveRecordingActions(String(recPath));
+    }
     syncLiveTranscriptFromSegments(segments);
     syncLivePostActions({ listening, sessionActive, segments, jobStatus });
     syncLiveClearBar({ sessionActive, segments });
@@ -338,7 +443,10 @@ async function startLive() {
   }
   liveEditDirty = false;
   const deviceId = micSelect && micSelect.value === "" ? undefined : Number(micSelect.value);
-  const body = {};
+  const saveAudioEl = document.getElementById("live-save-audio");
+  const body = {
+    save_audio: saveAudioEl ? Boolean(saveAudioEl.checked) : true,
+  };
   if (Number.isFinite(deviceId)) {
     body.device_id = deviceId;
   }
@@ -363,7 +471,10 @@ async function stopLive() {
       jobStatus: "running",
     });
   }
-  await api("/api/live/stop", { method: "POST" });
+  const stopped = await api("/api/live/stop", { method: "POST" });
+  if (stopped?.recording_path) {
+    syncLiveRecordingActions(stopped.recording_path);
+  }
   await pollLive();
   await refreshLibrary();
 }
@@ -373,12 +484,27 @@ export function initLive() {
     return;
   }
   liveInitialized = true;
+  loadSaveAudioPreference();
+  document.getElementById("live-save-audio")?.addEventListener("change", () => {
+    saveSaveAudioPreference();
+  });
+  document.getElementById("btn-live-open-recording")?.addEventListener("click", () =>
+    openLocalPath(liveLastRecordingPath, false).catch((err) =>
+      reportError(t("live.openRecording"), err)
+    )
+  );
+  document.getElementById("btn-live-open-recording-folder")?.addEventListener("click", () =>
+    openLocalPath(liveLastRecordingPath, true).catch((err) =>
+      reportError(t("live.openRecordingFolder"), err)
+    )
+  );
   const transcript = liveTranscriptEl();
   if (transcript) {
     transcript.setAttribute("aria-label", t("live.transcriptLabel"));
     transcript.addEventListener("input", () => {
       liveEditDirty = true;
       scheduleLiveTranscriptSave();
+      updateLiveCounterStats();
       syncLiveClearBar({ sessionActive: liveSessionActive, segments: liveLastSegments });
       const hasText = hasLiveTranscriptText(liveLastSegments);
       const panel = document.getElementById("live-post-actions");

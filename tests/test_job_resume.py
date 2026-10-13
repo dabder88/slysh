@@ -58,6 +58,31 @@ def test_map_transcribe_pass_progress():
     assert map_transcribe_pass_progress(0.4, 1.0) == 1.0
     mid = map_transcribe_pass_progress(0.4, 0.5)
     assert mid == pytest.approx(0.01 + 0.99 * 0.7)
+    penultimate = map_transcribe_pass_progress(0.0, 99 / 100)
+    assert penultimate < 1.0
+    assert penultimate == pytest.approx(0.01 + 0.99 * 0.99)
+
+
+def test_transcribe_pcm_chunks_finishes_at_full_progress():
+    import numpy as np
+
+    from slysh.chunking import CHUNK_SAMPLES
+    from slysh.transcribe import transcribe_pcm_chunks
+
+    pcm = np.zeros(CHUNK_SAMPLES * 2, dtype=np.float32)
+    seen: list[float] = []
+
+    def on_progress(value: float) -> None:
+        seen.append(float(value))
+
+    status, _ = transcribe_pcm_chunks(
+        pcm,
+        transcribe_chunk_fn=lambda _chunk: [],
+        cancelled=lambda: False,
+        on_progress=on_progress,
+    )
+    assert status == "completed"
+    assert seen[-1] == 1.0
 
 
 def test_progress_baseline_for_remote():

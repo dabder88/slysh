@@ -4,7 +4,7 @@
 
 **Легенда:** ✅ готово · 🟡 частично · 🔵 в работе / не в git · ⬜ не начато · ⏭️ отложено
 
-**Последнее обновление:** 2026-10-05 — plan-fix-2 **G** ✅, **H** код+subset CI 🟡; ручная R15 — [`implementation-status-fix2.md`](implementation-status-fix2.md).
+**Последнее обновление:** 2026-10-06 — активен plan-fix-3 (волна **I**): [`implementation-status-fix3.md`](implementation-status-fix3.md); fix2 G ✅, H 🟡 — [`implementation-status-fix2.md`](implementation-status-fix2.md).
 
 ---
 
@@ -24,13 +24,13 @@
 
 ## Следующий крупный этап (план агента)
 
-**Активно:** plan-fix-2 — [`implementation-status-fix2.md`](implementation-status-fix2.md): автоматика H закрыта; **ручная** VM / 10 min / WebView / load R10.
+**Активно:** plan-fix-3 — [`implementation-status-fix3.md`](implementation-status-fix3.md), порядок — [`implementation-order-fix3.md`](implementation-order-fix3.md) (F3-01…F3-07, волна **I**).
 
 | Блок | ID | Содержание |
 |------|-----|------------|
-| **1** | G | ✅ Критический минимум plan-fix-2 |
-| **2** | H | Таймауты/watchdog, decode/memmap, updates, offline bootstrap, приёмка subset |
-| **3** | — | VM E6 журнал, B.4.4 (10+ мин live), WebView E2E — вручную |
+| **I** | F3-01…07 | Дочистка после G/H: диаризация snapshot, live хвост, meeting overflow, revision UI, proxy `.bak`, PCM cleanup, wheelhouse bootstrap |
+| **fix2** | G/H | G ✅; H код+subset CI 🟡; ручная R15 — [`implementation-status-fix2.md`](implementation-status-fix2.md) |
+| **—** | — | VM E6, B.4.4 (10+ мин live), WebView E2E — вручную, вне gate fix3 |
 
 D.1–D.6 закрыты (таблица D). Волна **F** закрыта по пунктам F.1–F.5.
 

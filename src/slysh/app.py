@@ -4,6 +4,8 @@ import json
 import logging
 import sys
 
+from slysh.webview2_detect import webview2_runtime_installed
+
 # Expanded sidebar is 256px; 1100px leaves room after window chrome.
 SIDEBAR_EXPANDED_MIN_WIDTH = 1100
 DEFAULT_WINDOW_HEIGHT = 720
@@ -15,12 +17,13 @@ def window_size() -> tuple[int, int]:
 
 
 def webview_ui_url(port: int) -> str:
-    from slysh.release_version import installed_app_layout
+    from slysh.ui_locale import load_ui_locale
 
     base = f"http://127.0.0.1:{port}/"
-    if installed_app_layout():
-        return f"{base}?skip_boot_splash=1"
-    return base
+    locale = load_ui_locale()
+    if locale not in ("ru", "en"):
+        locale = "ru"
+    return f"{base}?ui_locale={locale}"
 
 
 class JsApi:
@@ -189,11 +192,6 @@ def _bind_native_drop(window) -> None:
         logging.exception("could not bind native file drop")
 
 
-_WEBVIEW2_CLIENT_ID = "{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
-_WEBVIEW2_KEY_PATHS = (
-    rf"SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{_WEBVIEW2_CLIENT_ID}",
-    rf"SOFTWARE\Microsoft\EdgeUpdate\Clients\{_WEBVIEW2_CLIENT_ID}",
-)
 # Официальный Evergreen Bootstrapper (Microsoft Learn, WebView2 distribution).
 WEBVIEW2_BOOTSTRAPPER_URL = "https://go.microsoft.com/fwlink/p/?LinkId=2124703"
 WEBVIEW2_DIALOG_TITLE = "Нужен Microsoft Edge WebView2 Runtime"
@@ -213,31 +211,6 @@ WEBVIEW2_DOWNLOAD_FAILED = (
     "Сохраните установщик, запустите его и снова откройте Slysh."
 )
 WEBVIEW2_MISSING_MESSAGE = WEBVIEW2_DIALOG_TITLE
-
-
-def _webview2_pv(hive: int, path: str) -> str | None:
-    import winreg
-
-    try:
-        with winreg.OpenKey(hive, path) as key:
-            version, _ = winreg.QueryValueEx(key, "pv")
-    except OSError:
-        return None
-    text = str(version or "").strip()
-    return text or None
-
-
-def webview2_runtime_installed() -> bool:
-    if sys.platform != "win32":
-        return True
-    import winreg
-
-    for hive in (winreg.HKEY_LOCAL_MACHINE, winreg.HKEY_CURRENT_USER):
-        for path in _WEBVIEW2_KEY_PATHS:
-            version = _webview2_pv(hive, path)
-            if version and version != "0.0.0.0":
-                return True
-    return False
 
 
 def _bootstrapper_is_executable(data: bytes) -> bool:
@@ -533,12 +506,10 @@ def main() -> None:
         faulthandler.enable()
 
     from slysh.runtime_setup import apply_fresh_install_marker
-
-    apply_fresh_install_marker()
-
     from slysh.ui_locale import configure_webview_browser_language, consume_install_ui_locale_seed
 
     consume_install_ui_locale_seed()
+    apply_fresh_install_marker()
     configure_webview_browser_language()
 
     import uvicorn
@@ -607,14 +578,30 @@ def main() -> None:
                 return
             exit_prompt_scheduled = True
 
-        def show_prompt() -> None:
-            nonlocal exit_prompt_scheduled
+        def _js_exit_prompt_shown() -> bool:
             try:
-                window.evaluate_js(
-                    "window.__promptAppExit && window.__promptAppExit()"
+                raw = window.evaluate_js(
+                    "(function(){try{return !!(window.__promptAppExit"
+                    "&&window.__promptAppExit());}catch(e){return false;}})()"
                 )
             except Exception:
                 logging.debug("exit prompt js failed", exc_info=True)
+                return False
+            if raw is True:
+                return True
+            if isinstance(raw, str):
+                return raw.strip().lower() in {"true", "1"}
+            return bool(raw)
+
+        def show_prompt() -> None:
+            nonlocal exit_prompt_scheduled
+            try:
+                if not _js_exit_prompt_shown():
+                    from slysh.app_exit_native import confirm_exit_native
+                    from slysh.ui_locale import load_ui_locale
+
+                    if confirm_exit_native(load_ui_locale()):
+                        api.finish_app_exit(False, True)
             finally:
                 with exit_prompt_lock:
                     exit_prompt_scheduled = False

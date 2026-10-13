@@ -7,19 +7,20 @@ from slysh.app import (
     _bootstrapper_is_executable,
     _run_webview2_download,
     _show_webview2_dialog,
-    _webview2_pv,
     install_webview2_bootstrapper,
     install_webview2_runtime,
     webview2_runtime_installed,
 )
+from slysh.webview2_detect import _webview2_pv
 
 
 def test_webview2_missing_when_registry_has_no_key(monkeypatch):
     def missing(_hive: int, _path: str) -> str | None:
         return None
 
-    monkeypatch.setattr("slysh.app._webview2_pv", missing)
-    monkeypatch.setattr("slysh.app.sys.platform", "win32")
+    monkeypatch.setattr("slysh.webview2_detect._webview2_pv", missing)
+    monkeypatch.setattr("slysh.webview2_detect._webview2_exe_on_disk", lambda: False)
+    monkeypatch.setattr("slysh.webview2_detect.sys.platform", "win32")
     assert webview2_runtime_installed() is False
 
 
@@ -29,15 +30,24 @@ def test_webview2_installed_when_registry_has_version(monkeypatch):
             return "131.0.2903.112"
         return None
 
-    monkeypatch.setattr("slysh.app._webview2_pv", present)
-    monkeypatch.setattr("slysh.app.sys.platform", "win32")
+    monkeypatch.setattr("slysh.webview2_detect._webview2_pv", present)
+    monkeypatch.setattr("slysh.webview2_detect._webview2_exe_on_disk", lambda: False)
+    monkeypatch.setattr("slysh.webview2_detect.sys.platform", "win32")
     assert webview2_runtime_installed() is True
 
 
 def test_webview2_ignores_empty_version(monkeypatch):
-    monkeypatch.setattr("slysh.app._webview2_pv", lambda *_args: "0.0.0.0")
-    monkeypatch.setattr("slysh.app.sys.platform", "win32")
+    monkeypatch.setattr("slysh.webview2_detect._webview2_pv", lambda *_args: "0.0.0.0")
+    monkeypatch.setattr("slysh.webview2_detect._webview2_exe_on_disk", lambda: False)
+    monkeypatch.setattr("slysh.webview2_detect.sys.platform", "win32")
     assert webview2_runtime_installed() is False
+
+
+def test_webview2_installed_when_exe_on_disk(monkeypatch):
+    monkeypatch.setattr("slysh.webview2_detect._webview2_pv", lambda *_a: None)
+    monkeypatch.setattr("slysh.webview2_detect._webview2_exe_on_disk", lambda: True)
+    monkeypatch.setattr("slysh.webview2_detect.sys.platform", "win32")
+    assert webview2_runtime_installed() is True
 
 
 def test_webview2_pv_reads_string(monkeypatch):

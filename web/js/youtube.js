@@ -1,4 +1,4 @@
-﻿import { api, showToast, isAbsolutePath } from "./api.js";
+import { api, showToast, isAbsolutePath } from "./api.js";
 import { reportError } from "./errors.js";
 import { navigate, getRoute, getEditorJobId } from "./router.js";
 import { ensureIntakeAllowed } from "./intake-duplicate.js";
@@ -6,6 +6,17 @@ import { selectJob } from "./legacy.js";
 import { refreshEditorJob } from "./editor.js";
 import { localeDateTag, t } from "./i18n.js";
 import { bindSecretInput, readSecretForSave } from "./secret-field.js";
+import {
+  addExportDirRowToList,
+  applyFavoritePathToExportList,
+  buildFavoriteKeySet,
+  collectExportTargetDirs,
+  fetchExportFavoriteDirs,
+  fillExportDirsList,
+  renderFavoritePickList,
+  syncAllExportDirRowStars,
+  syncExportDirRowStar,
+} from "./export-favorites.js";
 
 function applyYoutubeApifyField(provider) {
   const input = document.getElementById("youtube-apify-key");
@@ -26,6 +37,15 @@ const BATCH_PREVIEW_KEY = "youtube-batch-preview-videos";
 let youtubeInitialized = false;
 let ingestPollTimer = null;
 let youtubeBatchApiReady = false;
+const youtubeBatchFavoriteKeys = new Set();
+let youtubeBatchFavoriteDirsCache = [];
+
+function syncYoutubeBatchFavoriteKeysFromDirs(dirs) {
+  youtubeBatchFavoriteKeys.clear();
+  for (const key of buildFavoriteKeySet(dirs)) {
+    youtubeBatchFavoriteKeys.add(key);
+  }
+}
 
 function selectedMethod() {
   const checked = document.querySelector('input[name="youtube-method"]:checked');
@@ -167,9 +187,10 @@ async function refreshYoutubeStatus() {
     youtubeBatchApiReady = Boolean(status.batch_api);
     syncYoutubeBatchStartButton();
     let apifyInfo = status.apify;
-    if (status.apify_key_set && (!apifyInfo || !apifyInfo.api_key_tail)) {
+    if (status.apify_key_set) {
       try {
-        apifyInfo = await api("/api/providers/apify");
+        const fromProvider = await api("/api/providers/apify");
+        apifyInfo = { ...apifyInfo, ...fromProvider };
       } catch {
         apifyInfo = apifyInfo || {};
       }
@@ -613,101 +634,108 @@ async function pickYoutubeExportFolder(current = "") {
   return "";
 }
 
-function createYoutubeExportDirRow(value = "") {
-  const row = document.createElement("div");
-  row.className = "export-dir-row field-row";
-
-  const input = document.createElement("input");
-  input.type = "text";
-  input.className = "export-dir-input";
-  input.spellcheck = false;
-  input.value = value;
-
-  const browseBtn = document.createElement("button");
-  browseBtn.type = "button";
-  browseBtn.className = "btn-outline btn-compact";
-  browseBtn.title = t("common.browse");
-  browseBtn.setAttribute("aria-label", t("common.browse"));
-  browseBtn.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">folder_open</span>';
-  browseBtn.addEventListener("click", async () => {
-    const folder = await pickYoutubeExportFolder(input.value);
-    if (folder) {
-      input.value = folder;
-    }
-  });
-
-  const removeBtn = document.createElement("button");
-  removeBtn.type = "button";
-  removeBtn.className = "btn-outline btn-compact export-dir-remove";
-  removeBtn.title = t("common.delete");
-  removeBtn.setAttribute("aria-label", t("common.delete"));
-  removeBtn.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">close</span>';
-  removeBtn.addEventListener("click", () => {
-    const list = document.getElementById("youtube-batch-export-dirs");
-    if (!list || list.querySelectorAll(".export-dir-row").length <= 1) {
-      return;
-    }
-    row.remove();
-    syncYoutubeExportDirRemoveButtons();
-  });
-
-  row.append(input, browseBtn, removeBtn);
-  return row;
+function youtubeBatchExportDirsListEl() {
+  return document.getElementById("youtube-batch-export-dirs");
 }
 
-function syncYoutubeExportDirRemoveButtons() {
-  const list = document.getElementById("youtube-batch-export-dirs");
-  if (!list) {
+function youtubeBatchExportFavoritesPickListEl() {
+  return document.getElementById("youtube-batch-export-favorites-pick-list");
+}
+
+function youtubeBatchExportFavoritesEmptyEl() {
+  return document.getElementById("youtube-batch-export-favorites-empty");
+}
+
+function youtubeBatchExportDirRowOptions() {
+  return {
+    onBrowse: async (input) => {
+      const folder = await pickYoutubeExportFolder(input.value);
+      if (folder) {
+        input.value = folder;
+        input.title = folder;
+        const row = input.closest(".export-dir-row");
+        if (row) {
+          syncExportDirRowStar(row, youtubeBatchFavoriteKeys);
+        }
+      }
+    },
+    favoriteKeys: youtubeBatchFavoriteKeys,
+    showFavoriteStar: true,
+    onFavoriteToggled: handleYoutubeBatchFavoriteToggled,
+    onTargetDirsChanged: () => renderYoutubeBatchFavoritePickList(youtubeBatchFavoriteDirsCache),
+  };
+}
+
+function renderYoutubeBatchFavoritePickList(dirs) {
+  youtubeBatchFavoriteDirsCache = Array.isArray(dirs) ? dirs : [];
+  renderFavoritePickList(
+    youtubeBatchExportFavoritesPickListEl(),
+    youtubeBatchExportFavoritesEmptyEl(),
+    youtubeBatchFavoriteDirsCache,
+    {
+      onAdd: (dir) => {
+        const result = applyFavoritePathToExportList(
+          youtubeBatchExportDirsListEl(),
+          dir,
+          youtubeBatchExportDirRowOptions()
+        );
+        if (result === "duplicate") {
+          showToast(t("exportUi.favoriteAlreadyInList"));
+        } else if (result !== "noop") {
+          renderYoutubeBatchFavoritePickList(youtubeBatchFavoriteDirsCache);
+        }
+      },
+      onRemove: (updatedDirs) => {
+        youtubeBatchFavoriteDirsCache = updatedDirs;
+        syncYoutubeBatchFavoriteKeysFromDirs(updatedDirs);
+        renderYoutubeBatchFavoritePickList(updatedDirs);
+        syncAllExportDirRowStars(youtubeBatchExportDirsListEl(), youtubeBatchFavoriteKeys);
+      },
+      targetListEl: youtubeBatchExportDirsListEl(),
+    }
+  );
+}
+
+async function handleYoutubeBatchFavoriteToggled(result) {
+  if (result?.error) {
+    showToast(result.error.message || String(result.error));
     return;
   }
-  const rows = list.querySelectorAll(".export-dir-row");
-  const hideRemove = rows.length <= 1;
-  rows.forEach((row) => {
-    const btn = row.querySelector(".export-dir-remove");
-    if (btn) {
-      btn.hidden = hideRemove;
+  let dirs = result?.dirs;
+  if (!dirs) {
+    try {
+      dirs = await fetchExportFavoriteDirs({ fresh: true });
+    } catch (err) {
+      showToast(err.message || String(err));
+      return;
     }
-  });
+  }
+  syncYoutubeBatchFavoriteKeysFromDirs(dirs);
+  renderYoutubeBatchFavoritePickList(dirs);
+  syncAllExportDirRowStars(youtubeBatchExportDirsListEl(), youtubeBatchFavoriteKeys);
+  if (result?.added) {
+    showToast(t("settings.exportFavoriteDirsSaved"));
+  }
+}
+
+async function prepareYoutubeBatchExportDirs() {
+  let dirs = [];
+  try {
+    dirs = await fetchExportFavoriteDirs({ fresh: true });
+  } catch {
+    dirs = [];
+  }
+  syncYoutubeBatchFavoriteKeysFromDirs(dirs);
+  fillExportDirsList(youtubeBatchExportDirsListEl(), [""], youtubeBatchExportDirRowOptions());
+  renderYoutubeBatchFavoritePickList(dirs);
 }
 
 function addYoutubeExportDirRow(value = "") {
-  const list = document.getElementById("youtube-batch-export-dirs");
-  if (!list) {
-    return;
-  }
-  list.appendChild(createYoutubeExportDirRow(value));
-  syncYoutubeExportDirRemoveButtons();
-}
-
-function resetYoutubeBatchExportDirs() {
-  const list = document.getElementById("youtube-batch-export-dirs");
-  if (!list) {
-    return;
-  }
-  list.replaceChildren();
-  addYoutubeExportDirRow("");
+  addExportDirRowToList(youtubeBatchExportDirsListEl(), value, youtubeBatchExportDirRowOptions());
 }
 
 function collectYoutubeBatchExportDirs() {
-  const list = document.getElementById("youtube-batch-export-dirs");
-  if (!list) {
-    return [];
-  }
-  const seen = new Set();
-  const unique = [];
-  for (const input of list.querySelectorAll(".export-dir-input")) {
-    const value = (input.value || "").trim();
-    if (!value) {
-      continue;
-    }
-    const key = value.toLowerCase();
-    if (seen.has(key)) {
-      continue;
-    }
-    seen.add(key);
-    unique.push(value);
-  }
-  return unique;
+  return collectExportTargetDirs(youtubeBatchExportDirsListEl());
 }
 
 function setYoutubeScreenMode(mode) {
@@ -878,7 +906,7 @@ export function initYoutube() {
   document.getElementById("youtube-batch-export-dir-add")?.addEventListener("click", () => {
     addYoutubeExportDirRow("");
   });
-  resetYoutubeBatchExportDirs();
+  prepareYoutubeBatchExportDirs().catch(() => {});
   syncYoutubeBatchExportOptions();
   setYoutubeScreenMode("single");
   syncBatchSourcePanels();
@@ -889,4 +917,5 @@ export function onYoutubeShow() {
   refreshYoutubeStatus();
   loadBrowserProfiles();
   syncYoutubeBatchExportOptions();
+  prepareYoutubeBatchExportDirs().catch(() => {});
 }

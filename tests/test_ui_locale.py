@@ -14,7 +14,8 @@ from slysh.ui_locale import (
     save_ui_locale,
     webview_language_tag,
 )
-from slysh.paths import install_ui_locale_seed_path
+from slysh.paths import install_root, install_ui_locale_seed_path
+from slysh.runtime_setup import FRESH_INSTALL_MARKER
 
 
 def test_normalize_locale_hint():
@@ -87,12 +88,28 @@ def test_consume_install_ui_locale_seed(tmp_path, monkeypatch):
     assert load_ui_locale() == "en"
     assert not seed.is_file()
     seed.write_text("ru\n", encoding="utf-8")
-    assert consume_install_ui_locale_seed() is None
+    assert consume_install_ui_locale_seed() == "ru"
+    assert load_ui_locale() == "ru"
+    assert not seed.is_file()
+
+
+def test_consume_seed_overrides_on_fresh_install(tmp_path, monkeypatch):
+    install = tmp_path / "install"
+    install.mkdir()
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("SLYSH_INSTALL_ROOT", str(install))
+    monkeypatch.setenv("GIGAAM_DESKTOP_HOME", str(home))
+    save_ui_locale("ru")
+    (install_root() / FRESH_INSTALL_MARKER).write_text("1", encoding="utf-8")
+    seed = install_ui_locale_seed_path()
+    seed.write_text("en\n", encoding="utf-8")
+    assert consume_install_ui_locale_seed() == "en"
     assert load_ui_locale() == "en"
     assert not seed.is_file()
 
 
-def test_consume_seed_skips_when_settings_have_locale(tmp_path, monkeypatch):
+def test_consume_seed_applies_over_existing_settings(tmp_path, monkeypatch):
     install = tmp_path / "install"
     install.mkdir()
     home = tmp_path / "home"
@@ -102,6 +119,22 @@ def test_consume_seed_skips_when_settings_have_locale(tmp_path, monkeypatch):
     save_ui_locale("ru")
     seed = install_ui_locale_seed_path()
     seed.write_text("en\n", encoding="utf-8")
-    assert consume_install_ui_locale_seed() is None
+    assert consume_install_ui_locale_seed() == "en"
+    assert load_ui_locale() == "en"
+    assert not seed.is_file()
+
+
+def test_consume_seed_applies_on_upgrade_without_fresh_marker(tmp_path, monkeypatch):
+    install = tmp_path / "install"
+    install.mkdir()
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("SLYSH_INSTALL_ROOT", str(install))
+    monkeypatch.setenv("GIGAAM_DESKTOP_HOME", str(home))
+    save_ui_locale("en")
+    assert not (install_root() / FRESH_INSTALL_MARKER).is_file()
+    seed = install_ui_locale_seed_path()
+    seed.write_text("ru\n", encoding="utf-8")
+    assert consume_install_ui_locale_seed() == "ru"
     assert load_ui_locale() == "ru"
     assert not seed.is_file()

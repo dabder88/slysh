@@ -1,4 +1,4 @@
-﻿import { jobDisplayName } from "./api.js";
+import { jobDisplayName } from "./api.js";
 import { batchDoneCount, batchFileCount } from "./library-utils.js";
 import { jobSourceKinds, jobSourceKind } from "./job-source.js";
 import { localeDateTag, t } from "./i18n.js";
@@ -372,14 +372,31 @@ export function paginateItems(items, page, pageSize) {
   };
 }
 
+const SOURCE_ICONS = {
+  file: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>`,
+  live: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>`,
+  meeting: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path></svg>`,
+  youtube: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>`,
+};
+
 function updateFiltersBadge(summary, filters) {
   const badge = summary.querySelector(".library-filters-badge");
-  const active = countActiveFilters(filters);
+  const count = countActiveFilters(filters);
   if (!badge) {
     return;
   }
-  badge.textContent = active ? `· ${active}` : "";
-  badge.hidden = !active;
+  const textEl = badge.querySelector(".library-filters-badge-text");
+  if (count > 0) {
+    badge.hidden = false;
+    if (textEl) {
+      textEl.textContent = t("filters.activeCount", { count });
+    }
+  } else {
+    badge.hidden = true;
+    if (textEl) {
+      textEl.textContent = "";
+    }
+  }
 }
 
 export function createFiltersSpoiler({ storageKey, filters, onChange }) {
@@ -391,14 +408,47 @@ export function createFiltersSpoiler({ storageKey, filters, onChange }) {
   });
 
   const summary = document.createElement("summary");
-  const summaryText = document.createElement("span");
-  summaryText.textContent = t("filters.title");
-  summary.appendChild(summaryText);
+  summary.className = "library-filters-summary";
+
+  const summaryLeft = document.createElement("div");
+  summaryLeft.className = "library-filters-summary-left";
+
+  const chevron = document.createElement("span");
+  chevron.className = "library-filters-chevron";
+  chevron.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>`;
+
+  const summaryIcon = document.createElement("div");
+  summaryIcon.className = "library-filters-summary-icon";
+  summaryIcon.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>`;
+
+  const summaryTitle = document.createElement("span");
+  summaryTitle.className = "library-filters-summary-title";
+  summaryTitle.textContent = t("filters.title");
+
   const badge = document.createElement("span");
-  badge.className = "library-filters-badge spoiler-meta";
-  summary.appendChild(badge);
+  badge.className = "library-filters-badge";
+  badge.hidden = true;
+  const badgeDot = document.createElement("span");
+  badgeDot.className = "library-filters-badge-dot";
+  badgeDot.setAttribute("aria-hidden", "true");
+  const badgeText = document.createElement("span");
+  badgeText.className = "library-filters-badge-text";
+  badge.append(badgeDot, badgeText);
+
+  summaryLeft.append(chevron, summaryIcon, summaryTitle, badge);
+
+  const summaryRight = document.createElement("div");
+  summaryRight.className = "library-filters-summary-right";
+
+  const quickResetBtn = document.createElement("button");
+  quickResetBtn.type = "button";
+  quickResetBtn.className = "library-filters-quick-reset";
+  quickResetBtn.title = t("filters.reset");
+  quickResetBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg><span>${t("filters.reset")}</span>`;
+
+  summaryRight.appendChild(quickResetBtn);
+  summary.append(summaryLeft, summaryRight);
   details.appendChild(summary);
-  updateFiltersBadge(summary, filters);
 
   const body = document.createElement("div");
   body.className = "library-filters-body";
@@ -412,183 +462,287 @@ export function createFiltersSpoiler({ storageKey, filters, onChange }) {
     onChange();
   };
 
-  const nameField = document.createElement("label");
-  nameField.className = "library-filter-field";
-  nameField.textContent = t("common.name");
-  const nameInput = document.createElement("input");
-  nameInput.type = "search";
-  nameInput.className = "library-filter-input";
-  nameInput.placeholder = t("filters.namePlaceholder");
-  nameInput.value = filters.name;
-  nameInput.autocomplete = "off";
-  let nameDebounceTimer = null;
-  nameInput.addEventListener("input", () => {
-    filters.name = nameInput.value.trim().toLowerCase();
-    clearTimeout(nameDebounceTimer);
-    nameDebounceTimer = setTimeout(() => emitChange(), 250);
+  const topRow = document.createElement("div");
+  topRow.className = "library-filters-top-row";
+
+  const searchField = document.createElement("div");
+  searchField.className = "library-filter-field library-filter-field--search";
+
+  const searchLabel = document.createElement("div");
+  searchLabel.className = "library-filter-label";
+  searchLabel.textContent = t("common.name");
+
+  const searchBox = document.createElement("div");
+  searchBox.className = "library-filter-search-box";
+
+  const searchIcon = document.createElement("span");
+  searchIcon.className = "library-filter-search-icon";
+  searchIcon.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>`;
+
+  const searchInput = document.createElement("input");
+  searchInput.type = "search";
+  searchInput.className = "library-filter-search-input";
+  searchInput.placeholder = t("filters.namePlaceholder");
+  searchInput.value = filters.name || "";
+  searchInput.autocomplete = "off";
+
+  let searchDebounceTimer = null;
+  searchInput.addEventListener("input", () => {
+    filters.name = searchInput.value.trim().toLowerCase();
+    clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = setTimeout(() => emitChange(), 250);
   });
-  nameField.appendChild(nameInput);
-  body.appendChild(nameField);
 
-  const sourceGroup = document.createElement("fieldset");
-  sourceGroup.className = "library-filter-fieldset";
-  const sourceLegend = document.createElement("legend");
-  sourceLegend.textContent = t("libraryTable.source");
-  sourceGroup.appendChild(sourceLegend);
-  const sourceGrid = document.createElement("div");
-  sourceGrid.className = "library-filter-checks";
-  for (const [kind, meta] of Object.entries(jobSourceKinds())) {
-    const label = document.createElement("label");
-    label.className = "library-filter-check";
-    const box = document.createElement("input");
-    box.type = "checkbox";
-    box.value = kind;
-    box.checked = filters.sources.includes(kind);
-    box.addEventListener("change", () => {
-      filters.sources = [...sourceGrid.querySelectorAll("input:checked")].map((el) => el.value);
-      emitChange();
-    });
-    label.append(box, document.createTextNode(meta.label));
-    sourceGrid.appendChild(label);
-  }
-  sourceGroup.appendChild(sourceGrid);
-  body.appendChild(sourceGroup);
-
-  const dateRow = document.createElement("div");
-  dateRow.className = "library-filter-row";
-  const dateFromField = document.createElement("label");
-  dateFromField.className = "library-filter-field";
-  dateFromField.textContent = t("filters.dateFrom");
-  const dateFromInput = document.createElement("input");
-  dateFromInput.type = "date";
-  dateFromInput.lang = localeDateTag();
-  dateFromInput.setAttribute("lang", localeDateTag());
-  dateFromInput.className = "library-filter-input";
-  dateFromInput.value = filters.dateFrom;
-  dateFromInput.addEventListener("change", () => {
-    filters.dateFrom = dateFromInput.value;
+  const searchClearBtn = document.createElement("button");
+  searchClearBtn.type = "button";
+  searchClearBtn.className = "library-filter-search-clear";
+  searchClearBtn.textContent = "✕";
+  searchClearBtn.title = t("filters.clearSearch");
+  searchClearBtn.addEventListener("click", () => {
+    searchInput.value = "";
+    filters.name = "";
     emitChange();
+    searchInput.focus();
   });
-  dateFromField.appendChild(dateFromInput);
-  const dateToField = document.createElement("label");
-  dateToField.className = "library-filter-field";
-  dateToField.textContent = t("filters.dateTo");
-  const dateToInput = document.createElement("input");
-  dateToInput.type = "date";
-  dateToInput.lang = localeDateTag();
-  dateToInput.setAttribute("lang", localeDateTag());
-  dateToInput.className = "library-filter-input";
-  dateToInput.value = filters.dateTo;
-  dateToInput.addEventListener("change", () => {
-    filters.dateTo = dateToInput.value;
-    emitChange();
-  });
-  dateToField.appendChild(dateToInput);
-  dateRow.append(dateFromField, dateToField);
-  body.appendChild(dateRow);
 
-  const durationRow = document.createElement("div");
-  durationRow.className = "library-filter-row";
-  const durationMinField = document.createElement("label");
-  durationMinField.className = "library-filter-field";
-  durationMinField.textContent = t("filters.durationMin");
-  const durationMinInput = document.createElement("input");
-  durationMinInput.type = "number";
-  durationMinInput.min = "0";
-  durationMinInput.step = "1";
-  durationMinInput.className = "library-filter-input";
-  durationMinInput.value = filters.durationMin;
-  durationMinInput.addEventListener("change", () => {
-    filters.durationMin = durationMinInput.value.trim();
-    emitChange();
-  });
-  durationMinField.appendChild(durationMinInput);
-  const durationMaxField = document.createElement("label");
-  durationMaxField.className = "library-filter-field";
-  durationMaxField.textContent = t("filters.durationMax");
-  const durationMaxInput = document.createElement("input");
-  durationMaxInput.type = "number";
-  durationMaxInput.min = "0";
-  durationMaxInput.step = "1";
-  durationMaxInput.className = "library-filter-input";
-  durationMaxInput.value = filters.durationMax;
-  durationMaxInput.addEventListener("change", () => {
-    filters.durationMax = durationMaxInput.value.trim();
-    emitChange();
-  });
-  durationMaxField.appendChild(durationMaxInput);
-  durationRow.append(durationMinField, durationMaxField);
-  body.appendChild(durationRow);
+  searchBox.append(searchIcon, searchInput, searchClearBtn);
+  searchField.append(searchLabel, searchBox);
 
-  const statusGroup = document.createElement("fieldset");
-  statusGroup.className = "library-filter-fieldset";
-  const statusLegend = document.createElement("legend");
-  statusLegend.textContent = t("libraryTable.status");
-  statusGroup.appendChild(statusLegend);
-  const statusGrid = document.createElement("div");
-  statusGrid.className = "library-filter-checks";
-  for (const opt of jobStatusFilterOptions()) {
-    const label = document.createElement("label");
-    label.className = "library-filter-check";
-    const box = document.createElement("input");
-    box.type = "checkbox";
-    box.value = opt.id;
-    box.checked = filters.statuses.includes(opt.id);
-    box.addEventListener("change", () => {
-      filters.statuses = [...statusGrid.querySelectorAll("input:checked")].map((el) => el.value);
-      emitChange();
-    });
-    label.append(box, document.createTextNode(opt.label));
-    statusGrid.appendChild(label);
-  }
-  statusGroup.appendChild(statusGrid);
-  body.appendChild(statusGroup);
+  const speakersField = document.createElement("div");
+  speakersField.className = "library-filter-field library-filter-field--speakers";
 
-  const speakersField = document.createElement("label");
-  speakersField.className = "library-filter-field";
-  speakersField.textContent = t("filters.speakers");
+  const speakersLabel = document.createElement("div");
+  speakersLabel.className = "library-filter-label";
+  speakersLabel.textContent = t("filters.speakers");
+
   const speakersSelect = document.createElement("select");
-  speakersSelect.className = "library-filter-input";
+  speakersSelect.className = "library-filter-select";
   for (const opt of speakersFilterOptions()) {
-    const option = document.createElement("option");
-    option.value = opt.id;
-    option.textContent = opt.label;
-    speakersSelect.appendChild(option);
+    const optEl = document.createElement("option");
+    optEl.value = opt.id;
+    optEl.textContent = opt.label;
+    speakersSelect.appendChild(optEl);
   }
-  speakersSelect.value = filters.speakers;
+  speakersSelect.value = filters.speakers || "any";
   speakersSelect.addEventListener("change", () => {
     filters.speakers = speakersSelect.value;
     emitChange();
   });
-  speakersField.appendChild(speakersSelect);
-  body.appendChild(speakersField);
+  speakersField.append(speakersLabel, speakersSelect);
 
-  const actions = document.createElement("div");
-  actions.className = "library-filters-actions";
-  const resetBtn = document.createElement("button");
-  resetBtn.type = "button";
-  resetBtn.className = "btn-outline btn-compact";
-  resetBtn.textContent = t("filters.reset");
-  resetBtn.addEventListener("click", () => {
-    Object.assign(filters, defaultFilters());
-    nameInput.value = "";
-    dateFromInput.value = "";
-    dateToInput.value = "";
-    durationMinInput.value = "";
-    durationMaxInput.value = "";
-    speakersSelect.value = "any";
-    sourceGrid.querySelectorAll("input").forEach((el) => {
-      el.checked = false;
+  const resetBtnWrap = document.createElement("div");
+  resetBtnWrap.className = "library-filter-field library-filter-field--reset";
+
+  const resetBtnLabel = document.createElement("div");
+  resetBtnLabel.className = "library-filter-label";
+  resetBtnLabel.style.visibility = "hidden";
+  resetBtnLabel.textContent = "—";
+
+  const fullResetBtn = document.createElement("button");
+  fullResetBtn.type = "button";
+  fullResetBtn.className = "library-filter-btn-reset";
+  fullResetBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg><span>${t("filters.reset")}</span>`;
+
+  resetBtnWrap.append(resetBtnLabel, fullResetBtn);
+  topRow.append(searchField, speakersField, resetBtnWrap);
+  body.appendChild(topRow);
+
+  const bentoGrid = document.createElement("div");
+  bentoGrid.className = "library-filters-bento-grid";
+
+  const colSources = document.createElement("div");
+  colSources.className = "library-filter-col-sources";
+
+  const sourcesLabel = document.createElement("div");
+  sourcesLabel.className = "library-filter-label";
+  sourcesLabel.textContent = t("libraryTable.source");
+
+  const sourcesGrid = document.createElement("div");
+  sourcesGrid.className = "library-filter-grid-2x2";
+
+  const sourceButtons = new Map();
+  for (const [kind, meta] of Object.entries(jobSourceKinds())) {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "library-filter-chip";
+    chip.dataset.source = kind;
+    chip.innerHTML = `${SOURCE_ICONS[kind] || ""}<span>${meta.label}</span>`;
+    if (filters.sources.includes(kind)) {
+      chip.classList.add("is-active");
+    }
+    chip.addEventListener("click", () => {
+      chip.classList.toggle("is-active");
+      const activeSources = [];
+      sourceButtons.forEach((btn, k) => {
+        if (btn.classList.contains("is-active")) {
+          activeSources.push(k);
+        }
+      });
+      filters.sources = activeSources;
+      emitChange();
     });
-    statusGrid.querySelectorAll("input").forEach((el) => {
-      el.checked = false;
+    sourceButtons.set(kind, chip);
+    sourcesGrid.appendChild(chip);
+  }
+  colSources.append(sourcesLabel, sourcesGrid);
+
+  const divider1 = document.createElement("div");
+  divider1.className = "library-filter-v-divider";
+
+  const colStatuses = document.createElement("div");
+  colStatuses.className = "library-filter-col-statuses";
+
+  const statusesLabel = document.createElement("div");
+  statusesLabel.className = "library-filter-label";
+  statusesLabel.textContent = t("libraryTable.status");
+
+  const statusesGrid = document.createElement("div");
+  statusesGrid.className = "library-filter-grid-3x2";
+
+  const statusButtons = new Map();
+  for (const opt of jobStatusFilterOptions()) {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "library-filter-chip";
+    chip.dataset.status = opt.id;
+    chip.innerHTML = `<span class="library-filter-status-dot"></span><span>${opt.label}</span>`;
+    if (filters.statuses.includes(opt.id)) {
+      chip.classList.add("is-active");
+    }
+    chip.addEventListener("click", () => {
+      chip.classList.toggle("is-active");
+      const activeStatuses = [];
+      statusButtons.forEach((btn, id) => {
+        if (btn.classList.contains("is-active")) {
+          activeStatuses.push(id);
+        }
+      });
+      filters.statuses = activeStatuses;
+      emitChange();
     });
+    statusButtons.set(opt.id, chip);
+    statusesGrid.appendChild(chip);
+  }
+  colStatuses.append(statusesLabel, statusesGrid);
+
+  const divider2 = document.createElement("div");
+  divider2.className = "library-filter-v-divider";
+
+  const colRanges = document.createElement("div");
+  colRanges.className = "library-filter-col-ranges";
+
+  const rangesLabel = document.createElement("div");
+  rangesLabel.className = "library-filter-label";
+  rangesLabel.textContent = t("filters.periodAndDuration");
+
+  const rangesStack = document.createElement("div");
+  rangesStack.className = "library-filter-ranges-stack";
+
+  const dateRow = document.createElement("div");
+  dateRow.className = "library-filter-range-compact-row";
+
+  const dateTag = document.createElement("span");
+  dateTag.className = "library-filter-range-tag";
+  dateTag.textContent = t("filters.rangeDateTag");
+
+  const dateFromInput = document.createElement("input");
+  dateFromInput.type = "date";
+  dateFromInput.lang = localeDateTag();
+  dateFromInput.setAttribute("lang", localeDateTag());
+  dateFromInput.className = "library-filter-range-input";
+  dateFromInput.value = filters.dateFrom || "";
+  dateFromInput.title = t("filters.dateFrom");
+  dateFromInput.addEventListener("change", () => {
+    filters.dateFrom = dateFromInput.value;
     emitChange();
   });
-  actions.appendChild(resetBtn);
-  body.appendChild(actions);
+
+  const dateDivider = document.createElement("span");
+  dateDivider.className = "library-filter-range-divider";
+  dateDivider.textContent = "—";
+
+  const dateToInput = document.createElement("input");
+  dateToInput.type = "date";
+  dateToInput.lang = localeDateTag();
+  dateToInput.setAttribute("lang", localeDateTag());
+  dateToInput.className = "library-filter-range-input";
+  dateToInput.value = filters.dateTo || "";
+  dateToInput.title = t("filters.dateTo");
+  dateToInput.addEventListener("change", () => {
+    filters.dateTo = dateToInput.value;
+    emitChange();
+  });
+
+  dateRow.append(dateTag, dateFromInput, dateDivider, dateToInput);
+
+  const durRow = document.createElement("div");
+  durRow.className = "library-filter-range-compact-row";
+
+  const durTag = document.createElement("span");
+  durTag.className = "library-filter-range-tag";
+  durTag.textContent = t("filters.rangeMinTag");
+
+  const durMinInput = document.createElement("input");
+  durMinInput.type = "number";
+  durMinInput.min = "0";
+  durMinInput.step = "1";
+  durMinInput.placeholder = t("filters.durationFromPlaceholder");
+  durMinInput.className = "library-filter-range-input";
+  durMinInput.value = filters.durationMin || "";
+  durMinInput.title = t("filters.durationMin");
+  durMinInput.addEventListener("change", () => {
+    filters.durationMin = durMinInput.value.trim();
+    emitChange();
+  });
+
+  const durDivider = document.createElement("span");
+  durDivider.className = "library-filter-range-divider";
+  durDivider.textContent = "—";
+
+  const durMaxInput = document.createElement("input");
+  durMaxInput.type = "number";
+  durMaxInput.min = "0";
+  durMaxInput.step = "1";
+  durMaxInput.placeholder = t("filters.durationToPlaceholder");
+  durMaxInput.className = "library-filter-range-input";
+  durMaxInput.value = filters.durationMax || "";
+  durMaxInput.title = t("filters.durationMax");
+  durMaxInput.addEventListener("change", () => {
+    filters.durationMax = durMaxInput.value.trim();
+    emitChange();
+  });
+
+  durRow.append(durTag, durMinInput, durDivider, durMaxInput);
+
+  rangesStack.append(dateRow, durRow);
+  colRanges.append(rangesLabel, rangesStack);
+
+  bentoGrid.append(colSources, divider1, colStatuses, divider2, colRanges);
+  body.appendChild(bentoGrid);
 
   details.appendChild(body);
+
+  function resetAllFilters() {
+    Object.assign(filters, defaultFilters());
+    searchInput.value = "";
+    speakersSelect.value = "any";
+    dateFromInput.value = "";
+    dateToInput.value = "";
+    durMinInput.value = "";
+    durMaxInput.value = "";
+    sourceButtons.forEach((btn) => btn.classList.remove("is-active"));
+    statusButtons.forEach((btn) => btn.classList.remove("is-active"));
+    emitChange();
+  }
+
+  quickResetBtn.addEventListener("click", (event) => {
+    event.stopPropagation();
+    event.preventDefault();
+    resetAllFilters();
+  });
+  fullResetBtn.addEventListener("click", () => resetAllFilters());
+
+  updateFiltersBadge(summary, filters);
   return details;
 }
 

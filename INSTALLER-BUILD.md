@@ -1,6 +1,6 @@
 # Сборка установщика Slysh (волна E)
 
-Пользовательский артефакт: `dist\Slysh-Setup.exe` (не в git).
+Пользовательские артефакты: `dist\Slysh-Setup-{version}-ru.exe`, `dist\Slysh-Setup-{version}-en.exe` (версия из `pyproject.toml`, не в git).
 
 ## Требования на машине сборки
 
@@ -33,7 +33,7 @@ powershell -File scripts\build-slysh-setup.ps1
 | E.4 | Обновления + SHA-256 | `updates.py`, `smoke_updates_sha256.py`; без digest — нет auto-install |
 | E.5 | Upgrade vs first-run | `IsAppUpgrade` в `Slysh.iss` — `.fresh-install` только для новой установки |
 | E.6 | Чистые Win10/11 | [`installer/E6-OFFLINE-VM.md`](installer/E6-OFFLINE-VM.md) + `e6-offline-vm-verify.ps1` |
-| — | EULA при установке | RU: `LICENSE-RU.txt` → `Slysh-Setup.exe`; EN: `LICENSE-EN.txt` → `Slysh-Setup-en.exe`; в payload обе копии в `licenses\` |
+| — | EULA при установке | RU: `LICENSE-RU.txt` → `Slysh-Setup-ru.exe`; EN: `LICENSE-EN.txt` → `Slysh-Setup-en.exe`; в payload обе копии в `licenses\` |
 
 ## E.6 — чистая VM offline
 

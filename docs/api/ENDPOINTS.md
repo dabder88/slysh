@@ -13,6 +13,7 @@
 | PATCH | `/api/jobs/{job_id}/segments` | Правка текста сегментов |
 | POST | `/api/jobs/{job_id}/start` | Старт расшифровки |
 | POST | `/api/jobs/{job_id}/retranscribe` | Повтор |
+| POST | `/api/jobs/{job_id}/pause` | Пауза: для job в активном пакете — `pause_after_current` пакета; для одиночного — прервать проход, сохранить сегменты, статус `idle` (**не** запускает следующий job в очереди) |
 | POST | `/api/jobs/{job_id}/cancel` | Отмена расшифровки, ingest YouTube, облачного ASR и **диаризации спикеров** |
 | DELETE | `/api/jobs/{job_id}` | Удаление |
 | GET | `/api/jobs/{job_id}/media` | Файл источника |
@@ -22,7 +23,7 @@
 | PUT | `/api/jobs/{job_id}/speakers` | Имена спикеров |
 | POST | `/api/jobs/{job_id}/remove-from-batch` | Убрать из пакета |
 
-В JSON job из `_decorate_job`: **`duration_s`** — длительность медиа (запись/контент); **`processing_s`** — время обработки job (`started_at` → `finished_at` или «сейчас» для активных). Список jobs без сегментов подмешивает fallback `segment_max_end_ms` из SQLite.
+В JSON job из `_decorate_job`: **`duration_s`** — длительность медиа (запись/контент); **`processing_s`** — время обработки job (`started_at` → `finished_at` или «сейчас» для активных); **`has_transcript`** — есть сегменты в БД (для списков без полного `segments`). Список jobs без сегментов подмешивает fallback `segment_max_end_ms` из SQLite.
 
 ## UI — library / batches
 
@@ -39,9 +40,18 @@
 | POST | `/api/batches/{batch_id}/items` | Добавить файлы |
 | PUT | `/api/batches/{batch_id}/reorder` | Порядок |
 | POST | `/api/batches/{batch_id}/start` | Запуск пакета |
-| POST | `/api/batches/{batch_id}/pause` | Пауза |
+| POST | `/api/batches/{batch_id}/pause` | Пауза после текущего файла пакета (`pause_after_current`) |
 | POST | `/api/batches/{batch_id}/cancel` | Отмена пакета |
 | POST | `/api/batches/{batch_id}/export` | Экспорт всех completed в пакете |
+
+## UI — очередь (bulk)
+
+| Метод | Путь | Назначение |
+|-------|------|------------|
+| GET | `/api/capabilities` | `{ job_pause, queue_bulk }` — наличие pause/bulk API (для UI очереди) |
+| POST | `/api/queue/pause-orphans` | Пауза всех orphan jobs в `queued` / `running` / `finalizing` → `idle`, без автозапуска следующего |
+| POST | `/api/queue/cancel-orphans` | Отмена всех активных orphan jobs, без pump очереди |
+| POST | `/api/queue/cancel-batches` | Отмена всех выполняющихся пакетов (`cancel_batch`) |
 
 ## UI — экспорт пачкой
 
@@ -72,6 +82,8 @@
 | POST | `/api/model/download` | Скачать веса в `models/`; body `{ "id": "gigaam" \| "whisper:<size>" }` (без body — GigaAM) |
 | GET | `/api/locale` | `{ "ui_locale": "ru" \| "en" }`; query `hint` — при отсутствии `ui_locale` в settings сохраняет `en`/`ru` по hint |
 | PUT | `/api/locale` | body `{ "ui_locale": "ru" \| "en" }` |
+| GET | `/api/ui/export-favorites` | `{ "dirs": string[] }` — избранные папки экспорта (`settings.json` → `ui.export_favorite_dirs`, до 12 путей) |
+| PUT | `/api/ui/export-favorites` | body `{ "dirs": string[] }` — нормализация (trim, dedupe без учёта регистра), ответ с каноническим списком |
 | GET/PUT | `/api/compute` | auto / gpu / cpu; поля `explanations` / `warning` по `ui_locale` из settings |
 | GET | `/api/setup` | `{ engine_packages, installing, dismissed, pending_model_setup, install_progress, remote_ready, log_tail, … }` — **не** стартует `uv`. При `installing`, `install_progress` включает `packages_done`, `packages_total`, `bytes_done`, `bytes_total`, `fraction`, `stalled` (нет изменений лога ~90 с) |
 | GET | `/api/setup/engine` | Тот же статус + хвост лога |
@@ -88,7 +100,7 @@
 
 | Метод | Путь | Назначение |
 |-------|------|------------|
-| GET | `/api/app/info` | `version`, `install_kind`, `updates_enabled`, `github_repo`, `releases_url`, `last_check_at`, `about_url`, `support_url` (донат: `settings.json` → `support_url` или env `SLYSH_SUPPORT_URL`; «О программе»: `about_url` / `SLYSH_ABOUT_URL`) |
+| GET | `/api/app/info` | Query `ui_locale` (`ru` \| `en`, опционально) — для дефолтных `about_url` / `support_url` на slyshai.pro; без параметра — по `settings.ui_locale`. Поля: `version`, `install_kind`, `updates_enabled`, `github_repo`, `releases_url`, `last_check_at`, `about_url`, `support_url`. Дефолты: `utm_source=soft`, `utm_medium=ru`/`en`, support — `#support`. Переопределение: `about_url` / `SLYSH_ABOUT_URL`, `support_url` / `SLYSH_SUPPORT_URL` |
 | POST | `/api/ui/session` | При `GIGAAM_UI_AUTH=1`: заголовок `X-Slysh-Bootstrap` (токен из pywebview `ui_bootstrap_token`) → выдаёт HttpOnly cookie `slysh_ui_session` |
 
 Провайдеры (OpenRouter, Apify, HTTP-пресеты, custom): в GET всегда `api_key_set`, `api_key_masked` (маска 4+…+4), `api_key_tail` (= masked). Поле `api_key` с полным значением — только при валидной UI-сессии (`GIGAAM_UI_AUTH=1` + cookie) или если UI auth выключен (тесты).
@@ -105,18 +117,18 @@
 | Метод | Путь |
 |-------|------|
 | GET | `/api/mics` | `?refresh=1` пересканирует микрофоны |
-| GET | `/api/live/status` | `listening`, `paused`, `session_active`, `segments`, `remaining_s` |
-| POST | `/api/live/start` |
+| GET | `/api/live/status` | `listening`, `paused`, `session_active`, `segments`, `remaining_s`, `live_chunk_seconds`, `save_audio`; после стопа — `recording_path` |
+| POST | `/api/live/start` | JSON: `device_id?`, `save_audio` (default true) — WAV в `recordings\` при true |
 | POST | `/api/live/pause` |
 | POST | `/api/live/resume` |
 | POST | `/api/live/stop` |
 | POST | `/api/live/clear` | Сброс `job_id` на экране диктофона (без удаления job из БД) |
 | GET | `/api/meeting/devices` | `?refresh=1` пересканирует выходы и микрофоны |
-| GET | `/api/meeting/status` | `listening`, `paused`, `session_active`, `segments`, `elapsed_s` |
-| POST | `/api/meeting/start` |
+| GET | `/api/meeting/status` | `listening`, `paused`, `session_active`, `segments`, `elapsed_s`, `live_chunk_seconds`, `save_audio`; после стопа — `recording_path` (или null) |
+| POST | `/api/meeting/start` | JSON: `output_device_id`, `mic_device_id`, `include_mic`, `save_audio` (default true) |
 | POST | `/api/meeting/pause` |
 | POST | `/api/meeting/resume` |
-| POST | `/api/meeting/stop` |
+| POST | `/api/meeting/stop` | Job payload + `recording_path` при `save_audio` |
 | POST | `/api/meeting/clear` | Сброс `job_id` на экране встречи (без удаления job из БД) |
 | GET | `/api/youtube/status` | Apify key, cookies, `cookies_auth_mode` (`file`/`browser`), yt-dlp, `batch_api`, `batch_resolve_api` |
 | GET | `/api/youtube/cookies/browsers` | Профили Firefox/Chrome/Edge |

@@ -185,3 +185,18 @@ def test_db_source_title_migration(tmp_path):
     db.set_job_source_title(job_id, "Заголовок")
     job = db.get_job(job_id)
     assert job["source_title"] == "Заголовок"
+
+
+def test_youtube_status_reveals_apify_key_when_allowed(monkeypatch):
+    from slysh.providers import save_apify
+
+    db = Database(db_path())
+    app = create_ui_app(db=db, engine=None)
+    client = TestClient(app)
+    save_apify(api_key="secret-apify-token")
+    monkeypatch.setattr("slysh.provider_reveal.apify_api_key", lambda: "secret-apify-token")
+    response = client.get("/api/youtube/status")
+    assert response.status_code == 200
+    apify = response.json()["apify"]
+    assert apify["api_key_set"] is True
+    assert apify.get("api_key") == "secret-apify-token"

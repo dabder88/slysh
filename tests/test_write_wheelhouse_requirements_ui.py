@@ -12,7 +12,7 @@ def test_build_requirements_ui_hash_free_and_includes_slysh(tmp_path: Path):
     wh = tmp_path / "wheelhouse"
     wh.mkdir()
     (wh / "proxy_tools-0.1.0-py3-none-any.whl").write_bytes(b"x")
-    (wh / "slysh-0.1.0-py3-none-any.whl").write_bytes(b"x")
+    (wh / "slysh-1.0.0-py3-none-any.whl").write_bytes(b"x")
     export = tmp_path / "export.txt"
     export.write_text(
         "proxy-tools==0.1.0 \\\n"
@@ -20,8 +20,8 @@ def test_build_requirements_ui_hash_free_and_includes_slysh(tmp_path: Path):
         encoding="utf-8",
     )
     out = wh / "requirements-ui.txt"
-    build_requirements_ui(export, wh, "0.1.0", out)
+    build_requirements_ui(export, wh, "1.0.0", out)
     text = out.read_text(encoding="utf-8")
     assert "--hash" not in text
     assert "proxy-tools==0.1.0" in text
-    assert "slysh==0.1.0" in text
+    assert "slysh==1.0.0" in text

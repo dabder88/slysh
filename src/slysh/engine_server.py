@@ -173,13 +173,26 @@ def create_app(backend, decode) -> FastAPI:
     @app.post("/transcribe_chunk")
     def transcribe_chunk(body: TranscribeChunkBody):
         is_cancelled = operation_cancel.start()
+        set_progress(0.05, "asr")
         try:
             pcm = np.asarray(body.samples, dtype=np.float32)
-            segments = backend.transcribe_chunk(pcm, is_cancelled)
+            transcribe_file = getattr(backend, "transcribe_file", None)
+            if callable(transcribe_file):
+
+                def on_partial(value: float) -> None:
+                    set_progress(0.05 + 0.95 * float(value), "asr")
+
+                segments = transcribe_file(pcm, is_cancelled, on_partial)
+            else:
+                segments = backend.transcribe_chunk(pcm, is_cancelled)
         except Exception as exc:
             logging.exception("transcribe_chunk failed")
             message = str(exc).strip() or "Ошибка распознавания"
             return JSONResponse(status_code=400, content={"error": message})
+        if is_cancelled():
+            set_progress(progress_state["progress"], "cancelled")
+        else:
+            set_progress(1.0, "asr")
         return _segments_payload(segments)
 
     @app.post("/label_speakers")
@@ -210,6 +223,7 @@ def create_app(backend, decode) -> FastAPI:
                 body.path,
                 segments,
                 cancelled=is_cancelled,
+                on_progress=lambda value: set_progress(value, "speakers"),
             )
         except SpeakerCancelledError:
             return JSONResponse(status_code=499, content={"error": "cancelled"})
@@ -246,7 +260,9 @@ def _bind_localhost(port: int) -> socket.socket:
 
 def main(argv: list[str] | None = None) -> None:
     from slysh.logging_setup import setup_logging
+    from slysh.subprocess_win import install_subprocess_hide_console_patch
 
+    install_subprocess_hide_console_patch()
     setup_logging()
     parser = argparse.ArgumentParser(description="GigaAM engine HTTP process")
     parser.add_argument("--port", type=int, default=0, help="Port (0 = ephemeral)")

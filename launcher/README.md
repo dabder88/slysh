@@ -4,6 +4,12 @@ GUI launcher without a console window. Sets the same environment as `Slysh.bat` 
 
 `.venv\Scripts\pythonw.exe -m slysh.app` (uv may briefly re-exec `pyvenv.cfg` `home`; `single_instance` in `main()` drops the extra process before UI).
 
+Before Python starts, shows a **native splash** (badge, status line, progress). Strings follow `ui_locale`: pending `{install}\.install-ui-locale` from Setup (if present), else `%LOCALAPPDATA%\Slysh\settings.json` (or `GIGAAM_DESKTOP_HOME`), else Russian.
+
+After Setup, if `.install-ui-locale` exists and `.venv` is already usable, the launcher runs **`uv pip sync`** from `wheelhouse/requirements-ui.txt` (Inno does not replace `.venv` on upgrade) so the installed `slysh` wheel matches the new payload before Python consumes the locale seed.
+
+Rebuild `installer/prebuilt/Slysh.exe` after changing launcher logic in `Slysh.c`.
+
 ## Rebuild prebuilt (maintainer)
 
 Requires **Visual Studio Build Tools** (Desktop development with C++).
