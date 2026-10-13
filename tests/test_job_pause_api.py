@@ -68,3 +68,19 @@ def test_pause_running_orphan_does_not_pump(tmp_path, monkeypatch):
     r = client.post(f"/api/jobs/{job_id}/pause")
     assert r.status_code == 200
     assert pumped == []
+
+
+def test_cancel_idle_orphan_after_pause_sets_cancelled(tmp_path, monkeypatch):
+    monkeypatch.setenv("GIGAAM_DESKTOP_HOME", str(tmp_path / "home"))
+    db = Database(tmp_path / "app.db")
+    wav = tmp_path / "a.wav"
+    wav.write_bytes(b"x")
+    job_id = db.create_job(JobKind.FILE, str(wav))
+    db.set_status(job_id, JobStatus.RUNNING)
+    client = TestClient(create_ui_app(db, engine=None))
+    assert client.post(f"/api/jobs/{job_id}/pause").status_code == 200
+    assert (db.get_job(job_id) or {})["status"] == JobStatus.IDLE.value
+
+    r = client.post(f"/api/jobs/{job_id}/cancel")
+    assert r.status_code == 200
+    assert (db.get_job(job_id) or {})["status"] == JobStatus.CANCELLED.value

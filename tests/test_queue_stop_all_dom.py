@@ -19,3 +19,10 @@ def test_stop_all_wired_in_queue_js():
     assert "btn-queue-stop-all" in text
     assert "/api/queue/cancel-orphans" in text
     assert "/api/queue/cancel-batches" in text
+    stop_idx = text.index("async function stopAllActive")
+    stop_body = text[stop_idx : text.index("export function initQueue")]
+    assert "isBatchPaused" in stop_body
+    assert "orphansNeedingCancel" in stop_body
+    assert "orphansToCancel" in stop_body
+    assert "function orphansNeedingCancel" in text
+    assert "isJobPausedInQueue" in text

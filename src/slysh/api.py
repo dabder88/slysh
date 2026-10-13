@@ -1301,6 +1301,42 @@ def _orphan_jobs_in_active_statuses(db: Database) -> list[dict]:
     return jobs
 
 
+def _job_has_queue_participation(db: Database, job: dict) -> bool:
+    if job.get("started_at"):
+        return True
+    if float(job.get("progress") or 0) > 0:
+        return True
+    return bool(db.list_segments(int(job["id"])))
+
+
+def _orphan_job_paused_in_queue(db: Database, job: dict) -> bool:
+    if job.get("batch_id") is not None:
+        return False
+    if job.get("status") != JobStatus.IDLE.value:
+        return False
+    return _job_has_queue_participation(db, job)
+
+
+def _job_in_paused_batch(db: Database, job: dict) -> bool:
+    batch_id = job.get("batch_id")
+    if batch_id is None:
+        return False
+    batch = db.get_batch(int(batch_id))
+    if not batch or batch.get("status") != BatchStatus.PAUSED.value:
+        return False
+    return job.get("status") in (JobStatus.IDLE.value, JobStatus.QUEUED.value)
+
+
+def _orphan_jobs_for_cancel(db: Database) -> list[dict]:
+    jobs: list[dict] = []
+    for job in db.list_orphan_jobs():
+        if job.get("status") in _JOB_ACTIVE_STATUSES:
+            jobs.append(job)
+        elif _orphan_job_paused_in_queue(db, job):
+            jobs.append(job)
+    return jobs
+
+
 def _pump_asr_queues(app: FastAPI, db: Database) -> None:
     if int(getattr(app.state, "asr_pump_suppressed", 0) or 0) > 0:
         return
@@ -2852,6 +2888,10 @@ def create_ui_app(
         was_queued = job.get("status") == JobStatus.QUEUED.value
         if job["status"] in _JOB_ACTIVE_STATUSES:
             db.set_status(job_id, JobStatus.CANCELLED)
+        elif job["status"] == JobStatus.IDLE.value and (
+            _orphan_job_paused_in_queue(db, job) or _job_in_paused_batch(db, job)
+        ):
+            db.set_status(job_id, JobStatus.CANCELLED)
         if pump_if_was_queued and was_queued:
             _pump_asr_queues(app, db)
 
@@ -2879,7 +2919,7 @@ def create_ui_app(
     def cancel_orphan_queue() -> dict:
         cancelled = 0
         with _suppress_asr_pump(app):
-            jobs = _orphan_jobs_in_active_statuses(db)
+            jobs = _orphan_jobs_for_cancel(db)
             for job in jobs:
                 jid = int(job["id"])
                 current = db.get_job(jid) or job
@@ -2894,7 +2934,8 @@ def create_ui_app(
         with _suppress_asr_pump(app):
             for batch in db.list_batches():
                 batch_id = int(batch["id"])
-                if not is_batch_active(app, batch_id):
+                paused = batch.get("status") == BatchStatus.PAUSED.value
+                if not is_batch_active(app, batch_id) and not paused:
                     continue
                 if cancel_batch(
                     app,

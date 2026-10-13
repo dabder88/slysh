@@ -4,7 +4,8 @@
 
 ## 2026-10-13
 
-- Очередь: пауза сохраняет файлы в секции «На паузе» (resume/stop по файлу, «Возобновить все»); «Остановить все» — cancel как раньше; bulk pause без gate capabilities; `engine_starting` per-job; фильтр `isJobInQueue`.
+- Очередь: «Остановить все» отменяет и файлы/пакеты **на паузе** (`cancel-orphans` для idle с участием в очереди, `cancel_batch` для `BatchStatus.paused`); закрытие приложения paused не сбрасывает — в БД остаётся `idle` с прогрессом.
+- Очередь: пауза сохраняет файлы в секции «На паузе» (resume/stop по файлу, «Возобновить все»); bulk pause без gate capabilities; `engine_starting` per-job; фильтр `isJobInQueue`.
 - Боковое меню: перетаскивание правого края колонки (200–480 px), ширина в `localStorage` (`sidebar-user-width`); двойной клик — сброс к умолчанию; дефолт **270 px**.
 
 ## 2026-10-12

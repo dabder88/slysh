@@ -34,3 +34,32 @@ def test_cancel_orphans_bulk_cancelled_and_no_pump(tmp_path, monkeypatch):
         assert (db.get_job(jid) or {})["status"] == JobStatus.CANCELLED.value
     assert pumped == []
     assert not db.list_queued_jobs()
+
+
+def test_cancel_orphans_includes_idle_after_pause(tmp_path, monkeypatch):
+    monkeypatch.setenv("GIGAAM_DESKTOP_HOME", str(tmp_path / "home"))
+    pumped: list[str] = []
+    monkeypatch.setattr(
+        api_mod,
+        "_pump_asr_queues",
+        lambda _app, _db: pumped.append("pump"),
+    )
+
+    db = Database(tmp_path / "app.db")
+    j1 = db.create_job(JobKind.FILE, str(tmp_path / "a.wav"))
+    j2 = db.create_job(JobKind.FILE, str(tmp_path / "b.wav"))
+    db.set_status(j1, JobStatus.RUNNING)
+    db.begin_transcription(j2)
+
+    client = TestClient(create_ui_app(db, engine=None))
+    r_pause = client.post("/api/queue/pause-orphans")
+    assert r_pause.status_code == 200
+    assert (db.get_job(j1) or {})["status"] == JobStatus.IDLE.value
+    assert (db.get_job(j2) or {})["status"] == JobStatus.IDLE.value
+
+    r = client.post("/api/queue/cancel-orphans")
+    assert r.status_code == 200
+    assert r.json().get("cancelled_count") == 2
+    for jid in (j1, j2):
+        assert (db.get_job(jid) or {})["status"] == JobStatus.CANCELLED.value
+    assert pumped == []

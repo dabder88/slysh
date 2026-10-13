@@ -50,8 +50,8 @@
 |-------|------|------------|
 | GET | `/api/capabilities` | `{ job_pause, queue_bulk }` — наличие pause/bulk API (для UI очереди) |
 | POST | `/api/queue/pause-orphans` | Пауза всех orphan jobs в `queued` / `running` / `finalizing` → `idle`, без автозапуска следующего |
-| POST | `/api/queue/cancel-orphans` | Отмена всех активных orphan jobs, без pump очереди |
-| POST | `/api/queue/cancel-batches` | Отмена всех выполняющихся пакетов (`cancel_batch`) |
+| POST | `/api/queue/cancel-orphans` | Отмена orphan jobs в `queued` / `running` / `finalizing` и paused в очереди (`idle` с `started_at`/прогрессом/сегментами), без pump |
+| POST | `/api/queue/cancel-batches` | Отмена выполняющихся и **paused** пакетов (`cancel_batch`) |
 
 ## UI — экспорт пачкой
 

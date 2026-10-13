@@ -52,8 +52,15 @@ function orphansNeedingPause(orphans) {
   return orphans.filter((j) => isJobActive(j) || j.status === "queued");
 }
 
-function orphansNeedingCancel(orphans) {
-  return orphans.filter((j) => isJobActive(j) || j.status === "queued");
+function orphansNeedingCancel(orphans, batchMap) {
+  return orphans.filter(
+    (j) =>
+      isJobActive(j) ||
+      j.status === "queued" ||
+      (isJobPausedInQueue(j, batchMap) &&
+        !isJobActive(j) &&
+        !isJobWaiting(j, batchMap))
+  );
 }
 
 async function pauseOrphansBulk(orphans) {
@@ -69,22 +76,22 @@ async function pauseOrphansBulk(orphans) {
   }
 }
 
-async function cancelOrphansBulk(orphans) {
+async function cancelOrphansBulk(orphans, batchMap) {
   try {
     await api("/api/queue/cancel-orphans", { method: "POST" });
   } catch (err) {
     if (!isBulkEndpointMissing(err)) {
       throw err;
     }
-    for (const job of orphansNeedingCancel(orphans)) {
+    for (const job of orphansNeedingCancel(orphans, batchMap)) {
       await cancelJob(job.id);
     }
   }
 }
 
 async function cancelActiveBatchesBulk(batches) {
-  const running = batches.filter((b) => b.running);
-  if (!running.length) {
+  const targets = batches.filter((b) => b.running || isBatchPaused(b));
+  if (!targets.length) {
     return;
   }
   try {
@@ -93,7 +100,7 @@ async function cancelActiveBatchesBulk(batches) {
     if (!isBulkEndpointMissing(err)) {
       throw err;
     }
-    for (const batch of running) {
+    for (const batch of targets) {
       await cancelBatch(batch.id);
     }
   }
@@ -754,9 +761,12 @@ async function resumeAllPaused() {
 
 async function stopAllActive() {
   const { batches, orphans } = getLibrarySnapshot();
-  const activeBatches = batches.filter((b) => b.running || isBatchActive(b));
-  const hasOrphans = orphanQueueHasWork(orphans);
-  if (!hasOrphans && !activeBatches.length) {
+  const batchMap = new Map(batches.map((b) => [b.id, b]));
+  const orphansToCancel = orphansNeedingCancel(orphans, batchMap);
+  const batchesToCancel = batches.filter(
+    (b) => b.running || isBatchActive(b) || isBatchPaused(b)
+  );
+  if (!orphansToCancel.length && !batchesToCancel.length) {
     showToast("queue.noActive");
     return;
   }
@@ -764,11 +774,11 @@ async function stopAllActive() {
     return;
   }
   try {
-    if (hasOrphans) {
-      await cancelOrphansBulk(orphans);
+    if (orphansToCancel.length) {
+      await cancelOrphansBulk(orphans, batchMap);
     }
-    if (activeBatches.some((b) => b.running)) {
-      await cancelActiveBatchesBulk(activeBatches);
+    if (batchesToCancel.length) {
+      await cancelActiveBatchesBulk(batchesToCancel);
     }
     await refreshQueue();
     showToast("queue.stopAllDone");

@@ -468,6 +468,13 @@ def pause_batch(app: FastAPI, batch_id: int) -> bool:
     return True
 
 
+def _cancel_batch_idle_and_queued_jobs(db: Database, batch_id: int) -> None:
+    for job in db.list_batch_jobs(batch_id):
+        if job["status"] in (JobStatus.IDLE.value, JobStatus.QUEUED.value):
+            db.set_status(int(job["id"]), JobStatus.CANCELLED)
+    db.update_batch(batch_id, status=BatchStatus.IDLE)
+
+
 def cancel_batch(
     app: FastAPI,
     db: Database,
@@ -478,10 +485,18 @@ def cancel_batch(
 ) -> bool:
     runner = get_runner(app)
     with runner.lock:
-        if runner.batch_id != batch_id:
+        on_runner = runner.batch_id == batch_id
+        if on_runner:
+            runner.cancel_requested = True
+            current_job_id = runner.current_job_id
+        else:
+            current_job_id = None
+    if not on_runner:
+        batch = db.get_batch(batch_id)
+        if not batch or batch.get("status") != BatchStatus.PAUSED.value:
             return False
-        runner.cancel_requested = True
-        current_job_id = runner.current_job_id
+        _cancel_batch_idle_and_queued_jobs(db, batch_id)
+        return True
     if current_job_id is not None:
         job = db.get_job(current_job_id) or {}
         if job.get("status") == JobStatus.RUNNING.value:
@@ -495,8 +510,5 @@ def cancel_batch(
                 except Exception:
                     logger.exception("engine cancel failed for batch job %s", current_job_id)
         db.set_status(int(current_job_id), JobStatus.CANCELLED)
-    for job in db.list_batch_jobs(batch_id):
-        if job["status"] in (JobStatus.IDLE.value, JobStatus.QUEUED.value):
-            db.set_status(int(job["id"]), JobStatus.CANCELLED)
-    db.update_batch(batch_id, status=BatchStatus.IDLE)
+    _cancel_batch_idle_and_queued_jobs(db, batch_id)
     return True
