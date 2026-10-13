@@ -848,6 +848,93 @@ static int wheelhouse_has_requirements_ui(const wchar_t *root) {
     return path_exists(req);
 }
 
+static void trim_stamp_text(char *text) {
+    size_t len;
+    size_t start = 0;
+    size_t end;
+
+    if (text == NULL)
+        return;
+    while (text[start] == ' ' || text[start] == '\t' || text[start] == '\r' || text[start] == '\n')
+        start++;
+    if (text[start] == '\0') {
+        text[0] = '\0';
+        return;
+    }
+    len = strlen(text + start);
+    end = start + len;
+    while (end > start &&
+           (text[end - 1] == ' ' || text[end - 1] == '\t' || text[end - 1] == '\r' || text[end - 1] == '\n')) {
+        end--;
+    }
+    if (start > 0)
+        memmove(text, text + start, end - start);
+    text[end - start] = '\0';
+}
+
+static int read_install_stamp_file(const wchar_t *path, char *buf, size_t buf_size) {
+    FILE *fp = NULL;
+    size_t n;
+
+    if (buf == NULL || buf_size < 2)
+        return 0;
+    buf[0] = '\0';
+    if (path == NULL || !path_exists(path))
+        return 0;
+    if (_wfopen_s(&fp, path, L"rb") != 0 || fp == NULL)
+        return 0;
+    n = fread(buf, 1, buf_size - 1, fp);
+    fclose(fp);
+    if (n == 0)
+        return 0;
+    buf[n] = '\0';
+    trim_stamp_text(buf);
+    return buf[0] != '\0';
+}
+
+static int payload_sync_pending_file(const wchar_t *root) {
+    wchar_t path[MAX_PATH * 2];
+
+    if (!PathCombineW(path, root, L".payload-sync-pending"))
+        return 0;
+    return path_exists(path);
+}
+
+static int payload_venv_resync_needed(const wchar_t *root) {
+    wchar_t path[MAX_PATH * 2];
+    char build[96];
+    char stamp[96];
+
+    if (install_ui_locale_seed_pending(root))
+        return 1;
+    if (payload_sync_pending_file(root))
+        return 1;
+    if (!PathCombineW(path, root, L"payload-build.txt") || !path_exists(path))
+        return 0;
+    if (!read_install_stamp_file(path, build, sizeof(build)))
+        return 0;
+    if (!PathCombineW(path, root, L".venv-payload-sync") || !path_exists(path))
+        return 1;
+    if (!read_install_stamp_file(path, stamp, sizeof(stamp)))
+        return 1;
+    return _stricmp(build, stamp) != 0;
+}
+
+static int write_venv_payload_sync_stamp(const wchar_t *root) {
+    wchar_t src[MAX_PATH * 2];
+    wchar_t dst[MAX_PATH * 2];
+
+    if (!PathCombineW(src, root, L"payload-build.txt") || !path_exists(src))
+        return 1;
+    if (!PathCombineW(dst, root, L".venv-payload-sync"))
+        return 0;
+    if (!CopyFileW(src, dst, FALSE))
+        return 0;
+    if (PathCombineW(dst, root, L".payload-sync-pending") && path_exists(dst))
+        DeleteFileW(dst);
+    return 1;
+}
+
 static int find_bundled_python(const wchar_t *root, wchar_t *python, size_t python_chars) {
     wchar_t rt[MAX_PATH * 2];
     wchar_t pattern[MAX_PATH * 2];
@@ -883,7 +970,7 @@ static int find_bundled_python(const wchar_t *root, wchar_t *python, size_t pyth
     return 0;
 }
 
-static int run_uv_pip_sync_only(const wchar_t *root, DWORD *exit_code) {
+static int run_uv_pip_sync_only(const wchar_t *root, DWORD *exit_code, int reinstall_slysh) {
     wchar_t uv[MAX_PATH * 2];
     wchar_t wheelhouse[MAX_PATH * 2];
     wchar_t venv_py[MAX_PATH * 2];
@@ -900,13 +987,24 @@ static int run_uv_pip_sync_only(const wchar_t *root, DWORD *exit_code) {
         return 0;
     if (!PathCombineW(venv_py, root, L".venv\\Scripts\\python.exe") || !path_exists(venv_py))
         return 0;
-    swprintf_s(cmdline,
-               sizeof(cmdline) / sizeof(cmdline[0]),
-               L"\"%ls\" pip sync --python \"%ls\" --no-index --find-links \"%ls\" \"%ls\"",
-               uv,
-               venv_py,
-               wheelhouse,
-               req_ui);
+    if (reinstall_slysh) {
+        swprintf_s(cmdline,
+                   sizeof(cmdline) / sizeof(cmdline[0]),
+                   L"\"%ls\" pip sync --python \"%ls\" --no-index --find-links \"%ls\" "
+                   L"--reinstall-package slysh \"%ls\"",
+                   uv,
+                   venv_py,
+                   wheelhouse,
+                   req_ui);
+    } else {
+        swprintf_s(cmdline,
+                   sizeof(cmdline) / sizeof(cmdline[0]),
+                   L"\"%ls\" pip sync --python \"%ls\" --no-index --find-links \"%ls\" \"%ls\"",
+                   uv,
+                   venv_py,
+                   wheelhouse,
+                   req_ui);
+    }
     return run_process_wait(uv, cmdline, root, exit_code, 1);
 }
 
@@ -1052,28 +1150,39 @@ static int ensure_venv(const wchar_t *root) {
                    L"Переустановите Slysh.");
         return 0;
     }
+    if (write_venv_payload_sync_stamp(root))
+        (void)0;
     splash_hide();
     return 1;
 }
 
-static int ensure_post_setup_venv_sync(const wchar_t *root) {
+static int ensure_payload_venv_sync(const wchar_t *root) {
     DWORD code = 0;
     const wchar_t *fail_reason = NULL;
+    int reinstall_slysh;
 
-    if (!install_ui_locale_seed_pending(root))
+    if (!payload_venv_resync_needed(root))
         return 1;
     if (!venv_usable(root, &fail_reason))
         return 1;
     if (!set_install_uv_env(root))
         return 0;
 
+    reinstall_slysh = 1;
     splash_show(root, splash_strings()->preparing);
-    if (!run_uv_pip_sync_only(root, &code) || code != 0) {
+    if (!run_uv_pip_sync_only(root, &code, reinstall_slysh) || code != 0) {
         splash_hide();
-        write_venv_repair_error(root, code, 0, L"post-setup pip sync");
+        write_venv_repair_error(root, code, 0, L"payload pip sync");
         show_error(L"Slysh!",
                    L"Не удалось обновить окружение после установки.\n"
                    L"Переустановите Slysh или удалите папку .venv и запустите снова.");
+        return 0;
+    }
+    if (!write_venv_payload_sync_stamp(root)) {
+        splash_hide();
+        show_error(L"Slysh!",
+                   L"Не удалось записать метку синхронизации окружения.\n"
+                   L"Проверьте права на папку программы.");
         return 0;
     }
     splash_hide();
@@ -1149,7 +1258,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
     if (!ensure_venv(root))
         return 1;
 
-    if (!ensure_post_setup_venv_sync(root))
+    if (!ensure_payload_venv_sync(root))
         return 1;
 
     if (!PathCombineW(pythonw, root, L".venv\\Scripts\\pythonw.exe")) {

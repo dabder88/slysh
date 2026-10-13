@@ -317,6 +317,24 @@ if (-not (Test-Path -LiteralPath $ReqUi)) {
     throw "wheelhouse requirements-ui.txt missing after write"
 }
 
+$slyshWheel = Get-ChildItem -LiteralPath $Wheelhouse -Filter "slysh-*.whl" |
+    Sort-Object LastWriteTime -Descending |
+    Select-Object -First 1
+if (-not $slyshWheel) {
+    throw "wheelhouse missing slysh-*.whl after uv build"
+}
+$payloadBuild = (Get-FileHash -Algorithm SHA256 -LiteralPath $slyshWheel.FullName).Hash.Substring(0, 16).ToLowerInvariant()
+$payloadBuildPath = Join-Path $Payload "payload-build.txt"
+[System.IO.File]::WriteAllText($payloadBuildPath, "$payloadBuild`n", [System.Text.UTF8Encoding]::new($false))
+$versionJson = @{
+    version       = $AppVersion
+    channel       = "stable"
+    github_repo   = $githubRepo
+    payload_build = $payloadBuild
+} | ConvertTo-Json -Compress
+[System.IO.File]::WriteAllText($versionPath, $versionJson, [System.Text.UTF8Encoding]::new($false))
+Write-Host "payload-build: $payloadBuild (slysh wheel $($slyshWheel.Name))"
+
 $html = Get-Content -LiteralPath (Join-Path $Payload "web\index.html") -Raw -Encoding UTF8
 foreach ($needle in @("btn-download-model", "engine-setup-settings", "btn-install-engine")) {
     if ($html -notmatch [regex]::Escape($needle)) {

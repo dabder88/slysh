@@ -4,6 +4,10 @@ from __future__ import annotations
 from pathlib import Path
 
 UI_REQUIREMENTS_FILENAME = "requirements-ui.txt"
+PAYLOAD_BUILD_FILENAME = "payload-build.txt"
+VENV_PAYLOAD_SYNC_STAMP = ".venv-payload-sync"
+PAYLOAD_SYNC_PENDING = ".payload-sync-pending"
+INSTALL_UI_LOCALE_SEED = ".install-ui-locale"
 
 # Legacy wheelhouse repair without pinned requirements (pre–F3-04 payloads).
 LEGACY_OFFLINE_UV_SYNC_FLAGS = ("--no-editable", "--no-dev", "--find-links", "--offline")
@@ -29,6 +33,60 @@ def venv_dir(install_root: Path) -> Path:
 
 def venv_python_path(install_root: Path) -> Path:
     return venv_dir(install_root) / "Scripts" / "python.exe"
+
+
+def payload_build_path(install_root: Path) -> Path:
+    return Path(install_root) / PAYLOAD_BUILD_FILENAME
+
+
+def venv_sync_stamp_path(install_root: Path) -> Path:
+    return Path(install_root) / VENV_PAYLOAD_SYNC_STAMP
+
+
+def _read_stamp_file(path: Path) -> str | None:
+    if not path.is_file():
+        return None
+    try:
+        text = path.read_text(encoding="utf-8").strip()
+    except OSError:
+        return None
+    return text or None
+
+
+def read_payload_build_id(install_root: Path) -> str | None:
+    return _read_stamp_file(payload_build_path(install_root))
+
+
+def venv_sync_stamp(install_root: Path) -> str | None:
+    return _read_stamp_file(venv_sync_stamp_path(install_root))
+
+
+def needs_ui_package_resync(install_root: Path) -> bool:
+    root = Path(install_root)
+    if (root / INSTALL_UI_LOCALE_SEED).is_file():
+        return True
+    if (root / PAYLOAD_SYNC_PENDING).is_file():
+        return True
+    build_id = read_payload_build_id(root)
+    if not build_id:
+        return False
+    stamp = venv_sync_stamp(root)
+    if not stamp:
+        return True
+    return stamp.lower() != build_id.lower()
+
+
+def write_venv_sync_stamp(install_root: Path) -> None:
+    root = Path(install_root)
+    build_id = read_payload_build_id(root)
+    if build_id:
+        venv_sync_stamp_path(root).write_text(build_id + "\n", encoding="utf-8")
+    pending = root / PAYLOAD_SYNC_PENDING
+    if pending.is_file():
+        try:
+            pending.unlink()
+        except OSError:
+            pass
 
 
 def bundled_python_path(install_root: Path) -> Path | None:
@@ -63,11 +121,11 @@ def uv_venv_create_argv(install_root: Path) -> list[str]:
     return args
 
 
-def uv_pip_sync_argv(install_root: Path) -> list[str]:
+def uv_pip_sync_argv(install_root: Path, *, reinstall_slysh: bool = False) -> list[str]:
     root = Path(install_root)
     wh = wheelhouse_dir(root)
     req = requirements_ui_path(root)
-    return [
+    args = [
         "pip",
         "sync",
         "--python",
@@ -77,6 +135,9 @@ def uv_pip_sync_argv(install_root: Path) -> list[str]:
         str(wh),
         str(req),
     ]
+    if reinstall_slysh:
+        args.extend(["--reinstall-package", "slysh"])
+    return args
 
 
 def offline_repair_steps(install_root: Path) -> list[list[str]]:

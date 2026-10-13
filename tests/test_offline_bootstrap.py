@@ -14,13 +14,18 @@ import pytest
 from slysh.offline_bootstrap import (
     LEGACY_OFFLINE_UV_SYNC_FLAGS,
     OFFLINE_PIP_SYNC_FLAGS,
+    PAYLOAD_SYNC_PENDING,
     UI_REQUIREMENTS_FILENAME,
     bundled_python_path,
+    needs_ui_package_resync,
     offline_pip_sync_ready,
     offline_repair_steps,
+    read_payload_build_id,
     requirements_ui_path,
     uv_pip_sync_argv,
     uv_sync_argv,
+    venv_sync_stamp,
+    write_venv_sync_stamp,
     wheelhouse_ready,
 )
 
@@ -43,6 +48,43 @@ def _download_idna_wheel(wh: Path) -> None:
         urllib.request.urlretrieve(wheel_url, dest)
     except (urllib.error.URLError, TimeoutError, StopIteration, KeyError) as exc:
         pytest.skip(f"wheel fixture unavailable: {exc}")
+
+
+def test_uv_pip_sync_argv_reinstall_slysh(tmp_path: Path):
+    wh = tmp_path / "wheelhouse"
+    wh.mkdir()
+    (wh / "a.whl").write_bytes(b"x")
+    (wh / UI_REQUIREMENTS_FILENAME).write_text("slysh==1.0.0\n", encoding="utf-8")
+    py = tmp_path / ".venv" / "Scripts"
+    py.mkdir(parents=True)
+    (py / "python.exe").write_bytes(b"")
+    args = uv_pip_sync_argv(tmp_path, reinstall_slysh=True)
+    assert "--reinstall-package" in args
+    assert "slysh" in args
+
+
+def test_needs_ui_package_resync_stamp_mismatch(tmp_path: Path):
+    tmp_path.joinpath("payload-build.txt").write_text("abc123\n", encoding="utf-8")
+    assert needs_ui_package_resync(tmp_path) is True
+    tmp_path.joinpath(".venv-payload-sync").write_text("abc123\n", encoding="utf-8")
+    assert needs_ui_package_resync(tmp_path) is False
+    tmp_path.joinpath("payload-build.txt").write_text("def456\n", encoding="utf-8")
+    assert needs_ui_package_resync(tmp_path) is True
+
+
+def test_needs_ui_package_resync_pending_markers(tmp_path: Path):
+    assert needs_ui_package_resync(tmp_path) is False
+    tmp_path.joinpath(PAYLOAD_SYNC_PENDING).write_text("1\n", encoding="utf-8")
+    assert needs_ui_package_resync(tmp_path) is True
+
+
+def test_write_venv_sync_stamp_clears_pending(tmp_path: Path):
+    tmp_path.joinpath("payload-build.txt").write_text("stamp9\n", encoding="utf-8")
+    tmp_path.joinpath(PAYLOAD_SYNC_PENDING).write_text("1\n", encoding="utf-8")
+    write_venv_sync_stamp(tmp_path)
+    assert venv_sync_stamp(tmp_path) == "stamp9"
+    assert read_payload_build_id(tmp_path) == "stamp9"
+    assert not (tmp_path / PAYLOAD_SYNC_PENDING).is_file()
 
 
 def test_offline_pip_sync_argv_when_requirements_ui(tmp_path: Path):
@@ -107,6 +149,8 @@ def test_slysh_bat_offline_pip_sync_contract():
     assert "pip sync" in bat
     assert "--no-index" in bat
     assert "--python" in bat
+    assert "--reinstall-package slysh" in bat
+    assert "payload-build.txt" in bat
     assert "runtime\\python\\cpython-" in bat
 
 
@@ -116,6 +160,9 @@ def test_launcher_c_offline_wheelhouse_contract():
     assert "wheelhouse_has_requirements_ui" in src
     assert "pip sync" in src
     assert "--no-index" in src
+    assert "payload-build.txt" in src
+    assert "ensure_payload_venv_sync" in src
+    assert "--reinstall-package slysh" in src
 
 
 def test_e6_probe_flags_match_module(tmp_path: Path):

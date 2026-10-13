@@ -60,8 +60,8 @@ def test_launcher_post_setup_pip_sync_when_locale_seed():
     src = (ROOT / "launcher" / "Slysh.c").read_text(encoding="utf-8")
     assert "install_ui_locale_seed_pending" in src
     assert "run_uv_pip_sync_only" in src
-    assert "ensure_post_setup_venv_sync" in src
-    assert "post-setup pip sync" in src
+    assert "ensure_payload_venv_sync" in src
+    assert "payload pip sync" in src
     seed_idx = src.index("read_install_ui_locale_seed(install_root)")
     settings_idx = src.index("parse_settings_ui_locale(settings_path)")
     assert seed_idx < settings_idx

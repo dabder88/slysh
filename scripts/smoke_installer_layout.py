@@ -34,6 +34,11 @@ def main() -> int:
     req_ui = wheelhouse / "requirements-ui.txt"
     if not req_ui.is_file():
         return _fail(f"missing wheelhouse requirements-ui.txt ({req_ui})")
+    payload_build = PAYLOAD / "payload-build.txt"
+    if not payload_build.is_file():
+        return _fail(f"missing payload-build.txt ({payload_build})")
+    if not payload_build.read_text(encoding="utf-8").strip():
+        return _fail("payload-build.txt is empty")
     if list(wheelhouse.glob("proxy_tools*.whl")) == []:
         return _fail("wheelhouse missing proxy_tools*.whl (offline repair)")
     sdists = list(wheelhouse.glob("*.tar.gz"))

@@ -33,7 +33,7 @@ cd /d "%ROOT%" || (
 if not exist "%PYTHON%" goto :ensure_venv
 "%PYTHON%" -c "import sys" >nul 2>&1
 if errorlevel 1 goto :ensure_venv
-goto :start
+goto :sync_payload_if_needed
 
 :ensure_venv
 if exist "%ROOT%\bin\uv.exe" (
@@ -77,6 +77,27 @@ if not exist "%PYTHON%" (
     pause
     exit /b 1
 )
+
+:sync_payload_if_needed
+if not exist "%ROOT%\bin\uv.exe" goto :start
+if not exist "%ROOT%\wheelhouse\requirements-ui.txt" goto :start
+if not exist "%PYTHON%" goto :start
+set "NEED_SYNC=0"
+if exist "%ROOT%\.install-ui-locale" set "NEED_SYNC=1"
+if exist "%ROOT%\.payload-sync-pending" set "NEED_SYNC=1"
+if exist "%ROOT%\payload-build.txt" (
+    if not exist "%ROOT%\.venv-payload-sync" (
+        set "NEED_SYNC=1"
+    ) else (
+        fc /b "%ROOT%\payload-build.txt" "%ROOT%\.venv-payload-sync" >nul 2>&1
+        if errorlevel 1 set "NEED_SYNC=1"
+    )
+)
+if "%NEED_SYNC%"=="0" goto :start
+"%ROOT%\bin\uv.exe" pip sync --python "%PYTHON%" --no-index --find-links "%ROOT%\wheelhouse" --reinstall-package slysh "%ROOT%\wheelhouse\requirements-ui.txt"
+if errorlevel 1 goto :venv_fail
+if exist "%ROOT%\payload-build.txt" copy /y "%ROOT%\payload-build.txt" "%ROOT%\.venv-payload-sync" >nul
+if exist "%ROOT%\.payload-sync-pending" del "%ROOT%\.payload-sync-pending"
 
 :start
 set "GIGAAM_UI_AUTH=1"

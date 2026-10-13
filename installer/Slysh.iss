@@ -89,6 +89,8 @@ Type: files; Name: "{app}\runtime-env.json"
 Type: files; Name: "{app}\launch-last-error.txt"
 Type: files; Name: "{app}\venv-check.log"
 Type: files; Name: "{app}\.install-ui-locale"
+Type: files; Name: "{app}\.payload-sync-pending"
+Type: files; Name: "{app}\.venv-payload-sync"
 Type: files; Name: "{app}\.fresh-install"
 Type: dirifempty; Name: "{app}"
 
@@ -350,6 +352,8 @@ begin
     SaveStringToFile(LocalePath, SelectedUiLocale, False);
     if not IsAppUpgrade then
       SaveStringToFile(ExpandConstant('{app}\.fresh-install'), '1', False);
+    if IsAppUpgrade then
+      SaveStringToFile(ExpandConstant('{app}\.payload-sync-pending'), '1', False);
     WriteStartMenuFolderDesktopIni;
     RefreshStartMenuCache;
   end;

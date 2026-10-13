@@ -6,7 +6,7 @@ GUI launcher without a console window. Sets the same environment as `Slysh.bat` 
 
 Before Python starts, shows a **native splash** (badge, status line, progress). Strings follow `ui_locale`: pending `{install}\.install-ui-locale` from Setup (if present), else `%LOCALAPPDATA%\Slysh\settings.json` (or `GIGAAM_DESKTOP_HOME`), else Russian.
 
-After Setup, if `.install-ui-locale` exists and `.venv` is already usable, the launcher runs **`uv pip sync`** from `wheelhouse/requirements-ui.txt` (Inno does not replace `.venv` on upgrade) so the installed `slysh` wheel matches the new payload before Python consumes the locale seed.
+After Setup, if `.venv` is already usable and any of these is true — **`payload-build.txt` ≠ `.venv-payload-sync`**, **`.install-ui-locale`** (pending locale from Setup), or **`.payload-sync-pending`** (upgrade marker from Inno) — the launcher runs **`uv pip sync --reinstall-package slysh`** from `wheelhouse/requirements-ui.txt` (Inno does not replace `.venv` on upgrade). Plain `pip sync` is **not** enough when `slysh==x.y.z` is unchanged but the wheel file in `wheelhouse` was rebuilt; `payload-build.txt` (hash of the slysh wheel) drives reinstall. On success the launcher copies the stamp to `.venv-payload-sync`.
 
 Rebuild `installer/prebuilt/Slysh.exe` after changing launcher logic in `Slysh.c`.
 

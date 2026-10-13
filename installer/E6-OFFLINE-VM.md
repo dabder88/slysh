@@ -61,7 +61,7 @@ powershell -ExecutionPolicy Bypass -File .\e6-offline-vm-verify.ps1 `
 | E6-SPACE | Win10 или 11 | `C:\Program Files\Slysh Test\` (пробелы) | off | то же | Первый запуск, модал пакетов «Позже», настройки |
 | E6-CYR | Win10 или 11 | `C:\Пользователи\Тест\Slysh\` или профиль с кириллицей | off | то же | `Slysh.bat` из ярлыка |
 | E6-ENGINE | любая | дефолт | off → **кратко on** для engine | после verify | Установка engine из UI; обрыв сети → повтор; отмена |
-| E6-UPGRADE | любая | дефолт | off после upgrade | verify на новой версии | Сохранены БД/ключи; нет `.fresh-install` |
+| E6-UPGRADE | любая | дефолт | off после upgrade | verify на новой версии | Сохранены БД/ключи; нет `.fresh-install`; первый запуск после Setup — `uv pip sync --reinstall-package slysh` (stamp `payload-build.txt`); `GET /api/capabilities` → `job_pause: true`; пауза в очереди работает |
 | E6-UNINSTALL | любая | дефолт | — | — | Удаление; нет зависших `engine_server` / `pythonw` Slysh |
 
 ### Ручной минимум после авто-проверки
