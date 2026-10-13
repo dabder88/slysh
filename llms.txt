@@ -1,0 +1,34 @@
+# Slysh!
+
+> Private, offline Windows desktop speech-to-text workstation powered by GigaAM and Whisper. Zero-bot meeting capture (WASAPI loopback) and YouTube batching.
+
+## Overview
+- **Product Name**: Slysh!
+- **Primary OS**: Windows 10 & 11 (64-bit)
+- **Website**: https://slyshai.pro/
+- **Main Repository**: https://github.com/dabder88/slysh
+- **Python package**: `slysh` (entrypoint `uv run slysh` / `slysh.app:main`)
+- **App Data Directory**: `%LOCALAPPDATA%\Slysh`
+
+## Architecture Principles
+1. **Process Decoupling**:
+   - The UI process (FastAPI + uvicorn + pywebview) **never imports PyTorch or heavy AI models**.
+   - Speech inference runs in an isolated engine subprocess (`slysh.engine_server`) communicating over local ephemeral HTTP.
+2. **Audio Engines**:
+   - Local: Sber GigaAM RNNT/CTC, Faster-Whisper, OpenAI Whisper.
+   - Diarization: NVIDIA NeMo (optional extra).
+   - Cloud: Groq, Gladia, Deepgram, OpenRouter, custom HTTP, Gemini CLI.
+3. **Capture**:
+   - Meetings: Windows WASAPI loopback (system audio) + microphone mixed to mono.
+4. **Data Layer**:
+   - SQLite `app.db` with jobs, segments, speakers, and batch management.
+
+## Public documentation in this repository
+- [README.md](README.md) / [README.ru.md](README.ru.md) — product overview and quick start
+- [LICENSE](LICENSE) — proprietary, personal non-commercial use
+- [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) — open-source components
+- [CONTRIBUTING.md](CONTRIBUTING.md) — architecture constraints and tests
+- [SECURITY.md](SECURITY.md) — vulnerability reporting
+- [TEST_BASELINE.md](TEST_BASELINE.md) — CI and pytest baseline
+- [docs/api/ENDPOINTS.md](docs/api/ENDPOINTS.md) — HTTP API summary
+- [docs/database/SCHEMA.md](docs/database/SCHEMA.md) — SQLite schema summary

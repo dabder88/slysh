@@ -1,0 +1,26 @@
+changelog:
+  exclude:
+    labels:
+      - "skip-changelog"
+      - "internal"
+    authors:
+      - "dependabot[bot]"
+  categories:
+    - title: "🚀 Новые возможности / New Features"
+      labels:
+        - "enhancement"
+        - "feature"
+    - title: "🐛 Исправления ошибок / Bug Fixes"
+      labels:
+        - "bug"
+        - "fix"
+    - title: "⚡ Оптимизация и производительность / Performance"
+      labels:
+        - "performance"
+    - title: "📝 Документация / Documentation"
+      labels:
+        - "documentation"
+        - "docs"
+    - title: "🧰 Прочие изменения / Maintenance"
+      labels:
+        - "*"

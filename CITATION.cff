@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+message: "If you use Slysh in your research, academic work, or application, please cite it as below."
+type: software
+title: "Slysh: Private Offline Speech-to-Text & Meeting Recorder for Windows"
+authors:
+  - family-names: "Sergachev"
+    given-names: "Anton"
+version: "1.0.0"
+date-released: 2026-10-13
+url: "https://slyshai.pro/"
+repository-code: "https://github.com/dabder88/slysh"
+keywords:
+  - "speech-to-text"
+  - "automatic-speech-recognition"
+  - "gigaam"
+  - "whisper"
+  - "meeting-transcription"
+  - "wasapi-loopback"
+  - "diarization"
+  - "windows-desktop"

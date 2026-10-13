@@ -1,0 +1,64 @@
+name: "🐛 Bug Report / Сообщение об ошибке"
+description: "Сообщить об ошибке в работе Slysh!"
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: "Спасибо, что помогаете делать Slysh! лучше. Пожалуйста, заполните форму ниже."
+  - type: dropdown
+    id: os_version
+    attributes:
+      label: Версия Windows
+      description: Укажите вашу операционную систему
+      options:
+        - "Windows 11 (24H2 / 23H2)"
+        - "Windows 10 (22H2 / 21H2)"
+        - "Другая версия"
+    validations:
+      required: true
+  - type: dropdown
+    id: launch_type
+    attributes:
+      label: Способ запуска
+      options:
+        - "Официальный установщик (.exe) из Releases / slyshai.pro"
+        - "Запуск из исходников (Slysh.bat / start-gigaam-desktop.bat)"
+        - "Консольный запуск через uv run"
+    validations:
+      required: true
+  - type: dropdown
+    id: engine_used
+    attributes:
+      label: Используемый ASR-движок
+      options:
+        - "GigaAM (локальная модель)"
+        - "Faster-Whisper / OpenAI Whisper (локальная)"
+        - "Облачный ASR (Groq / Gladia / Deepgram / OpenRouter)"
+        - "YouTube субтитры (без локального ASR)"
+        - "Ошибка на этапе запуска / выбора модели"
+    validations:
+      required: true
+  - type: textarea
+    id: bug_description
+    attributes:
+      label: Описание проблемы
+      placeholder: Подробно опишите, что произошло, и чего вы ожидали.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction_steps
+    attributes:
+      label: Шаги для воспроизведения
+      placeholder: |
+        1. Открыл экран 'Запись созвона'
+        2. Включил запись WASAPI loopback
+        3. Нажал 'Стоп'
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Логи консоли или лог-файлы
+      description: Приложите логи из терминала или из папки %LOCALAPPDATA%\Slysh\logs
+      render: shell

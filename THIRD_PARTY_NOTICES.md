@@ -1,118 +1,75 @@
-# Сторонние компоненты (справка для владельца)
+# Third-Party Notices & Licenses
 
-Краткий перечень основных зависимостей **Slysh** для установленной копии. **Лицензию всего продукта выбирает владелец.** Отдельная юридическая due diligence **не входит в план продукта** — см. [`PRODUCT_OUT_OF_SCOPE.md`](PRODUCT_OUT_OF_SCOPE.md). Точные версии пакетов — в `uv.lock`.
-
-Копия для пользователя Setup: `licenses\` в каталоге программы — `THIRD-PARTY-NOTICES.md`, `Slysh-EULA-RU.txt`, `Slysh-EULA-EN.txt`, `Slysh-LICENSE.txt`, `ffmpeg-LGPL.txt`. Лицензия **на саму программу Slysh** — см. [`LICENSE`](LICENSE), [`installer/LICENSE-RU.txt`](installer/LICENSE-RU.txt), [`installer/LICENSE-EN.txt`](installer/LICENSE-EN.txt), не этот файл.
-
-## Как обновлять
-
-1. При изменении `pyproject.toml` / `uv.lock` — проверить строки ниже и при необходимости дописать новые пакеты.
-2. Для полного списка wheels после `uv sync` (на машине разработки):  
-   `uv pip list` в UI `.venv` и в engine venv после установки extras.
-3. Сборка payload: `scripts\build-installer-payload.ps1` кладёт этот файл в `dist\payload\licenses\`.
+Slysh! incorporates or interacts with open-source software and model weights licensed under various permissive and copyleft licenses. Below is a summary of the key components and their licenses:
 
 ---
 
-## Python — базовый UI (`[project]` dependencies)
+## 1. AI Models & ASR Engines
 
-| Компонент | Типичная лицензия | Назначение в Slysh |
-|-----------|-------------------|---------------------|
-| [FastAPI](https://github.com/tiangolo/fastapi) | MIT | HTTP API UI |
-| [Uvicorn](https://github.com/encode/uvicorn) | BSD-3-Clause | ASGI-сервер |
-| [pywebview](https://github.com/r0x0r/pywebview) | BSD-3-Clause | Окно WebView2 |
-| [sounddevice](https://github.com/spatialaudio/python-sounddevice) | MIT | Захват аудио (PortAudio) |
-| [soundfile](https://github.com/bastibe/python-soundfile) | BSD-3-Clause | Чтение/запись WAV (libsndfile) |
-| [NumPy](https://numpy.org/) | BSD-3-Clause | Буферы аудио в UI |
+### GigaAM (Salute Developers / Sber AI)
+- **License**: Apache License 2.0
+- **Repository**: [https://github.com/salute-developers/GigaAM](https://github.com/salute-developers/GigaAM)
+- **Copyright**: (c) Salute Developers, Sber AI
 
-Транзитивные зависимости (Pydantic, Starlette, httptools и др.) наследуют свои лицензии из lock-файла.
+### OpenAI Whisper
+- **License**: MIT License
+- **Repository**: [https://github.com/openai/whisper](https://github.com/openai/whisper)
+- **Copyright**: (c) OpenAI
 
----
+### Faster-Whisper (SYSTRAN)
+- **License**: MIT License
+- **Repository**: [https://github.com/SYSTRAN/faster-whisper](https://github.com/SYSTRAN/faster-whisper)
+- **Copyright**: (c) SYSTRAN
 
-## Python — extra `engine` (локальная расшифровка)
-
-Устанавливается в отдельное engine-окружение (`.venv-engine-*`), не в лёгкий UI venv.
-
-| Компонент | Типичная лицензия | Назначение |
-|-----------|-------------------|------------|
-| [PyTorch](https://pytorch.org/) | BSD-style (см. NOTICE) | Инференс моделей |
-| [torchaudio](https://github.com/pytorch/audio) | BSD-style | Аудио для torch |
-| [faster-whisper](https://github.com/SYSTRAN/faster-whisper) | MIT | Whisper CTranslate2 |
-| [openai-whisper](https://github.com/openai/whisper) | MIT | Whisper (референс) |
-| [GigaAM](https://github.com/salute-developers/GigaAM) | См. репозиторий (Salute) | Основной RNNT ASR |
-
-PyTorch wheels для установщика подтягиваются с индекса `pytorch-cu129` (см. `pyproject.toml`); при поставке пользователю учитывайте условия NVIDIA/CUDA для GPU-сборок.
+### NVIDIA NeMo (Sortformer / MSDD Diarization)
+- **License**: Apache License 2.0
+- **Repository**: [https://github.com/NVIDIA/NeMo](https://github.com/NVIDIA/NeMo)
+- **Copyright**: (c) NVIDIA Corporation
 
 ---
 
-## Python — extra `diarization`
+## 2. Core Python Framework & UI Libraries
 
-| Компонент | Типичная лицензия | Назначение |
-|-----------|-------------------|------------|
-| [NeMo toolkit ASR](https://github.com/NVIDIA/NeMo) | Apache-2.0 | Диаризация спикеров |
-| [OmegaConf](https://github.com/omry/omegaconf) | BSD-3-Clause | Конфиги NeMo |
+### FastAPI
+- **License**: MIT License
+- **Repository**: [https://github.com/fastapi/fastapi](https://github.com/fastapi/fastapi)
+- **Copyright**: (c) Sebastián Ramírez
 
-Тяжёлые зависимости NeMo — см. `uv.lock`; для релиза может потребоваться отдельный перечень NOTICE от NVIDIA.
+### PyWebView
+- **License**: BSD-3-Clause License
+- **Repository**: [https://github.com/r0x0r/pywebview](https://github.com/r0x0r/pywebview)
+- **Copyright**: (c) Roman Sakno
 
----
+### Uvicorn
+- **License**: BSD-3-Clause License
+- **Repository**: [https://github.com/encode/uvicorn](https://github.com/encode/uvicorn)
+- **Copyright**: (c) Encode OSS Ltd.
 
-## Python — extra `youtube`
+### SoundDevice & SoundFile
+- **License**: MIT License / BSD-3-Clause
+- **Copyright**: (c) Matthias Geier, Bastian Bechtold
 
-| Компонент | Типичная лицензия | Назначение |
-|-----------|-------------------|------------|
-| [yt-dlp](https://github.com/yt-dlp/yt-dlp) | Unlicense | Скачивание с YouTube |
-| [browser-cookie3](https://github.com/borisbabic/browser_cookie3) | LGPL-3.0 | Cookies для yt-dlp |
-| [youtube-transcript-api](https://github.com/jdepoix/youtube-transcript-api) | MIT | Субтитры YouTube |
-| [Requests](https://requests.readthedocs.io/) | Apache-2.0 | HTTP-клиент |
-
----
-
-## Сборка репозитория (не в runtime пользователя, кроме артефактов Setup)
-
-| Компонент | Лицензия | Назначение |
-|-----------|----------|------------|
-| [Tailwind CSS](https://tailwindcss.com/) | MIT | Сборка `web/app.css` |
-| [Node.js / npm](https://nodejs.org/) | Разные (см. npm пакеты) | `npm run build:css` |
-| [Hatchling](https://github.com/pypa/hatch) | MIT | Сборка wheel пакета `slysh` |
-| [pytest](https://pytest.org/), httpx | MIT | Тесты (dev group) |
+### NumPy
+- **License**: BSD-3-Clause License
+- **Copyright**: (c) NumPy Developers
 
 ---
 
-## Бинарники и runtime в Setup (payload)
+## 3. External Binaries & Media Tools
 
-| Компонент | Лицензия / условия | Назначение |
-|-----------|-------------------|------------|
-| **ffmpeg** / **ffprobe** (`bin\`, текст `licenses\ffmpeg-LGPL.txt`) | LGPL-2.1+ (сборка зависит от конфигурации ffmpeg) | Декодирование медиа |
-| **uv** (`bin\uv.exe`) | Apache-2.0 / MIT (Astral) | Создание и sync venv |
-| **CPython** (`runtime\python\…`) | PSF License | Интерпретатор для uv/UI venv |
-| **Slysh.exe** (лаунчер) | Проприетарный код продукта | Старт без консоли |
-| **Microsoft Edge WebView2 Runtime** (bootstrapper в Setup) | [Условия Microsoft](https://developer.microsoft.com/microsoft-edge/webview2/) | Отображение UI |
+### FFmpeg
+- **License**: GNU Lesser General Public License (LGPL) version 2.1 or later / GPL
+- **Website**: [https://ffmpeg.org](https://ffmpeg.org)
+- FFmpeg is an external utility invoked as a subprocess for audio extraction and format conversion. Slysh does not statically link FFmpeg into its binaries. Pre-built builds redistribute LGPL-compliant dynamic FFmpeg executables without modifications.
 
 ---
 
-## Облачные сервисы (по выбору пользователя)
+## 4. Frontend & Styling
 
-Данные отправляются на сторонние API только при настройке ключей пользователем:
+### Tailwind CSS
+- **License**: MIT License
+- **Copyright**: (c) Tailwind Labs, Inc.
 
-| Провайдер | Документация |
-|-----------|--------------|
-| OpenRouter | https://openrouter.ai/ |
-| Groq, OpenAI | Соответствующие ToS/API |
-| Gladia, Deepgram | Пресеты HTTP ASR |
-| Кастомный HTTP endpoint | URL пользователя |
-| Gemini CLI | Google — отдельный CLI и ToS |
-| Apify (YouTube) | https://apify.com/ |
-
-Секреты на Windows хранятся локально (DPAPI), не в репозитории.
-
----
-
-## Обязательства при распространении (кратко)
-
-- **LGPL (ffmpeg):** при изменении линковки/поставке object code — соблюдать требования LGPL; в payload кладётся `ffmpeg-LGPL.txt`.
-- **MIT / BSD / Apache:** обычно требуют сохранения текста лицензии и отказа от гарантий; для релиза часто объединяют NOTICE-файл из `uv pip licenses` или аналога.
-- **NeMo / PyTorch / CUDA:** проверить совместимость коммерческого использования и redist GPU-библиотек.
-- **Git-зависимость GigaAM:** фиксируется коммитом в `uv.lock`; при форке — соблюдать лицензию upstream.
-
----
-
-*Волна F (F.4). Последнее содержательное обновление: 2026-10-02.*
+### Material Symbols (Google)
+- **License**: Apache License 2.0
+- **Copyright**: (c) Google LLC

@@ -1,0 +1,36 @@
+name: "💡 Feature Request / Предложение функции"
+description: "Предложить идею или улучшение для Slysh!"
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: "Мы всегда рады идеям по развитию Slysh! Расскажите, что сделает программу еще удобнее."
+  - type: dropdown
+    id: category
+    attributes:
+      label: Категория улучшения
+      options:
+        - "Редактор и плеер расшифровки"
+        - "Запись созвонов (WASAPI loopback)"
+        - "Пакетная обработка и YouTube"
+        - "Движки распознавания и облачные API"
+        - "Экспорт (SRT, VTT, Markdown, TXT)"
+        - "Установщик и запуск"
+        - "Другое"
+    validations:
+      required: true
+  - type: textarea
+    id: problem_statement
+    attributes:
+      label: Какую задачу или проблему решает эта функция?
+      placeholder: Опишите сценарий, в котором вам не хватает этой возможности.
+    validations:
+      required: true
+  - type: textarea
+    id: proposed_solution
+    attributes:
+      label: Предлагаемое решение
+      placeholder: Как, по вашему мнению, это должно работать в интерфейсе?
+    validations:
+      required: true

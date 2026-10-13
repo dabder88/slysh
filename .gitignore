@@ -39,7 +39,20 @@ installer/redist/*.exe
 # Not in git: internal docs, agent configs, one-off maintainer scripts (below).
 
 docs/
+!docs/assets/
+!docs/assets/**
 wiki/
+
+# Local debug / cloud test artifacts
+.tmp-cloud-debug/
+
+# Internal maintainer plans (not for public repo vitrina)
+plan-fix.md
+plan-fix-*.md
+implementation-order.md
+implementation-order-*.md
+implementation-status.md
+implementation-status-*.md
 .cursor/
 .claude/
 AGENTS.md
