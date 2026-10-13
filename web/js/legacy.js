@@ -1998,6 +1998,7 @@ async function confirmUploadAsOrphans() {
 
 async function confirmUploadAsBatch() {
   const paths = [...pendingUploadPaths];
+  const uploadRules = pendingUploadRules;
   const nameEl = document.getElementById("upload-target-batch-name");
   const name = (nameEl?.value || "").trim() || defaultBatchName(paths);
   closeUploadTargetModal();
@@ -2008,7 +2009,7 @@ async function confirmUploadAsBatch() {
     const batch = await api("/api/batches", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, rules: pendingUploadRules || undefined }),
+      body: JSON.stringify({ name, rules: uploadRules || undefined }),
     });
     const updated = await addToBatch(batch.id, paths, false);
     setSelectedBatch(batch.id);
