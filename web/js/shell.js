@@ -2274,6 +2274,7 @@ function initEngineSetup() {
   const logChevron = document.getElementById("engine-setup-log-chevron");
   const choicesEl = document.querySelector(".engine-setup-choices");
   let engineChoice = "local";
+  let engineInstallActivityKey = "";
   const settingsBlock = document.getElementById("engine-setup-settings");
   const resyncBlock = document.getElementById("engine-resync-settings");
   const settingsBtn = document.getElementById("btn-install-engine");
@@ -2421,18 +2422,19 @@ function initEngineSetup() {
     }
   }
 
-  function engineProgressHintVisible(ip, installing) {
+  function engineDisplayFraction(ip, installing) {
     if (!installing) {
-      return false;
+      return null;
     }
-    if (ip.stalled) {
-      return true;
+    if (ip.fraction != null && ip.indeterminate === false) {
+      return Math.min(1, Math.max(0, Number(ip.fraction)));
     }
-    const msg = String(ip.message || "").toLowerCase();
-    if (msg.includes("downloading") || msg.includes("torch")) {
-      return true;
+    const total = Number(ip.packages_total) || 0;
+    const done = Number(ip.packages_done) || 0;
+    if (total > 0) {
+      return Math.min(1, Math.max(0, done / total));
     }
-    return ip.fraction == null || ip.indeterminate !== false;
+    return null;
   }
 
   function installScreenActive() {
@@ -2458,11 +2460,12 @@ function initEngineSetup() {
     if (choicesEl) {
       choicesEl.hidden = Boolean(status.installing);
     }
+    const displayFraction = engineDisplayFraction(ip, status.installing);
     if (progressEl) {
-      if (showProgress && status.installing && ip.fraction != null && ip.indeterminate === false) {
+      if (showProgress && status.installing && displayFraction != null) {
         progressEl.indeterminate = false;
-        progressEl.value = Math.round(Number(ip.fraction) * 100);
-      } else if (showProgress) {
+        progressEl.value = Math.round(displayFraction * 100);
+      } else if (showProgress && status.installing) {
         progressEl.removeAttribute("value");
         progressEl.indeterminate = true;
       } else {
@@ -2470,14 +2473,27 @@ function initEngineSetup() {
       }
     }
     if (progressFill && showProgress) {
-      if (status.installing && ip.fraction != null && ip.indeterminate === false) {
-        const pct = Math.round(Number(ip.fraction) * 100);
+      if (status.installing && displayFraction != null) {
+        const pct = Math.round(displayFraction * 100);
         progressFill.style.width = `${pct}%`;
+        progressFill.classList.remove("slysh-progress-animated");
         if (progressPct) {
           progressPct.textContent = `${pct}%`;
         }
+      } else if (status.installing) {
+        const activityKey = `${ip.current_package || ""}|${ip.message || ""}|${ip.packages_done || 0}`;
+        if (activityKey !== engineInstallActivityKey) {
+          engineInstallActivityKey = activityKey;
+        }
+        const pulse = 28 + (engineInstallActivityKey.length % 45);
+        progressFill.style.width = `${pulse}%`;
+        progressFill.classList.add("slysh-progress-animated");
+        if (progressPct) {
+          progressPct.textContent = "";
+        }
       } else {
-        progressFill.style.width = "35%";
+        progressFill.style.width = "0%";
+        progressFill.classList.remove("slysh-progress-animated");
         if (progressPct) {
           progressPct.textContent = "";
         }
@@ -2495,8 +2511,9 @@ function initEngineSetup() {
     }
     if (progressLabel) {
       if (status.installing) {
+        const pkg = String(ip.current_package || "").trim();
         progressLabel.textContent =
-          ip.message || t("firstRun.engineProgressWorking");
+          pkg || ip.message || t("firstRun.engineProgressWorking");
       } else if (showProgress) {
         progressLabel.textContent = t("firstRun.engineProgressWorking");
       } else {
@@ -2504,14 +2521,14 @@ function initEngineSetup() {
       }
     }
     if (progressHint) {
-      const showHint = engineProgressHintVisible(ip, status.installing);
-      progressHint.hidden = !showHint;
-      progressHint.textContent = showHint ? t("firstRun.engineProgressHint") : "";
+      progressHint.hidden = !status.installing;
+      progressHint.textContent = status.installing
+        ? t("firstRun.engineInstallWaitHint")
+        : "";
     }
     if (progressStalled) {
-      const stalled = Boolean(status.installing && ip.stalled);
-      progressStalled.hidden = !stalled;
-      progressStalled.textContent = stalled ? t("firstRun.engineProgressStalledVpn") : "";
+      progressStalled.hidden = true;
+      progressStalled.textContent = "";
     }
     if (logToggle) {
       logToggle.hidden = !status.installing;

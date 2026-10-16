@@ -2,6 +2,16 @@
 
 Сюда дописывать дату и что изменилось в продовой копии. Старые строки не переписывать.
 
+## 2026-10-16
+
+- Релиз **v1.0.2**: first-run UX установки пакетов (прогресс из лога uv, подсказки без VPN при stalled); скрипты `audit_release_state`, `git_push_with_token`, `publish_release_assets`.
+- First-run / установка пакетов (uv): парсер `install_progress` — tqdm `%`, `X/Y MiB`, безопасный `N/M`; в UI постоянная подсказка о долгих пакетах, убран текст про VPN при `stalled`; нейтральная заметка на шаге install вместо amber VPN.
+
+## 2026-10-14
+
+- Скилл релиза [.cursor/skills/slysh-release/SKILL.md](../.cursor/skills/slysh-release/SKILL.md): audit → версия → сборка → тесты → отчёт → **подтверждение** → push/Release; CLI `audit_release_state.py`, `git_push_with_token.py`, `publish_release_assets.py`.
+- Документация: политика версий [docs/guides/VERSIONING.md](../docs/guides/VERSIONING.md) (мягкий MAJOR/MINOR/PATCH, `payload_build` отдельно); ссылка в [APP-UPDATES.md](../docs/features/APP-UPDATES.md).
+
 ## 2026-10-13
 
 - Установщик: после upgrade — `payload-build.txt` + `uv pip sync --reinstall-package slysh` (лаунчер/Slysh.bat), иначе UI новее `.venv` и пауза в очереди даёт 405.

@@ -76,6 +76,69 @@ _SIZE_TOKEN = re.compile(
     r"(?P<num>\d+(?:\.\d+)?)\s*(?P<unit>GiB|MiB|KiB)",
     re.IGNORECASE,
 )
+_BYTE_PAIR = re.compile(
+    r"(?P<done>\d+(?:\.\d+)?)\s*(?P<du>GiB|MiB|KiB)\s*/\s*"
+    r"(?P<total>\d+(?:\.\d+)?)\s*(?P<tu>GiB|MiB|KiB)",
+    re.IGNORECASE,
+)
+# tqdm/uv: "12.5/25.0 MiB" (single unit suffix)
+_BYTE_PAIR_SLASH = re.compile(
+    r"(?P<done>\d+(?:\.\d+)?)\s*/\s*(?P<total>\d+(?:\.\d+)?)\s*(?P<unit>GiB|MiB|KiB)",
+    re.IGNORECASE,
+)
+_PERCENT = re.compile(r"(?P<pct>\d+(?:\.\d+)?)\s*%")
+_PROGRESS_NM_HINTS = (
+    "downloading",
+    "installing",
+    "prepared",
+    "building",
+    "resolved",
+    "package",
+)
+
+
+def _size_to_bytes(num: float, unit: str) -> int:
+    u = unit.lower()
+    if u == "gib":
+        return int(num * 1024**3)
+    if u == "mib":
+        return int(num * 1024**2)
+    if u == "kib":
+        return int(num * 1024)
+    return int(num)
+
+
+def _line_allows_nm_fraction(line: str) -> bool:
+    lower = line.lower()
+    return any(hint in lower for hint in _PROGRESS_NM_HINTS)
+
+
+def _parse_byte_pair_fraction(line: str) -> tuple[float, int, int] | None:
+    match = _BYTE_PAIR.search(line)
+    if match:
+        done_b = _size_to_bytes(float(match.group("done")), match.group("du"))
+        total_b = _size_to_bytes(float(match.group("total")), match.group("tu"))
+    else:
+        slash = _BYTE_PAIR_SLASH.search(line)
+        if not slash:
+            return None
+        unit = slash.group("unit")
+        done_b = _size_to_bytes(float(slash.group("done")), unit)
+        total_b = _size_to_bytes(float(slash.group("total")), unit)
+    if total_b <= 0:
+        return None
+    frac = min(1.0, max(0.0, done_b / total_b))
+    return frac, done_b, total_b
+
+
+def _parse_percent_fraction(line: str) -> float | None:
+    match = _PERCENT.search(line)
+    if not match:
+        return None
+    pct = float(match.group("pct"))
+    if pct > 100.0:
+        return None
+    return min(1.0, max(0.0, pct / 100.0))
 
 _lock = threading.Lock()
 _install: dict = {
@@ -318,28 +381,53 @@ def _parse_engine_setup_progress(log_text: str) -> dict:
             elif name not in package_sizes:
                 package_sizes[name] = 0
 
+    tail_message = message
     for line in reversed(lines[-30:]):
-        match = re.search(r"(\d+)\s*/\s*(\d+)", line)
-        if match:
-            num = int(match.group(1))
-            den = int(match.group(2))
-            if den > 0:
-                fraction = min(1.0, max(0.0, num / den))
-                return {
-                    **base,
-                    "message": line[:500],
-                    "indeterminate": False,
-                    "fraction": fraction,
-                    "packages_done": num,
-                    "packages_total": den,
-                }
         lower = line.lower()
         if any(
             token in lower
             for token in ("downloading", "installing", "prepared", "built", "resolved")
         ):
-            message = line
+            tail_message = line
             break
+
+    for line in reversed(lines[-25:]):
+        pair = _parse_byte_pair_fraction(line)
+        if pair is not None:
+            fraction, bytes_done, bytes_total = pair
+            return {
+                **base,
+                "message": line[:500],
+                "indeterminate": False,
+                "fraction": fraction,
+                "bytes_done": bytes_done,
+                "bytes_total": bytes_total,
+            }
+        pct_frac = _parse_percent_fraction(line)
+        if pct_frac is not None:
+            return {
+                **base,
+                "message": line[:500],
+                "indeterminate": False,
+                "fraction": pct_frac,
+            }
+        if _line_allows_nm_fraction(line):
+            match = re.search(r"(\d+)\s*/\s*(\d+)", line)
+            if match:
+                num = int(match.group(1))
+                den = int(match.group(2))
+                if den > 0:
+                    fraction = min(1.0, max(0.0, num / den))
+                    return {
+                        **base,
+                        "message": line[:500],
+                        "indeterminate": False,
+                        "fraction": fraction,
+                        "packages_done": num,
+                        "packages_total": den,
+                    }
+
+    message = tail_message
 
     all_names = set(package_sizes) | downloaded
     packages_total = len(all_names)

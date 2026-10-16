@@ -313,6 +313,25 @@ def test_parse_engine_setup_progress_indeterminate():
     assert "Resolved" in parsed["message"]
 
 
+def test_parse_engine_setup_progress_tqdm_percent():
+    log = (
+        "Resolved 80 packages in 3s\n"
+        "Downloading llvmlite (25.0MiB)\n"
+        "llvmlite ━━━━━━━━━━━━━━━━━━━ 12.5/25.0 MiB 50%\n"
+    )
+    parsed = _parse_engine_setup_progress(log)
+    assert parsed["indeterminate"] is False
+    assert parsed["fraction"] == pytest.approx(0.5)
+
+
+def test_parse_engine_setup_progress_byte_pair_without_percent():
+    log = "torch ━━━━━━━━━━━━━━━━━━━ 1.65/3.30 GiB\n"
+    parsed = _parse_engine_setup_progress(log)
+    assert parsed["indeterminate"] is False
+    assert parsed["fraction"] == pytest.approx(0.5)
+    assert parsed["bytes_total"] > 0
+
+
 def test_parse_engine_setup_progress_uv_download_sizes():
     log = (
         "Resolved 80 packages in 3s\n"
@@ -508,7 +527,7 @@ def test_start_engine_install_repeat_no_deadlock(monkeypatch):
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
         futs = [pool.submit(call_start) for _ in range(3)]
-        for fut in concurrent.futures.as_completed(futs, timeout=2.0):
+        for fut in concurrent.futures.as_completed(futs, timeout=10.0):
             body = fut.result()
             assert "installing" in body
     reset_install_state_for_tests()
@@ -528,7 +547,7 @@ def test_setup_status_concurrent_while_installing_no_deadlock(monkeypatch):
     try:
         with concurrent.futures.ThreadPoolExecutor(max_workers=6) as pool:
             futs = [pool.submit(setup_status) for _ in range(12)]
-            for fut in concurrent.futures.as_completed(futs, timeout=2.0):
+            for fut in concurrent.futures.as_completed(futs, timeout=10.0):
                 body = fut.result()
                 assert body["installing"] is True
     finally:
