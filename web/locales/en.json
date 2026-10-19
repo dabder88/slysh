@@ -268,7 +268,9 @@
     "progressVolumeMiB": "~{done} of ~{total} MB",
     "progressPercent": "{percent}%",
     "gigaamVpn": "When downloading GigaAM, turn off VPN for the download — otherwise the file may be corrupted or the download may appear stuck.",
-    "downloadWaitHint": "The download may take from a few minutes up to half an hour. Progress may barely move for a while — usually one large file is still transferring, and that is normal. Keep this window open until the download finishes."
+    "downloadWaitHint": "The download may take from a few minutes up to half an hour. Progress may barely move for a while — usually one large file is still transferring, and that is normal. Keep this window open until the download finishes.",
+    "errorAdminHint": "Run Slysh as administrator (right-click the shortcut → Run as administrator) and try downloading the model again.",
+    "errorPermission": "Cannot write to {path}."
   },
   "intake": {
     "cancelled": "Cancelled",

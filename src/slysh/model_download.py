@@ -23,11 +23,94 @@ from slysh.whisper_download import model_download_log_path
 _STALL_SECONDS = 90.0
 _LOG_TAIL_BYTES = 64 * 1024
 
+_PERMISSION_HINTS = (
+    "permissionerror",
+    "winerror 5",
+    "access is denied",
+    "errno 13",
+    "read-only",
+    "отказано в доступе",
+    "permission denied",
+)
+
+
+class ModelDownloadStartError(Exception):
+    """Failed before download threads start (lock, paths)."""
+
+    def __init__(self, formatted: dict[str, Any]) -> None:
+        self.formatted = formatted
+        super().__init__(str(formatted.get("message") or ""))
+
+
+def _suggests_run_as_admin(text: str) -> bool:
+    lower = text.lower()
+    return any(hint in lower for hint in _PERMISSION_HINTS)
+
+
+def _last_meaningful_log_line(raw: str) -> str:
+    for line in reversed(raw.splitlines()):
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if stripped.startswith('File "') and ", line " in stripped:
+            continue
+        return stripped[:500]
+    text = raw.strip()
+    return text[:500] if text else ""
+
+
+def format_model_download_failure(
+    raw: str,
+    *,
+    models_dir: Path | None = None,
+) -> dict[str, Any]:
+    detail = _last_meaningful_log_line(raw)
+    if not detail and raw.strip():
+        detail = raw.strip()[:500]
+    suggest = _suggests_run_as_admin(raw) or _suggests_run_as_admin(detail)
+    models_path = str(models_dir) if models_dir is not None else ""
+
+    if suggest:
+        target = models_path or "папку моделей программы (models)"
+        message = (
+            f"Нет прав на запись в {target}. "
+            "Проверьте доступ к диску и что антивирус не блокирует Slysh."
+        )
+    elif detail:
+        lower = detail.lower()
+        if "скачивание завершилось с кодом" in lower:
+            message = detail
+        else:
+            message = f"Не удалось скачать модель: {detail}"
+    else:
+        message = (
+            "Не удалось скачать модель. "
+            "Подробности — в логе model-download.log в папке данных Slysh."
+        )
+
+    if detail and detail == message:
+        detail = ""
+    return {
+        "message": message,
+        "detail": detail,
+        "suggest_run_as_admin": suggest,
+    }
+
+
+def _store_download_failure(formatted: dict[str, Any]) -> None:
+    with _lock:
+        _state["error"] = formatted["message"]
+        _state["error_detail"] = formatted.get("detail") or None
+        _state["suggest_run_as_admin"] = bool(formatted.get("suggest_run_as_admin"))
+
+
 _lock = threading.Lock()
 _state: dict[str, Any] = {
     "running": False,
     "id": None,
     "error": None,
+    "error_detail": None,
+    "suggest_run_as_admin": False,
     "baseline_bytes": 0,
     "progress": None,
 }
@@ -83,8 +166,15 @@ def _acquire_download_lock() -> None:
             "Дождитесь окончания или закройте лишнее окно."
         )
     path = _download_lock_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(str(os.getpid()), encoding="utf-8")
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(str(os.getpid()), encoding="utf-8")
+    except OSError as exc:
+        formatted = format_model_download_failure(
+            str(exc),
+            models_dir=logs_dir(),
+        )
+        raise ModelDownloadStartError(formatted) from exc
 
 
 def _release_download_lock() -> None:
@@ -99,6 +189,8 @@ def reset_model_download_state_for_tests() -> None:
         _state["running"] = False
         _state["id"] = None
         _state["error"] = None
+        _state["error_detail"] = None
+        _state["suggest_run_as_admin"] = False
         _state["baseline_bytes"] = 0
         _state["progress"] = None
     _release_download_lock()
@@ -421,6 +513,8 @@ def model_download_payload() -> dict:
             "active": bool(_state["running"]),
             "id": _state["id"] if _state["running"] else None,
             "error": _state["error"],
+            "error_detail": _state.get("error_detail"),
+            "suggest_run_as_admin": bool(_state.get("suggest_run_as_admin")),
             "progress": dict(progress),
         }
 
@@ -463,7 +557,18 @@ def _subprocess_env() -> dict[str, str]:
 
 def _run_download(model_id: str) -> None:
     log_path = model_download_log_path()
-    log_path.parent.mkdir(parents=True, exist_ok=True)
+    models_dir = project_models_dir()
+    try:
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        _store_download_failure(
+            format_model_download_failure(str(exc), models_dir=logs_dir())
+        )
+        _release_download_lock()
+        with _lock:
+            _state["running"] = False
+            _state["id"] = None
+        return
     cmd = _download_command(model_id)
     try:
         with log_path.open("w", encoding="utf-8") as log:
@@ -479,6 +584,8 @@ def _run_download(model_id: str) -> None:
         with _lock:
             if proc.returncode == 0:
                 _state["error"] = None
+                _state["error_detail"] = None
+                _state["suggest_run_as_admin"] = False
                 total = model_download_bytes_estimate(model_id) or 0
                 if total > 0:
                     _state["progress"] = {
@@ -495,11 +602,17 @@ def _run_download(model_id: str) -> None:
                     tail = log_path.read_text(encoding="utf-8", errors="replace")[-2000:]
                 except OSError:
                     tail = ""
-                msg = tail.strip() or f"Скачивание завершилось с кодом {proc.returncode}"
-                _state["error"] = msg
+                raw = tail.strip() or f"Скачивание завершилось с кодом {proc.returncode}"
+                formatted = format_model_download_failure(raw, models_dir=models_dir)
+                _state["error"] = formatted["message"]
+                _state["error_detail"] = formatted.get("detail") or None
+                _state["suggest_run_as_admin"] = bool(
+                    formatted.get("suggest_run_as_admin")
+                )
     except Exception as exc:
-        with _lock:
-            _state["error"] = str(exc)
+        _store_download_failure(
+            format_model_download_failure(str(exc), models_dir=models_dir)
+        )
     finally:
         _release_download_lock()
         with _lock:
@@ -521,6 +634,8 @@ def start_model_download(model_id: str) -> None:
         _state["running"] = True
         _state["id"] = wanted
         _state["error"] = None
+        _state["error_detail"] = None
+        _state["suggest_run_as_admin"] = False
         _state["baseline_bytes"] = baseline
         _state["progress"] = _empty_progress()
         if model_download_bytes_estimate(wanted):

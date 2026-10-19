@@ -195,6 +195,55 @@ def test_compute_progress_gigaam_uses_tqdm(tmp_path, monkeypatch):
     assert 0.3 < progress["fraction"] < 0.4
 
 
+def test_format_model_download_failure_permission():
+    from slysh.model_download import format_model_download_failure
+
+    raw = (
+        'PermissionError: [WinError 5] Отказано в доступе: '
+        r'"C:\Program Files\Slysh\models\gigaam"'
+    )
+    formatted = format_model_download_failure(
+        raw, models_dir=Path(r"C:\Program Files\Slysh\models")
+    )
+    assert formatted["suggest_run_as_admin"] is True
+    assert "models" in formatted["message"].lower() or "Program Files" in formatted["message"]
+    assert formatted["detail"]
+
+
+def test_format_model_download_failure_generic_exit():
+    from slysh.model_download import format_model_download_failure
+
+    formatted = format_model_download_failure("Скачивание завершилось с кодом 1")
+    assert formatted["suggest_run_as_admin"] is False
+    assert "кодом 1" in formatted["message"]
+
+
+def test_format_model_download_failure_empty_tail():
+    from slysh.model_download import format_model_download_failure
+
+    formatted = format_model_download_failure("   \n  ")
+    assert formatted["suggest_run_as_admin"] is False
+    assert "model-download.log" in formatted["message"]
+
+
+def test_model_download_payload_includes_error_fields(tmp_path, monkeypatch):
+    from slysh.model_download import model_download_payload, reset_model_download_state_for_tests
+
+    _isolate_roots(tmp_path, monkeypatch)
+    reset_model_download_state_for_tests()
+    from slysh.model_download import _lock, _state
+
+    with _lock:
+        _state["error"] = "Тест"
+        _state["error_detail"] = "detail line"
+        _state["suggest_run_as_admin"] = True
+    payload = model_download_payload()
+    assert payload["error"] == "Тест"
+    assert payload["error_detail"] == "detail line"
+    assert payload["suggest_run_as_admin"] is True
+    reset_model_download_state_for_tests()
+
+
 def test_whisper_download_size_uses_hf_hub(tmp_path, monkeypatch):
     _isolate_roots(tmp_path, monkeypatch)
     recorded: dict = {}

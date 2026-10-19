@@ -132,6 +132,32 @@ function splitModelCatalogLabel(label) {
   return { title: text, meta: "" };
 }
 
+function modelDownloadErrorText(md) {
+  if (!md?.error) {
+    return "";
+  }
+  let text = String(md.error);
+  const detail = String(md.error_detail || "").trim();
+  if (detail && detail !== text) {
+    text += `\n${detail}`;
+  }
+  if (md.suggest_run_as_admin) {
+    text += `\n\n${t("modelSetup.errorAdminHint")}`;
+  }
+  return text;
+}
+
+function modelDownloadErrorFromApiErr(err) {
+  const payload = err?.payload && typeof err.payload === "object" ? err.payload : {};
+  const message =
+    typeof payload.error === "string" ? payload.error : err?.message || String(err);
+  return modelDownloadErrorText({
+    error: message,
+    error_detail: payload.detail,
+    suggest_run_as_admin: Boolean(payload.suggest_run_as_admin),
+  });
+}
+
 function applyModelDownloadProgress(md, ui) {
   const active = Boolean(md?.active);
   const prog = md?.progress || {};
@@ -181,11 +207,8 @@ function applyModelDownloadProgress(md, ui) {
     }
   }
   if (ui.stalledEl) {
-    const stalled = Boolean(active && prog.stalled);
-    ui.stalledEl.hidden = !stalled;
-    ui.stalledEl.textContent = stalled
-      ? t("settings.modelDownloadStalled") || t("firstRun.engineProgressStalledVpn")
-      : "";
+    ui.stalledEl.hidden = true;
+    ui.stalledEl.textContent = "";
   }
   if (ui.waitHintEl) {
     ui.waitHintEl.hidden = !active;
@@ -1224,7 +1247,7 @@ function initAsrModelSettings() {
       }
       if (downloadStatus) {
         downloadStatus.hidden = false;
-        downloadStatus.textContent = md.error;
+        downloadStatus.textContent = modelDownloadErrorText(md);
       }
       return;
     }
@@ -1287,7 +1310,7 @@ function initAsrModelSettings() {
       }
       if (downloadStatus) {
         downloadStatus.hidden = false;
-        downloadStatus.textContent = err.message || String(err);
+        downloadStatus.textContent = modelDownloadErrorFromApiErr(err);
       }
       downloadBtn.disabled = false;
       downloadTargetId = null;
@@ -2969,7 +2992,7 @@ function initModelSetup() {
       }
       if (statusEl && md.error) {
         statusEl.hidden = false;
-        statusEl.textContent = md.error;
+        statusEl.textContent = modelDownloadErrorText(md);
       } else if (statusEl && !md.error) {
         statusEl.hidden = true;
         statusEl.textContent = "";
@@ -3063,7 +3086,7 @@ function initModelSetup() {
       downloadTargetId = null;
       if (statusEl) {
         statusEl.hidden = false;
-        statusEl.textContent = err.message || String(err);
+        statusEl.textContent = modelDownloadErrorFromApiErr(err);
       }
       downloadBtn.disabled = false;
     }

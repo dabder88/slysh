@@ -16,15 +16,18 @@ export function api(path, options) {
     if (!r.ok) {
       const raw = await r.text();
       let message = raw;
+      let parsed = null;
       if (r.status === 405 || raw.trim() === "Method Not Allowed") {
         message = translateKnownApiError(message, r.status);
       } else {
         try {
-          const parsed = JSON.parse(raw);
-          if (typeof parsed.detail === "string") {
+          parsed = JSON.parse(raw);
+          if (typeof parsed.detail === "string" && !parsed.error) {
             message = parsed.detail;
           } else if (typeof parsed.error === "string") {
             message = parsed.error;
+          } else if (typeof parsed.detail === "string") {
+            message = parsed.detail;
           }
         } catch (_) {
           /* keep raw body */
@@ -32,6 +35,9 @@ export function api(path, options) {
       }
       const err = new Error(message);
       err.status = r.status;
+      if (parsed && typeof parsed === "object") {
+        err.payload = parsed;
+      }
       throw err;
     }
     const type = r.headers.get("content-type") || "";

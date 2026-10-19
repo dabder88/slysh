@@ -135,7 +135,12 @@ from slysh.remote_asr import (
     transcribe_http_file,
     transcribe_media,
 )
-from slysh.model_download import model_download_payload, start_model_download
+from slysh.model_download import (
+    ModelDownloadStartError,
+    format_model_download_failure,
+    model_download_payload,
+    start_model_download,
+)
 from slysh.runtime_setup import (
     activate_cloud_only_mode,
     dismiss_model_setup,
@@ -3474,12 +3479,36 @@ def create_ui_app(
         try:
             start_model_download(model_id)
             dismiss_model_setup()
+        except ModelDownloadStartError as exc:
+            formatted = exc.formatted
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "error": formatted["message"],
+                    "detail": formatted.get("detail"),
+                    "suggest_run_as_admin": bool(
+                        formatted.get("suggest_run_as_admin")
+                    ),
+                },
+            )
         except RuntimeError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         except OSError as exc:
-            return JSONResponse(status_code=500, content={"error": str(exc)})
+            formatted = format_model_download_failure(
+                str(exc), models_dir=project_models_dir()
+            )
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "error": formatted["message"],
+                    "detail": formatted.get("detail"),
+                    "suggest_run_as_admin": bool(
+                        formatted.get("suggest_run_as_admin")
+                    ),
+                },
+            )
         return {"status": "started", "id": model_id}
 
     @app.post("/api/engine/start")
