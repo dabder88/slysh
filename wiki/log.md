@@ -2,6 +2,11 @@
 
 Сюда дописывать дату и что изменилось в продовой копии. Старые строки не переписывать.
 
+## 2026-10-21
+
+- Релиз **v1.0.4**: YouTube yt-dlp / cookie3 / transcript-api через `.venv-engine` (split venv).
+- YouTube / split venv: `youtube_env.py` — probe и запуск yt-dlp, browser-cookie3 и youtube-transcript-api через `.venv-engine`, когда в лёгком UI `.venv` пакетов нет; статус `/api/youtube/status` и извлечение cookies через subprocess CLI.
+
 ## 2026-10-19
 
 - Релиз **v1.0.3** (готов локально): ошибки скачивания моделей + admin hint; stalled VPN в прогрессе модели убран.

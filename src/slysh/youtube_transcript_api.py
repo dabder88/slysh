@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import json
+import subprocess
+import sys
 from http.cookiejar import MozillaCookieJar
 
 from slysh.models import Segment
 from slysh.paths import youtube_cookies_path
+from slysh.youtube_env import resolve_youtube_python
 
 YTA_MISSING_MESSAGE = (
     "Пакет youtube-transcript-api не установлен. Выполните: uv pip install youtube-transcript-api"
@@ -15,11 +19,7 @@ class YoutubeTranscriptApiError(Exception):
 
 
 def transcript_api_available() -> bool:
-    try:
-        import youtube_transcript_api  # noqa: F401
-    except ImportError:
-        return False
-    return True
+    return resolve_youtube_python(require="youtube_transcript_api") is not None
 
 
 def _session_with_cookies():
@@ -105,7 +105,41 @@ def _fetch_snippets(api, video_id: str, preferred: list[str]):
         ) from exc
 
 
-def fetch_transcript_api(url: str, language: str = "ru") -> dict:
+def _segments_to_json(segments: list[Segment]) -> list[dict]:
+    return [
+        {
+            "start_ms": segment.start_ms,
+            "end_ms": segment.end_ms,
+            "text": segment.text,
+            "speaker": segment.speaker,
+        }
+        for segment in segments
+    ]
+
+
+def _payload_from_json(data: dict) -> dict:
+    segments = [
+        Segment(
+            start_ms=int(row["start_ms"]),
+            end_ms=int(row["end_ms"]),
+            text=str(row["text"]),
+            speaker=row.get("speaker"),
+        )
+        for row in data.get("segments") or []
+    ]
+    return {
+        "title": data.get("title") or "",
+        "channel": data.get("channel") or "",
+        "channel_url": data.get("channel_url") or "",
+        "upload_date": data.get("upload_date") or "",
+        "duration_s": data.get("duration_s"),
+        "chapters": data.get("chapters") or [],
+        "thumbnail_url": data.get("thumbnail_url") or "",
+        "segments": segments,
+    }
+
+
+def _fetch_transcript_api_inprocess(url: str, language: str = "ru") -> dict:
     from slysh.youtube_ingest import extract_video_id
 
     try:
@@ -139,3 +173,64 @@ def fetch_transcript_api(url: str, language: str = "ru") -> dict:
         "thumbnail_url": "",
         "segments": segments,
     }
+
+
+def _fetch_transcript_api_subprocess(python_exe: str, url: str, language: str) -> dict:
+    proc = subprocess.run(
+        [
+            python_exe,
+            "-m",
+            "slysh.youtube_transcript_api",
+            "fetch",
+            "--url",
+            url,
+            "--language",
+            language or "ru",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=180,
+        check=False,
+    )
+    if proc.returncode != 0:
+        message = (proc.stderr or proc.stdout or "youtube-transcript-api subprocess failed").strip()
+        raise YoutubeTranscriptApiError(message)
+    try:
+        payload = json.loads(proc.stdout)
+    except json.JSONDecodeError as exc:
+        raise YoutubeTranscriptApiError(
+            "Некорректный ответ subprocess youtube-transcript-api."
+        ) from exc
+    return _payload_from_json(payload)
+
+
+def fetch_transcript_api(url: str, language: str = "ru") -> dict:
+    py = resolve_youtube_python(require="youtube_transcript_api")
+    if not py:
+        raise YoutubeTranscriptApiError(YTA_MISSING_MESSAGE)
+    if py == sys.executable:
+        return _fetch_transcript_api_inprocess(url, language=language)
+    return _fetch_transcript_api_subprocess(py, url, language)
+
+
+def _cli_fetch(url: str, language: str) -> None:
+    result = _fetch_transcript_api_inprocess(url, language=language)
+    out = {**result, "segments": _segments_to_json(result["segments"])}
+    print(json.dumps(out, ensure_ascii=False))
+
+
+def main() -> None:
+    import argparse
+
+    parser = argparse.ArgumentParser(prog="slysh.youtube_transcript_api")
+    sub = parser.add_subparsers(dest="cmd", required=True)
+    fetch_parser = sub.add_parser("fetch")
+    fetch_parser.add_argument("--url", required=True)
+    fetch_parser.add_argument("--language", default="ru")
+    args = parser.parse_args()
+    if args.cmd == "fetch":
+        _cli_fetch(args.url, args.language)
+
+
+if __name__ == "__main__":
+    main()

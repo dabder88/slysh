@@ -16,6 +16,9 @@ from slysh.models import Segment
 from slysh.paths import youtube_cookies_path
 from slysh.vtt import parse_vtt
 
+from slysh.youtube_env import find_ytdlp as _find_ytdlp_resolved
+from slysh.youtube_env import resolve_ytdlp_command_prefix, ytdlp_missing_message
+
 YTDLP_MISSING_MESSAGE = (
     "yt-dlp не найден. Установите yt-dlp в PATH или выполните: uv sync --extra youtube"
 )
@@ -75,20 +78,7 @@ class YoutubeYtdlpError(Exception):
 
 
 def find_ytdlp() -> str | None:
-    env = os.environ.get("YTDLP_BINARY") or os.environ.get("YT_DLP_BINARY")
-    if env:
-        candidate = Path(env)
-        if candidate.is_file():
-            return str(candidate)
-    which = shutil.which("yt-dlp")
-    if which:
-        return which
-    try:
-        import yt_dlp  # noqa: F401
-
-        return sys.executable + " -m yt_dlp"
-    except ImportError:
-        return None
+    return _find_ytdlp_resolved()
 
 
 def cookies_auth_mode() -> str:
@@ -143,13 +133,10 @@ def _run_ytdlp(
     ytdlp_procs: dict[int, subprocess.Popen] | None = None,
     job_id: int | None = None,
 ) -> subprocess.CompletedProcess[str]:
-    binary = find_ytdlp()
-    if not binary:
-        raise YoutubeYtdlpError(YTDLP_MISSING_MESSAGE)
-    if binary.endswith(" -m yt_dlp"):
-        command = [sys.executable, "-m", "yt_dlp", *args]
-    else:
-        command = [binary, *args]
+    prefix = resolve_ytdlp_command_prefix()
+    if not prefix:
+        raise YoutubeYtdlpError(ytdlp_missing_message())
+    command = [*prefix, *args]
 
     if cancelled is None:
         try:

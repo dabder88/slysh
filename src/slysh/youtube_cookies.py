@@ -4,11 +4,14 @@ import configparser
 import json
 import os
 import shutil
+import subprocess
+import sys
 from datetime import datetime, timezone
 from http.cookiejar import MozillaCookieJar
 from pathlib import Path
 
 from slysh.paths import youtube_cookies_path, youtube_dir
+from slysh.youtube_env import resolve_youtube_python
 
 COOKIES_META_NAME = "cookies-meta.json"
 CHROME_APP_BOUND_HINT = (
@@ -46,11 +49,34 @@ def cookies_present() -> bool:
 
 
 def browser_cookie3_available() -> bool:
+    return resolve_youtube_python(require="browser_cookie3") is not None
+
+
+def _browser_cookie3_missing_message() -> str:
+    return (
+        "Пакет browser-cookie3 не установлен. Выполните: uv sync --extra engine "
+        "--extra diarization --extra youtube (локальные пакеты) или uv pip install browser-cookie3"
+    )
+
+
+def _run_cookies_subcommand(argv: list[str]) -> dict:
+    py = resolve_youtube_python(require="browser_cookie3")
+    if not py:
+        raise YoutubeCookiesError(_browser_cookie3_missing_message())
+    proc = subprocess.run(
+        [py, "-m", "slysh.youtube_cookies", *argv],
+        capture_output=True,
+        text=True,
+        timeout=180,
+        check=False,
+    )
+    if proc.returncode != 0:
+        message = (proc.stderr or proc.stdout or "browser-cookie3 subprocess failed").strip()
+        raise YoutubeCookiesError(message)
     try:
-        import browser_cookie3  # noqa: F401
-    except ImportError:
-        return False
-    return True
+        return json.loads(proc.stdout)
+    except json.JSONDecodeError as exc:
+        raise YoutubeCookiesError("Некорректный ответ subprocess browser-cookie3.") from exc
 
 
 def cookies_status() -> dict:
@@ -253,13 +279,8 @@ def list_browser_profiles() -> dict:
     }
 
 
-def extract_cookies_quick(browser: str = "firefox") -> dict:
-    try:
-        import browser_cookie3
-    except ImportError as exc:
-        raise YoutubeCookiesError(
-            "Пакет browser-cookie3 не установлен. Выполните: uv pip install browser-cookie3"
-        ) from exc
+def _extract_cookies_quick_impl(browser: str = "firefox") -> dict:
+    import browser_cookie3
 
     browser_key = (browser or "firefox").strip().lower()
     try:
@@ -304,20 +325,22 @@ def extract_cookies_quick(browser: str = "firefox") -> dict:
     return cookies_status()
 
 
-def extract_cookies(browser: str, profile: str) -> dict:
-    try:
-        import browser_cookie3
-    except ImportError as exc:
-        raise YoutubeCookiesError(
-            "Пакет browser-cookie3 не установлен. Выполните: uv pip install browser-cookie3"
-        ) from exc
+def extract_cookies_quick(browser: str = "firefox") -> dict:
+    py = resolve_youtube_python(require="browser_cookie3")
+    if not py:
+        raise YoutubeCookiesError(_browser_cookie3_missing_message())
+    if py == sys.executable:
+        return _extract_cookies_quick_impl(browser)
+    return _run_cookies_subcommand(["extract-quick", "--browser", browser or "firefox"])
 
+
+def _extract_cookies_impl(browser: str, profile: str) -> dict:
     browser_key = (browser or "").strip().lower()
     profile_name = (profile or "").strip()
     if not browser_key:
         raise YoutubeCookiesError("Укажите браузер.")
     if not profile_name or profile_name == "__default__":
-        return extract_cookies_quick(browser_key)
+        return _extract_cookies_quick_impl(browser_key)
 
     profile_path = _resolve_profile_path(browser_key, profile_name)
     cookie_file = _cookie_db_path(browser_key, profile_path)
@@ -353,3 +376,46 @@ def extract_cookies(browser: str, profile: str) -> dict:
         }
     )
     return cookies_status()
+
+
+def extract_cookies(browser: str, profile: str) -> dict:
+    py = resolve_youtube_python(require="browser_cookie3")
+    if not py:
+        raise YoutubeCookiesError(_browser_cookie3_missing_message())
+    if py == sys.executable:
+        return _extract_cookies_impl(browser, profile)
+    profile_name = (profile or "").strip()
+    browser_key = (browser or "").strip().lower()
+    if not profile_name or profile_name == "__default__":
+        return _run_cookies_subcommand(["extract-quick", "--browser", browser_key or "firefox"])
+    return _run_cookies_subcommand(
+        [
+            "extract-profile",
+            "--browser",
+            browser_key,
+            "--profile",
+            profile_name,
+        ]
+    )
+
+
+def main() -> None:
+    import argparse
+
+    parser = argparse.ArgumentParser(prog="slysh.youtube_cookies")
+    sub = parser.add_subparsers(dest="cmd", required=True)
+    quick = sub.add_parser("extract-quick")
+    quick.add_argument("--browser", default="firefox")
+    profile = sub.add_parser("extract-profile")
+    profile.add_argument("--browser", required=True)
+    profile.add_argument("--profile", required=True)
+    args = parser.parse_args()
+    if args.cmd == "extract-quick":
+        result = _extract_cookies_quick_impl(args.browser)
+    else:
+        result = _extract_cookies_impl(args.browser, args.profile)
+    print(json.dumps(result, ensure_ascii=False))
+
+
+if __name__ == "__main__":
+    main()
