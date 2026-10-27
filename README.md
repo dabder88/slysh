@@ -10,6 +10,8 @@
 [![License](https://img.shields.io/badge/license-Free%20for%20Personal%20Use-blue?style=flat-square)](LICENSE)
 [![Models](https://img.shields.io/badge/models-GigaAM%20%7C%20Whisper%20%7C%20NeMo-F97316?style=flat-square)](https://github.com/dabder88/slysh)
 [![uv](https://img.shields.io/badge/tested%20with-uv-DE5FE9?style=flat-square&logo=astral&logoColor=white)](https://docs.astral.sh/uv/)
+[![Telegram](https://img.shields.io/badge/Telegram-@dabder88-229ED9?style=flat-square&logo=telegram&logoColor=white)](https://t.me/dabder88)
+[![Sponsor](https://img.shields.io/badge/Sponsor-CloudTips-EC4899?style=flat-square&logo=heart&logoColor=white)](https://pay.cloudtips.ru/p/4e14b5b2)
 
 **English** · [🇷🇺 Перейти к русской версии](README.ru.md)
 
@@ -186,6 +188,11 @@ Slysh! is developed independently without venture capital, ads, or paid subscrip
 - Star this repository on GitHub.
 - Support the author via [CloudTips](https://pay.cloudtips.ru/p/4e14b5b2).
 - Contact: Telegram [@dabder88](https://t.me/dabder88) | Email: [dabder@mail.ru](mailto:dabder@mail.ru)
+
+<p align="left">
+  <a href="https://t.me/dabder88"><img src="https://img.shields.io/badge/Telegram-@dabder88-229ED9?style=for-the-badge&logo=telegram&logoColor=white" alt="Telegram"></a>
+  <a href="https://pay.cloudtips.ru/p/4e14b5b2"><img src="https://img.shields.io/badge/Sponsor-CloudTips-EC4899?style=for-the-badge&logo=heart&logoColor=white" alt="Sponsor on CloudTips"></a>
+</p>
 
 ---
 
