@@ -186,12 +186,13 @@ Slysh! является проприетарным программным обе
 
 Slysh! разрабатывается независимо без венчурных инвестиций, рекламы и платных тарифов. Если программа помогает вам в работе:
 - Поставьте звезду репозиторию на GitHub.
-- Поддержите автора через сервис [CloudTips](https://pay.cloudtips.ru/p/4e14b5b2).
+- Поддержите автора через сервис [CloudTips (карты РФ)](https://pay.cloudtips.ru/p/4e14b5b2) или [Lava.top (зарубежные карты / USD)](https://app.lava.top/brutalsweet?donate=open&currency=USD).
 - Для связи и обратной связи: Telegram [@dabder88](https://t.me/dabder88) | Email: [dabder@mail.ru](mailto:dabder@mail.ru)
 
 <p align="left">
   <a href="https://t.me/dabder88"><img src="https://img.shields.io/badge/Telegram-@dabder88-229ED9?style=for-the-badge&logo=telegram&logoColor=white" alt="Telegram"></a>
   <a href="https://pay.cloudtips.ru/p/4e14b5b2"><img src="https://img.shields.io/badge/Поддержать-CloudTips-EC4899?style=for-the-badge&logo=heart&logoColor=white" alt="Поддержать на CloudTips"></a>
+  <a href="https://app.lava.top/brutalsweet?donate=open&currency=USD"><img src="https://img.shields.io/badge/Donate-Lava.top-EC4899?style=for-the-badge&logo=heart&logoColor=white" alt="Donate on Lava.top"></a>
 </p>
 
 ---
