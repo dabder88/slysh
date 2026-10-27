@@ -23,12 +23,12 @@ https://github.com/dabder88/slysh/settings
 
 Создайте release от тега `v1.0.0`. Текст и SHA-256: см. [GITHUB_RELEASE_v1.0.0.md](GITHUB_RELEASE_v1.0.0.md).
 
-Загрузите assets:
+Загрузите assets (автоматически через `publish_release_assets.py`):
 
-- `dist\Slysh-Setup-1.0.0-ru.exe`
-- `dist\Slysh-Setup-1.0.0-en.exe`
+- `dist\Slysh-Setup-X.Y.Z-ru.exe` и `dist\Slysh-Setup-X.Y.Z-en.exe`
+- алиасы **`Slysh-Setup-ru.exe`** и **`Slysh-Setup-en.exe`** (стабильные URL в README)
 
-Рекомендуется также загрузить копии с именами `Slysh-Setup-ru.exe` и `Slysh-Setup-en.exe` для кнопок README и in-app updates.
+Догрузка только алиасов в существующий релиз: `publish_release_assets.py --version X.Y.Z --canonical-only`.
 
 ## 4. Проверка
 

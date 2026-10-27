@@ -8,6 +8,8 @@ Patch release: YouTube на установленной копии — yt-dlp, br
 
 - `Slysh-Setup-1.0.4-ru.exe`
 - `Slysh-Setup-1.0.4-en.exe`
+- `Slysh-Setup-ru.exe` (same bytes as versioned RU; README download)
+- `Slysh-Setup-en.exe` (same bytes as versioned EN; README download)
 
 ## SHA-256 (required for in-app update)
 

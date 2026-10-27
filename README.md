@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/dabder88/slysh/releases/latest"><img src="https://img.shields.io/github/v/release/dabder88/slysh?style=flat-square&color=10B981&label=version%201.0.0" alt="Latest Release"></a>
+  <a href="https://github.com/dabder88/slysh/releases/latest"><img src="https://img.shields.io/github/v/release/dabder88/slysh?style=flat-square&color=10B981" alt="Latest Release"></a>
   <a href="https://slyshai.pro/en/"><img src="https://img.shields.io/badge/website-slyshai.pro-6366F1?style=flat-square" alt="Website"></a>
   <img src="https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D6?style=flat-square&logo=windows&logoColor=white" alt="Platform">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Free%20for%20Personal%20Use-blue?style=flat-square" alt="License"></a>
@@ -26,7 +26,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/dabder88/slysh/releases/latest/download/Slysh-Setup-1.0.0-en.exe">
+  <a href="https://github.com/dabder88/slysh/releases/latest/download/Slysh-Setup-en.exe">
     <img src="https://img.shields.io/badge/⬇️_Download_for_Windows_(.exe)-0078D4?style=for-the-badge&logo=windows&logoColor=white" alt="Download for Windows">
   </a>
   <a href="https://slyshai.pro/en/">
@@ -134,7 +134,7 @@ Paste a channel or playlist link to batch-collect clean author or automatic capt
 ## 🚀 Getting Started
 
 ### Option A: Official Windows Installer (Recommended)
-1. Download **`Slysh-Setup-1.0.0-en.exe`** (or **`Slysh-Setup-en.exe`** from the same release) from [GitHub Releases](https://github.com/dabder88/slysh/releases/latest) or [slyshai.pro](https://slyshai.pro/en/).
+1. Download **`Slysh-Setup-en.exe`** from [GitHub Releases](https://github.com/dabder88/slysh/releases/latest) (button above) or [slyshai.pro](https://slyshai.pro/en/).
 2. Run the installer and launch Slysh! from your desktop or Start Menu.
 3. Choose your preferred mode: use free cloud keys (Groq/Gladia) instantly, or click **Download Models** in Settings to run 100% offline.
 

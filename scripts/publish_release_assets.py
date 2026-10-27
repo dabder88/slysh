@@ -5,13 +5,35 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import ssl
 import sys
 import urllib.error
 import urllib.request
 from pathlib import Path
 
+try:
+    import certifi
+except ImportError:
+    certifi = None  # type: ignore[assignment]
+
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_REPO = "dabder88/slysh"
+
+SETUP_ASSET_NAME_RU = "Slysh-Setup-ru.exe"
+SETUP_ASSET_NAME_EN = "Slysh-Setup-en.exe"
+
+
+def release_upload_plan(version: str, dist: Path) -> list[tuple[Path, str]]:
+    """Local installer path and GitHub asset name (versioned + canonical aliases)."""
+    ver = version.strip().lstrip("v")
+    ru_src = dist / f"Slysh-Setup-{ver}-ru.exe"
+    en_src = dist / f"Slysh-Setup-{ver}-en.exe"
+    return [
+        (ru_src, ru_src.name),
+        (en_src, en_src.name),
+        (ru_src, SETUP_ASSET_NAME_RU),
+        (en_src, SETUP_ASSET_NAME_EN),
+    ]
 
 
 def _load_token() -> str:
@@ -42,8 +64,11 @@ def _request(
     if headers:
         hdr.update(headers)
     req = urllib.request.Request(url, data=data, method=method, headers=hdr)
+    ctx = None
+    if certifi is not None:
+        ctx = ssl.create_default_context(cafile=certifi.where())
     try:
-        with urllib.request.urlopen(req, timeout=600.0) as resp:
+        with urllib.request.urlopen(req, timeout=600.0, context=ctx) as resp:
             return resp.status, resp.read()
     except urllib.error.HTTPError as exc:
         return exc.code, exc.read()
@@ -67,6 +92,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     p.add_argument("--repo", default=DEFAULT_REPO, help="GitHub owner/repo")
     p.add_argument("--dist", default=None, help="Directory with installers (default: dist/)")
+    p.add_argument(
+        "--canonical-only",
+        action="store_true",
+        help="Upload only Slysh-Setup-ru.exe and Slysh-Setup-en.exe (release must exist)",
+    )
     return p.parse_args(argv)
 
 
@@ -79,21 +109,26 @@ def main(argv: list[str] | None = None) -> int:
 
     version = args.version.strip().lstrip("v")
     tag = f"v{version}"
-    notes_path = Path(args.notes) if args.notes else ROOT / "release" / f"GITHUB_RELEASE_v{version}.md"
-    if not notes_path.is_file():
-        print(f"Missing notes file: {notes_path}", file=sys.stderr)
-        return 1
-
-    gh_body = _release_body_from_notes(notes_path)
     dist = Path(args.dist) if args.dist else ROOT / "dist"
-    assets = [
-        dist / f"Slysh-Setup-{version}-ru.exe",
-        dist / f"Slysh-Setup-{version}-en.exe",
-    ]
-    for path in assets:
+    full_plan = release_upload_plan(version, dist)
+    if args.canonical_only:
+        uploads = [(path, name) for path, name in full_plan if name in (SETUP_ASSET_NAME_RU, SETUP_ASSET_NAME_EN)]
+    else:
+        uploads = full_plan
+
+    required_paths = {path for path, _ in uploads}
+    for path in required_paths:
         if not path.is_file():
             print(f"Missing {path}", file=sys.stderr)
             return 1
+
+    gh_body: str | None = None
+    if not args.canonical_only:
+        notes_path = Path(args.notes) if args.notes else ROOT / "release" / f"GITHUB_RELEASE_v{version}.md"
+        if not notes_path.is_file():
+            print(f"Missing notes file: {notes_path}", file=sys.stderr)
+            return 1
+        gh_body = _release_body_from_notes(notes_path)
 
     repo = args.repo
     status, raw = _request(
@@ -107,11 +142,14 @@ def main(argv: list[str] | None = None) -> int:
         release = json.loads(raw.decode("utf-8"))
         print(f"Release exists id={release['id']}")
     else:
+        if args.canonical_only:
+            print(f"Release {tag} not found (required for --canonical-only)", file=sys.stderr)
+            return 1
         payload = json.dumps(
             {
                 "tag_name": tag,
                 "name": f"Slysh! {version}",
-                "body": gh_body,
+                "body": gh_body or "",
                 "draft": False,
                 "prerelease": False,
                 "generate_release_notes": False,
@@ -133,8 +171,7 @@ def main(argv: list[str] | None = None) -> int:
     release_id = release["id"]
     existing = {a["name"] for a in release.get("assets") or []}
 
-    for path in assets:
-        name = path.name
+    for path, name in uploads:
         if name in existing:
             print(f"Skip upload (exists): {name}")
             continue
@@ -160,7 +197,7 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         print(f"Uploaded {name}")
 
-    if release.get("body") != gh_body:
+    if gh_body and release.get("body") != gh_body:
         payload = json.dumps({"body": gh_body}).encode("utf-8")
         st, _ = _request(
             "PATCH",

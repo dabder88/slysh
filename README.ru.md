@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/dabder88/slysh/releases/latest"><img src="https://img.shields.io/github/v/release/dabder88/slysh?style=flat-square&color=10B981&label=версия%201.0.0" alt="Последний релиз"></a>
+  <a href="https://github.com/dabder88/slysh/releases/latest"><img src="https://img.shields.io/github/v/release/dabder88/slysh?style=flat-square&color=10B981" alt="Последний релиз"></a>
   <a href="https://slyshai.pro/"><img src="https://img.shields.io/badge/сайт-slyshai.pro-6366F1?style=flat-square" alt="Сайт"></a>
   <img src="https://img.shields.io/badge/платформа-Windows%2010%20%7C%2011-0078D6?style=flat-square&logo=windows&logoColor=white" alt="Платформа">
   <a href="LICENSE"><img src="https://img.shields.io/badge/лицензия-Бесплатно%20для%20личного%20использования-blue?style=flat-square" alt="Лицензия"></a>
@@ -26,7 +26,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/dabder88/slysh/releases/latest/download/Slysh-Setup-1.0.0-ru.exe">
+  <a href="https://github.com/dabder88/slysh/releases/latest/download/Slysh-Setup-ru.exe">
     <img src="https://img.shields.io/badge/⬇️_Скачать_для_Windows_(.exe)-0078D4?style=for-the-badge&logo=windows&logoColor=white" alt="Скачать для Windows">
   </a>
   <a href="https://slyshai.pro/">
@@ -134,7 +134,7 @@
 ## 🚀 Быстрый старт на Windows
 
 ### Вариант А: Официальный установщик (Рекомендуется)
-1. Скачайте **`Slysh-Setup-1.0.0-ru.exe`** (или **`Slysh-Setup-ru.exe`** из того же релиза) в [GitHub Releases](https://github.com/dabder88/slysh/releases/latest) или на [slyshai.pro](https://slyshai.pro/).
+1. Скачайте **`Slysh-Setup-ru.exe`** в [GitHub Releases](https://github.com/dabder88/slysh/releases/latest) (кнопка выше) или на [slyshai.pro](https://slyshai.pro/).
 2. Запустите установщик и откройте Slysh! с рабочего стола или меню Пуск.
 3. Выберите режим: подключите бесплатный API-ключ (Groq/Gladia) для работы без мощной видеокарты, либо нажмите **Скачать модель** в Настройках для 100% офлайн-работы.
 
