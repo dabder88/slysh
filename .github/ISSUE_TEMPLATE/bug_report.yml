@@ -23,7 +23,7 @@ body:
       label: Способ запуска
       options:
         - "Официальный установщик (.exe) из Releases / slyshai.pro"
-        - "Запуск из исходников (Slysh.bat / start-gigaam-desktop.bat)"
+        - "Запуск из исходников (Slysh.bat)"
         - "Консольный запуск через uv run"
     validations:
       required: true

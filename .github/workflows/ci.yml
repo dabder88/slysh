@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches: [ master, main, prod-launch ]
+  pull_request:
+    branches: [ master, main, prod-launch ]
+
+jobs:
+  test:
+    name: Architecture & UI Isolation Test
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Install lightweight UI dependencies
+        run: uv sync
+
+      - name: Run Architecture & UI Isolation Tests
+        run: uv run pytest tests/test_ui_imports.py
