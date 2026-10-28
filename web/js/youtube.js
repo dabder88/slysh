@@ -402,7 +402,11 @@ async function ingestYoutube() {
       return;
     }
   }
-  if (method !== "apify" && status.youtube_reachable === false) {
+  if (
+    method !== "apify" &&
+    status.youtube_reachable === false &&
+    !status.youtube_proxy_active
+  ) {
     showToast("youtube.unreachablePreflight");
   }
   if (btn) {

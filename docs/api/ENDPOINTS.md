@@ -104,7 +104,7 @@
 | POST | `/api/ui/session` | При `GIGAAM_UI_AUTH=1`: заголовок `X-Slysh-Bootstrap` (токен из pywebview `ui_bootstrap_token`) → выдаёт HttpOnly cookie `slysh_ui_session` |
 
 Провайдеры (OpenRouter, Apify, HTTP-пресеты, custom): в GET всегда `api_key_set`, `api_key_masked` (маска 4+…+4), `api_key_tail` (= masked). Поле `api_key` с полным значением — только при валидной UI-сессии (`GIGAAM_UI_AUTH=1` + cookie) или если UI auth выключен (тесты).
-| POST | `/api/updates/check` | GitHub `releases/latest` → `has_update`, `latest_version`, `release_notes`, `html_url` (только установленная копия) |
+| POST | `/api/updates/check` | GitHub `releases/latest` → `has_update`, `latest_version`, `release_summary[]`, `release_published_at`, короткий `release_notes`, `html_url` (только установленная копия) |
 | GET | `/api/updates/status` | `phase` (`idle` / `downloading` / `ready` / `error`), прогресс байтов, `error` |
 | POST | `/api/updates/download` | Скачать `Slysh-Setup.exe` во временную папку |
 | POST | `/api/updates/apply` | Запуск установщика, выход процесса UI |
@@ -130,7 +130,7 @@
 | POST | `/api/meeting/resume` |
 | POST | `/api/meeting/stop` | Job payload + `recording_path` при `save_audio` |
 | POST | `/api/meeting/clear` | Сброс `job_id` на экране встречи (без удаления job из БД) |
-| GET | `/api/youtube/status` | Apify key, cookies, `cookies_auth_mode` (`file`/`browser`), yt-dlp, `youtube_reachable`, `batch_api`, `batch_resolve_api` |
+| GET | `/api/youtube/status` | Apify key, cookies, `cookies_auth_mode` (`file`/`browser`), yt-dlp, `youtube_reachable`, `youtube_proxy_active`, `batch_api`, `batch_resolve_api` |
 | GET | `/api/youtube/cookies/browsers` | Профили Firefox/Chrome/Edge |
 | POST | `/api/youtube/cookies/extract` | `{ browser, profile }` → cookies.txt; `profile: "__default__"` — быстрое извлечение |
 | POST | `/api/youtube/cookies/import` | `{ path }` — импорт cookies.txt |

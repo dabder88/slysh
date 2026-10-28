@@ -1420,10 +1420,30 @@
   }
 
   .update-modal-notes {
-    max-height: 12rem;
+    max-height: 14rem;
     overflow: auto;
-    white-space: pre-wrap;
     margin: 0.5rem 0 0;
+  }
+
+  .update-modal-meta {
+    margin: 0 0 0.35rem;
+  }
+
+  .update-modal-whats-new {
+    margin: 0.5rem 0 0.25rem;
+    font-weight: 600;
+    font-size: 13px;
+  }
+
+  .update-modal-summary {
+    margin: 0;
+    padding-left: 1.15rem;
+    font-size: 13px;
+    color: var(--on-surface-variant);
+  }
+
+  .update-modal-summary li + li {
+    margin-top: 0.35rem;
   }
 
   .settings-app-version {

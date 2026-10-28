@@ -1085,8 +1085,10 @@
     "newerThanRelease": "Your installed version is newer than the latest GitHub release",
     "openRelease": "Open on GitHub",
     "readyToInstall": "Installer is ready. Click Install.",
+    "releaseDate": "Release date: {date}",
     "title": "Update Slysh!",
-    "upToDate": "You are up to date ({version})"
+    "upToDate": "You are up to date ({version})",
+    "whatsNew": "What's new"
   },
   "transcripts": {
     "emptyBatches": "No completed batch transcripts yet. Create a batch under Files & batches and wait for at least one completed item.",

@@ -4,6 +4,7 @@ import json
 import logging
 import re
 import threading
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Literal
@@ -34,6 +35,8 @@ INGEST_ERROR_META_KEY = "_ingest_error"
 _VIDEO_ID_RE = re.compile(r"^[A-Za-z0-9_-]{11}$")
 _meta_db: object | None = None
 _meta_db_lock = threading.Lock()
+_PROBE_CACHE: tuple[str, float, bool] | None = None
+_PROBE_TTL_S = 45.0
 
 
 class YoutubeIngestError(Exception):
@@ -322,24 +325,76 @@ def normalize_youtube_url(raw: str) -> tuple[str, str]:
     return canonical, video_id
 
 
-def probe_youtube_reachable(*, timeout: float = 8.0) -> bool:
+def youtube_proxy_active() -> bool:
+    from slysh.http_proxy import load_proxy_config, should_use_proxy_for_target
+
+    if not should_use_proxy_for_target("youtube"):
+        return False
+    host = str(load_proxy_config().get("host") or "").strip()
+    return bool(host)
+
+
+def _probe_cache_key() -> str:
+    from slysh.http_proxy import load_proxy_config
+
+    cfg = load_proxy_config()
+    targets = cfg.get("targets") if isinstance(cfg.get("targets"), dict) else {}
+    return json.dumps(
+        {
+            "enabled": bool(cfg.get("enabled")),
+            "host": str(cfg.get("host") or "").strip(),
+            "port": cfg.get("port"),
+            "youtube": bool(targets.get("youtube")),
+        },
+        sort_keys=True,
+        ensure_ascii=False,
+    )
+
+
+def _probe_youtube_reachable_live(*, timeout: float = 8.0) -> bool:
     from slysh.http_proxy import opener_for_target
 
     try:
         import urllib.request
 
-        opener = opener_for_target("youtube")
+        open_url = opener_for_target("youtube")
         request = urllib.request.Request(
-            "https://www.youtube.com/",
-            method="HEAD",
-            headers={"User-Agent": "Slysh/1.0"},
+            "https://www.youtube.com/generate_204",
+            headers={
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) Slysh/1.0"
+                ),
+            },
         )
-        with opener.open(request, timeout=timeout) as response:
+        with open_url(request, timeout=timeout) as response:
             code = getattr(response, "status", None) or response.getcode()
             return 200 <= int(code) < 500
     except Exception:
         logging.debug("youtube reachability probe failed", exc_info=True)
         return False
+
+
+def probe_youtube_reachable(*, timeout: float = 8.0, use_cache: bool = True) -> bool:
+    global _PROBE_CACHE
+
+    key = _probe_cache_key()
+    now = time.monotonic()
+    if (
+        use_cache
+        and _PROBE_CACHE is not None
+        and _PROBE_CACHE[0] == key
+        and (now - _PROBE_CACHE[1]) < _PROBE_TTL_S
+    ):
+        return _PROBE_CACHE[2]
+    result = _probe_youtube_reachable_live(timeout=timeout)
+    _PROBE_CACHE = (key, now, result)
+    return result
+
+
+def reset_youtube_reachability_cache_for_tests() -> None:
+    global _PROBE_CACHE
+    _PROBE_CACHE = None
 
 
 def youtube_status() -> dict:
@@ -352,11 +407,13 @@ def youtube_status() -> dict:
         "ytdlp_found": bool(find_ytdlp()),
         "browser_cookie3": browser_cookie3_available(),
         "transcript_api": transcript_api_available(),
+        "youtube_proxy_active": youtube_proxy_active(),
         "youtube_reachable": probe_youtube_reachable(),
     }
 
 
 def _fetch_ytdlp_with_fallbacks(url: str, language: str) -> dict:
+    from slysh.http_proxy import should_use_proxy_for_target
     from slysh.youtube_errors import format_youtube_failure
 
     ytdlp_error: YoutubeYtdlpError | None = None
@@ -366,13 +423,15 @@ def _fetch_ytdlp_with_fallbacks(url: str, language: str) -> dict:
         ytdlp_error = exc
 
     reachable = probe_youtube_reachable()
+    proxy_active = should_use_proxy_for_target("youtube")
     api_message = ""
-    if transcript_api_available() and reachable:
+    try_transcript_api = transcript_api_available() and (reachable or proxy_active)
+    if try_transcript_api:
         try:
             return fetch_transcript_api(url, language=language)
         except YoutubeTranscriptApiError as exc:
             api_message = str(exc)
-    elif transcript_api_available() and not reachable:
+    elif transcript_api_available() and not reachable and not proxy_active:
         api_message = "YouTube недоступен из текущей сети (проверка перед fallback)."
 
     if apify_api_key():

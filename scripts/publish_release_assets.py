@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import ssl
 import sys
 import urllib.error
@@ -82,6 +83,15 @@ def _release_body_from_notes(path: Path) -> str:
     return release_body.strip()
 
 
+def _warn_if_missing_summary(body: str) -> None:
+    if not body or re.search(r"^##\s+Summary\s*$", body, re.MULTILINE | re.IGNORECASE):
+        return
+    print(
+        "Warning: release notes missing ## Summary (in-app update summary may be poor)",
+        file=sys.stderr,
+    )
+
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Create/update GitHub Release and upload Setup exe.")
     p.add_argument("--version", required=True, help="Semver X.Y.Z (no v prefix)")
@@ -129,6 +139,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Missing notes file: {notes_path}", file=sys.stderr)
             return 1
         gh_body = _release_body_from_notes(notes_path)
+        _warn_if_missing_summary(gh_body)
 
     repo = args.repo
     status, raw = _request(

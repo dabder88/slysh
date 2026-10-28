@@ -528,6 +528,67 @@ function initAppUpdates() {
     });
   }
 
+  function formatReleaseDateFromIso(iso) {
+    const token = String(iso || "").trim();
+    if (!token) {
+      return "";
+    }
+    const dt = new Date(token);
+    if (Number.isNaN(dt.getTime())) {
+      return "";
+    }
+    const loc = getLocale() === "en" ? "en-US" : "ru-RU";
+    return new Intl.DateTimeFormat(loc, {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    }).format(dt);
+  }
+
+  function renderUpdateReleaseNotes(result) {
+    if (!notesEl) {
+      return;
+    }
+    notesEl.replaceChildren();
+    const bullets = Array.isArray(result?.release_summary)
+      ? result.release_summary.filter((line) => String(line || "").trim())
+      : [];
+    if (!bullets.length && result?.release_notes) {
+      bullets.push(
+        ...String(result.release_notes)
+          .split("\n")
+          .map((line) => line.replace(/^\s*[•*-]\s*/, "").trim())
+          .filter(Boolean),
+      );
+    }
+    if (!bullets.length) {
+      notesEl.hidden = true;
+      return;
+    }
+    const dateText =
+      formatReleaseDateFromIso(result?.release_published_at) ||
+      String(result?.release_published_date || "").trim();
+    if (dateText) {
+      const dateLine = document.createElement("p");
+      dateLine.className = "update-modal-meta hint";
+      dateLine.textContent = t("updates.releaseDate", { date: dateText });
+      notesEl.appendChild(dateLine);
+    }
+    const heading = document.createElement("p");
+    heading.className = "update-modal-whats-new";
+    heading.textContent = t("updates.whatsNew");
+    notesEl.appendChild(heading);
+    const list = document.createElement("ul");
+    list.className = "update-modal-summary";
+    for (const line of bullets.slice(0, 5)) {
+      const li = document.createElement("li");
+      li.textContent = line;
+      list.appendChild(li);
+    }
+    notesEl.appendChild(list);
+    notesEl.hidden = false;
+  }
+
   function stopPoll() {
     if (pollTimer) {
       clearInterval(pollTimer);
@@ -547,7 +608,7 @@ function initAppUpdates() {
     }
     if (notesEl) {
       notesEl.hidden = true;
-      notesEl.textContent = "";
+      notesEl.replaceChildren();
     }
     if (versionLine) {
       versionLine.hidden = true;
@@ -639,10 +700,7 @@ function initAppUpdates() {
         if (statusEl) {
           statusEl.textContent = t("updates.available", { version: result.latest_version });
         }
-        if (notesEl && result.release_notes) {
-          notesEl.hidden = false;
-          notesEl.textContent = result.release_notes;
-        }
+        renderUpdateReleaseNotes(result);
         if (result.expected_sha256) {
           downloadBtn?.removeAttribute("hidden");
         } else if (statusEl) {

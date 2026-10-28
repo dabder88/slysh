@@ -70,6 +70,26 @@ ALLOWED_DOWNLOAD_HOSTS = frozenset(
 )
 _SHA256_IN_BODY = re.compile(r"sha256:\s*([a-fA-F0-9]{64})", re.IGNORECASE)
 _VERSION_TAG = re.compile(r"^v?(\d+(?:\.\d+)*)(?:[-+].*)?$", re.IGNORECASE)
+_SUMMARY_HEADING = re.compile(r"^##\s+Summary\s*$", re.MULTILINE | re.IGNORECASE)
+_SECTION_HEADING = re.compile(r"^##\s+", re.MULTILINE)
+_MAX_SUMMARY_BULLETS = 5
+_MAX_BULLET_CHARS = 120
+
+_RU_MONTHS = (
+    "",
+    "января",
+    "февраля",
+    "марта",
+    "апреля",
+    "мая",
+    "июня",
+    "июля",
+    "августа",
+    "сентября",
+    "октября",
+    "ноября",
+    "декабря",
+)
 
 _lock = threading.Lock()
 _state: dict[str, Any] = {
@@ -241,6 +261,96 @@ def _parse_expected_sha256(body: str, asset_name: str | None = None) -> str | No
     return match.group(1).lower()
 
 
+def _strip_inline_markdown(text: str) -> str:
+    cleaned = text.strip()
+    cleaned = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", cleaned)
+    cleaned = re.sub(r"\*\*([^*]+)\*\*", r"\1", cleaned)
+    cleaned = re.sub(r"`([^`]+)`", r"\1", cleaned)
+    return cleaned.strip()
+
+
+def extract_release_summary(body: str) -> list[str]:
+    text = body or ""
+    section = ""
+    match = _SUMMARY_HEADING.search(text)
+    if match:
+        rest = text[match.end() :]
+        next_heading = _SECTION_HEADING.search(rest)
+        section = rest[: next_heading.start()] if next_heading else rest
+    else:
+        lines = text.splitlines()
+        chunk: list[str] = []
+        past_title = False
+        for line in lines:
+            if line.startswith("# ") and not past_title:
+                past_title = True
+                continue
+            if not past_title:
+                continue
+            if _SECTION_HEADING.match(line):
+                if re.match(r"^##\s+(Assets|SHA-256)\b", line, re.IGNORECASE):
+                    break
+                break
+            chunk.append(line)
+        section = "\n".join(chunk)
+
+    bullets: list[str] = []
+    for raw_line in section.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("**Website"):
+            continue
+        if line.startswith(("-", "*")):
+            item = _strip_inline_markdown(line.lstrip("-* ").strip())
+        elif re.match(r"^\d+\.\s+", line):
+            item = _strip_inline_markdown(re.sub(r"^\d+\.\s+", "", line))
+        elif not bullets:
+            item = _strip_inline_markdown(line)
+        else:
+            continue
+        if not item or item.startswith("http"):
+            continue
+        bullets.append(item[:_MAX_BULLET_CHARS])
+        if len(bullets) >= _MAX_SUMMARY_BULLETS:
+            break
+    return bullets
+
+
+def format_published_date(iso: str, locale: str) -> str:
+    token = (iso or "").strip()
+    if not token:
+        return ""
+    try:
+        dt = datetime.fromisoformat(token.replace("Z", "+00:00"))
+    except ValueError:
+        return ""
+    loc = (locale or "ru").strip().lower()
+    if loc == "en":
+        return dt.strftime("%B %d, %Y")
+    if 1 <= dt.month <= 12:
+        return f"{dt.day} {_RU_MONTHS[dt.month]} {dt.year}"
+    return dt.strftime("%Y-%m-%d")
+
+
+def release_notes_for_ui(
+    body: str,
+    published_at: str | None,
+    locale: str,
+) -> dict[str, Any]:
+    bullets = extract_release_summary(body)
+    iso = (published_at or "").strip()
+    return {
+        "bullets": bullets,
+        "published_date": format_published_date(iso, locale),
+        "published_at": iso,
+    }
+
+
+def plain_release_notes_text(bullets: list[str]) -> str:
+    if not bullets:
+        return ""
+    return "\n".join(f"• {item}" for item in bullets)
+
+
 def _save_last_check() -> None:
     stamp = datetime.now(timezone.utc).isoformat()
 
@@ -277,13 +387,21 @@ def check_for_updates() -> dict[str, Any]:
     if not download_url.startswith("https://"):
         raise ValueError("Не удалось проверить обновления")
     body = str(release.get("body") or "")
+    published_at = str(release.get("published_at") or "")
+    ui_locale = load_ui_locale()
+    ui_notes = release_notes_for_ui(body, published_at, ui_locale)
+    summary = list(ui_notes["bullets"])
+    short_notes = plain_release_notes_text(summary)
     pending = {
         "version": latest,
         "tag": tag,
         "download_url": download_url,
         "size": int(asset.get("size") or 0),
         "expected_sha256": _parse_expected_sha256(body, asset_name),
-        "release_notes": body.strip(),
+        "release_body": body.strip(),
+        "release_summary": summary,
+        "release_published_at": published_at,
+        "release_notes": short_notes,
         "html_url": str(release.get("html_url") or f"https://github.com/{slug}/releases/tag/{tag}"),
     }
     with _lock:
@@ -309,7 +427,9 @@ def check_for_updates() -> dict[str, Any]:
         "latest_version": latest,
         "has_update": has_update,
         "newer_than_release": newer_than_installed,
-        "release_notes": pending["release_notes"],
+        "release_notes": short_notes,
+        "release_summary": summary,
+        "release_published_at": published_at,
         "html_url": pending["html_url"],
         "asset_size": pending["size"],
         "expected_sha256": pending["expected_sha256"],

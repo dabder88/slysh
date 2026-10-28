@@ -89,11 +89,15 @@ def test_youtube_status_endpoint(tmp_path, monkeypatch):
     monkeypatch.setattr("slysh.youtube_cookies.cookies_present", lambda: False)
     monkeypatch.setattr("slysh.youtube_ingest.cookies_present", lambda: False)
     monkeypatch.setattr("slysh.youtube_ytdlp.find_ytdlp", lambda: None)
+    monkeypatch.setattr("slysh.youtube_ingest.probe_youtube_reachable", lambda **kw: True)
+    monkeypatch.setattr("slysh.youtube_ingest.youtube_proxy_active", lambda: False)
     response = client.get("/api/youtube/status")
     assert response.status_code == 200
     payload = response.json()
     assert payload["apify_key_set"] is False
     assert payload["cookies_present"] is False
+    assert payload["youtube_proxy_active"] is False
+    assert payload["youtube_reachable"] is True
 
 
 def test_youtube_cookies_import(tmp_path, monkeypatch):
