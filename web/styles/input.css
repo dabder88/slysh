@@ -4471,6 +4471,39 @@
     border-bottom: 1px solid color-mix(in srgb, var(--primary) 16%, var(--outline-variant));
   }
 
+  .job-banner-error-body {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .job-banner-title {
+    margin: 0;
+    font-weight: 600;
+  }
+
+  .job-banner-lead {
+    margin: 0;
+  }
+
+  .job-banner-hints,
+  .youtube-error-modal-hints {
+    margin: 4px 0 0;
+    padding-left: 1.2rem;
+    font-size: 12px;
+    color: var(--on-surface-variant);
+  }
+
+  .job-banner-hints li + li,
+  .youtube-error-modal-hints li + li {
+    margin-top: 4px;
+  }
+
+  .job-banner-details {
+    font-size: 12px;
+    color: var(--on-surface-variant);
+  }
+
   .job-progress {
     display: flex;
     flex-direction: column;

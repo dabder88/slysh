@@ -5,6 +5,7 @@ import { ensureIntakeAllowed } from "./intake-duplicate.js";
 import { selectJob } from "./legacy.js";
 import { refreshEditorJob } from "./editor.js";
 import { localeDateTag, t } from "./i18n.js";
+import { showYoutubeErrorModal } from "./youtube-error-modal.js";
 import { bindSecretInput, readSecretForSave } from "./secret-field.js";
 import {
   addExportDirRowToList,
@@ -335,6 +336,7 @@ async function pollIngestJob(jobId) {
     if (btn) {
       btn.disabled = false;
     }
+    showYoutubeErrorModal(job);
     if (onEditor) {
       if (statusEl) {
         statusEl.textContent = "";
@@ -399,6 +401,9 @@ async function ingestYoutube() {
       showToast("youtube.k7094520");
       return;
     }
+  }
+  if (method !== "apify" && status.youtube_reachable === false) {
+    showToast("youtube.unreachablePreflight");
   }
   if (btn) {
     btn.disabled = true;

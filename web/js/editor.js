@@ -5,6 +5,7 @@ import { reportError } from "./errors.js";
 import { getRoute, navigate } from "./router.js";
 import { batchById, jobStatusLabel, upsertJobInStore } from "./library-store.js";
 import { localeDateTag, t } from "./i18n.js";
+import { showYoutubeErrorModal } from "./youtube-error-modal.js";
 import {
   selectJob,
   setEditorRefreshHook,
@@ -274,6 +275,9 @@ async function pollEditorJob() {
   updateTransport(job);
   if (!shouldPollEditorJob(job)) {
     stopEditorPoll();
+    if (job.status === "failed" && isYoutubeJob(job)) {
+      showYoutubeErrorModal(job);
+    }
     if (job.status === "completed" || job.status === "failed" || job.status === "cancelled") {
       renderBatchPanel(job);
       syncSpeakersPanel();
@@ -642,6 +646,11 @@ function streamingStatusText(job) {
   }
   const n = (job.segments || []).length;
   if (isYoutubeJob(job) && n === 0) {
+    const proc = Number(job.processing_s) || 0;
+    const prog = Number(job.progress) || 0;
+    if (proc > 180 && prog >= 0.7) {
+      return t("youtube.longRunningHint");
+    }
     return t("youtube.k4983190");
   }
   if (n > 0) {

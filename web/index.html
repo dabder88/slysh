@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <title>Slysh!</title>
   <link rel="icon" href="/branding/favicon-32.png" type="image/png" sizes="32x32">
-  <link rel="stylesheet" href="/app.css?v=152">
+  <link rel="stylesheet" href="/app.css?v=153">
   <style>
     .boot-error {
       position: fixed;
@@ -1428,6 +1428,20 @@
   </div>
 
   <!-- Modals -->
+  <div id="youtube-error-modal" class="modal" hidden>
+    <div class="modal-card update-modal-card" role="dialog" aria-labelledby="youtube-error-modal-title">
+      <h2 id="youtube-error-modal-title" data-i18n="youtube.errorModalTitle">YouTube</h2>
+      <p id="youtube-error-modal-lead" class="hint" aria-live="polite"></p>
+      <div id="youtube-error-modal-hints"></div>
+      <p id="youtube-error-modal-apify-note" class="hint" hidden data-i18n="youtube.errorApifyNote"></p>
+      <div class="modal-actions modal-actions--stack">
+        <button type="button" id="youtube-error-modal-settings" class="btn-primary" data-i18n="youtube.errorOpenProxy">Настройки (прокси)</button>
+        <button type="button" id="youtube-error-modal-youtube" class="btn-outline" data-i18n="youtube.errorOpenYoutube">Экран YouTube</button>
+        <button type="button" id="youtube-error-modal-close" class="ghost" data-i18n="page.0ec753be8df9">Отмена</button>
+      </div>
+    </div>
+  </div>
+
   <div id="update-modal" class="modal" hidden>
     <div class="modal-card update-modal-card" role="dialog" aria-labelledby="update-modal-title">
       <h2 id="update-modal-title" data-i18n="updates.title">Обновление Slysh</h2>
@@ -2514,7 +2528,7 @@
       "/js/batch-panel.js": "/js/batch-panel.js?v=47",
       "/js/batch-kind.js": "/js/batch-kind.js?v=45",
       "/js/dashboard.js": "/js/dashboard.js?v=46",
-      "/js/editor.js": "/js/editor.js?v=66",
+      "/js/editor.js": "/js/editor.js?v=67",
       "/js/panel-resize.js": "/js/panel-resize.js?v=1",
       "/js/transcript-format.js": "/js/transcript-format.js?v=1",
       "/js/errors.js": "/js/errors.js?v=45",
@@ -2522,7 +2536,7 @@
       "/js/icons.js": "/js/icons.js?v=45",
       "/js/intake-duplicate.js": "/js/intake-duplicate.js?v=45",
       "/js/intake-followup.js": "/js/intake-followup.js?v=3",
-      "/js/legacy.js": "/js/legacy.js?v=83",
+      "/js/legacy.js": "/js/legacy.js?v=84",
       "/js/export-favorites.js": "/js/export-favorites.js?v=8",
       "/js/media-time.js": "/js/media-time.js?v=45",
       "/js/library-store.js": "/js/library-store.js?v=48",
@@ -2542,7 +2556,8 @@
       "/js/state.js": "/js/state.js?v=45",
       "/js/transcripts.js": "/js/transcripts.js?v=48",
       "/js/version.js": "/js/version.js?v=45",
-      "/js/youtube.js": "/js/youtube.js?v=53"
+      "/js/youtube.js": "/js/youtube.js?v=54",
+      "/js/youtube-error-modal.js": "/js/youtube-error-modal.js?v=1",
     }
   }
   </script>

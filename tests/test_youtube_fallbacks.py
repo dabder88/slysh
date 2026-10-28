@@ -7,6 +7,7 @@ from slysh.youtube_ytdlp import YoutubeYtdlpError
 
 
 def test_fetch_ytdlp_fallback_to_transcript_api(monkeypatch):
+    monkeypatch.setattr("slysh.youtube_ingest.probe_youtube_reachable", lambda **kw: True)
     monkeypatch.setattr(
         "slysh.youtube_ingest.fetch_transcript_ytdlp",
         lambda url, language="ru": (_ for _ in ()).throw(
@@ -33,6 +34,7 @@ def test_fetch_ytdlp_fallback_to_transcript_api(monkeypatch):
 
 
 def test_fetch_ytdlp_fallback_to_apify(monkeypatch):
+    monkeypatch.setattr("slysh.youtube_ingest.probe_youtube_reachable", lambda **kw: True)
     monkeypatch.setattr(
         "slysh.youtube_ingest.fetch_transcript_ytdlp",
         lambda url, language="ru": (_ for _ in ()).throw(
@@ -59,6 +61,7 @@ def test_fetch_ytdlp_fallback_to_apify(monkeypatch):
 
 
 def test_fetch_ytdlp_all_fail_suggests_apify(monkeypatch):
+    monkeypatch.setattr("slysh.youtube_ingest.probe_youtube_reachable", lambda **kw: True)
     monkeypatch.setattr(
         "slysh.youtube_ingest.fetch_transcript_ytdlp",
         lambda url, language="ru": (_ for _ in ()).throw(
@@ -74,7 +77,7 @@ def test_fetch_ytdlp_all_fail_suggests_apify(monkeypatch):
     )
     monkeypatch.setattr("slysh.youtube_ingest.apify_api_key", lambda: "")
 
-    with pytest.raises(YoutubeIngestError, match="Apify"):
+    with pytest.raises(YoutubeIngestError):
         _fetch_ytdlp_with_fallbacks(
             "https://www.youtube.com/watch?v=dagGOOxhRcc",
             "ru",

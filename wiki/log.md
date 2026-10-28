@@ -2,6 +2,11 @@
 
 Сюда дописывать дату и что изменилось в продовой копии. Старые строки не переписывать.
 
+## 2026-10-28
+
+- Релиз **v1.0.5**: YouTube — таймауты, понятные ошибки/модалка, `youtube_reachable`; in-app update с 1.0.4.
+- YouTube UX при блокировке: таймауты yt-dlp, wall-clock fail job (~15 мин), `youtube_errors.py` (короткие сообщения + hints), `youtube_reachable` в status, баннер/модалка ошибки вместо traceback, i18n.
+
 ## 2026-10-21
 
 - Релиз **v1.0.4**: YouTube yt-dlp / cookie3 / transcript-api через `.venv-engine` (split venv).

@@ -23,6 +23,9 @@ YTDLP_MISSING_MESSAGE = (
     "yt-dlp не найден. Установите yt-dlp в PATH или выполните: uv sync --extra youtube"
 )
 COOKIES_FROM_BROWSER = "firefox"
+YTDLP_CALL_TIMEOUT = 90
+YTDLP_FETCH_WALL_CLOCK_S = 15 * 60
+YTDLP_NETWORK_ARGS = ["--socket-timeout", "25", "--retries", "2"]
 PO_TOKEN_HINT = (
     " YouTube блокирует субтитры через yt-dlp (нужен PO Token). "
     "Попробуйте метод Apify или обновите yt-dlp."
@@ -95,7 +98,7 @@ def _js_runtime_args() -> list[str]:
 
 
 def _strategy_args(cookie_mode: CookieMode, extractor_args: str | None) -> list[str]:
-    args = [*_js_runtime_args()]
+    args = [*YTDLP_NETWORK_ARGS, *_js_runtime_args()]
     if cookie_mode == "file":
         cookies = youtube_cookies_path()
         if cookies.is_file() and cookies.stat().st_size > 0:
@@ -286,10 +289,33 @@ def _metadata_from_json(payload: dict) -> dict:
 
 def _stderr_hints(stderr: str) -> str:
     text = stderr or ""
-    if "PO token" in text or "PO Token" in text:
+    lower = text.lower()
+    if "po token" in text or "PO Token" in text:
         return PO_TOKEN_HINT
     if "Sign in to confirm" in text or "not a bot" in text:
         return " YouTube запросил проверку — войдите в аккаунт в Firefox."
+    if "timeout after" in lower or "timed out" in lower or "yt-dlp timeout" in lower:
+        return (
+            " Превышено время ожидания ответа от YouTube. "
+            "Проверьте прокси в Настройках → Сеть (цель YouTube) или попробуйте Apify."
+        )
+    if any(
+        needle in lower
+        for needle in (
+            "unable to download",
+            "http error 403",
+            "403 forbidden",
+            "connection refused",
+            "network is unreachable",
+            "name or service not known",
+            "failed to establish",
+            "getaddrinfo failed",
+        )
+    ):
+        return (
+            " YouTube недоступен из текущей сети. "
+            "Включите прокси для YouTube в Настройках → Сеть или используйте Apify."
+        )
     return ""
 
 
@@ -315,7 +341,8 @@ def _download_subtitles(
             "-o",
             out_template,
             url,
-        ]
+        ],
+        timeout=YTDLP_CALL_TIMEOUT,
     )
     stderr = (result.stderr or result.stdout or "").strip()
     tmp_dir = Path(out_template).parent
@@ -333,7 +360,8 @@ def fetch_video_metadata_ytdlp(url: str) -> dict:
                 "--dump-json",
                 "--skip-download",
                 url,
-            ]
+            ],
+            timeout=YTDLP_CALL_TIMEOUT,
         )
         if result.returncode != 0:
             continue
@@ -348,7 +376,10 @@ def fetch_video_metadata_ytdlp(url: str) -> dict:
 
 def fetch_transcript_ytdlp(url: str, language: str = "ru") -> dict:
     meta_payload: dict = {}
-    meta_result = _run_ytdlp([*_base_ytdlp_args(), "--dump-json", "--skip-download", url])
+    meta_result = _run_ytdlp(
+        [*_base_ytdlp_args(), "--dump-json", "--skip-download", url],
+        timeout=YTDLP_CALL_TIMEOUT,
+    )
     if meta_result.returncode == 0:
         try:
             parsed = json.loads(meta_result.stdout)
@@ -359,6 +390,7 @@ def fetch_transcript_ytdlp(url: str, language: str = "ru") -> dict:
 
     lang = (language or "ru").strip() or "ru"
     errors: list[str] = []
+    timeout_streak = 0
     with tempfile.TemporaryDirectory(prefix="slysh-ytdlp-") as tmp:
         out_template = str(Path(tmp) / "%(id)s")
         for cookie_mode, extractor_args, all_langs in _SUBTITLE_STRATEGIES:
@@ -370,6 +402,15 @@ def fetch_transcript_ytdlp(url: str, language: str = "ru") -> dict:
                 extractor_args=extractor_args,
                 all_langs=all_langs,
             )
+            if stderr and ("timeout after" in stderr.lower() or "returncode 124" in stderr):
+                timeout_streak += 1
+            else:
+                timeout_streak = 0
+            if timeout_streak >= 3:
+                raise YoutubeYtdlpError(
+                    "YouTube не отвечает (таймаут). Проверьте прокси в Настройках → Сеть "
+                    "или выберите способ Apify."
+                )
             vtt_path = _pick_vtt_file(files, lang)
             if vtt_path is None:
                 if stderr:

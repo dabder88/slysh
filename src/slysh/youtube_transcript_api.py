@@ -8,6 +8,7 @@ from http.cookiejar import MozillaCookieJar
 from slysh.models import Segment
 from slysh.paths import youtube_cookies_path
 from slysh.youtube_env import resolve_youtube_python
+from slysh.youtube_errors import format_youtube_failure, parse_subprocess_error_json
 
 YTA_MISSING_MESSAGE = (
     "Пакет youtube-transcript-api не установлен. Выполните: uv pip install youtube-transcript-api"
@@ -77,6 +78,11 @@ def _segments_from_snippets(snippets) -> list[Segment]:
     return segments
 
 
+def _raise_transcript_api_error(exc: Exception) -> None:
+    formatted = format_youtube_failure(exc, method="ytdlp")
+    raise YoutubeTranscriptApiError(formatted["message"]) from exc
+
+
 def _fetch_snippets(api, video_id: str, preferred: list[str]):
     try:
         return api.fetch(video_id, languages=preferred)
@@ -85,9 +91,7 @@ def _fetch_snippets(api, video_id: str, preferred: list[str]):
     try:
         transcript_list = api.list(video_id)
     except Exception as exc:
-        raise YoutubeTranscriptApiError(
-            f"Не удалось получить список субтитров: {exc}"
-        ) from exc
+        _raise_transcript_api_error(exc)
     try:
         transcript = transcript_list.find_transcript(preferred)
     except Exception:
@@ -100,9 +104,7 @@ def _fetch_snippets(api, video_id: str, preferred: list[str]):
     try:
         return transcript.fetch()
     except Exception as exc:
-        raise YoutubeTranscriptApiError(
-            f"Не удалось скачать субтитры: {exc}"
-        ) from exc
+        _raise_transcript_api_error(exc)
 
 
 def _segments_to_json(segments: list[Segment]) -> list[dict]:
@@ -193,7 +195,11 @@ def _fetch_transcript_api_subprocess(python_exe: str, url: str, language: str) -
         check=False,
     )
     if proc.returncode != 0:
-        message = (proc.stderr or proc.stdout or "youtube-transcript-api subprocess failed").strip()
+        parsed = parse_subprocess_error_json(proc.stderr or "")
+        if parsed:
+            raise YoutubeTranscriptApiError(parsed)
+        raw = (proc.stderr or proc.stdout or "youtube-transcript-api subprocess failed").strip()
+        message = format_youtube_failure(raw, method="ytdlp")["message"]
         raise YoutubeTranscriptApiError(message)
     try:
         payload = json.loads(proc.stdout)
@@ -214,7 +220,15 @@ def fetch_transcript_api(url: str, language: str = "ru") -> dict:
 
 
 def _cli_fetch(url: str, language: str) -> None:
-    result = _fetch_transcript_api_inprocess(url, language=language)
+    try:
+        result = _fetch_transcript_api_inprocess(url, language=language)
+    except YoutubeTranscriptApiError as exc:
+        print(json.dumps({"error": str(exc)}, ensure_ascii=False), file=sys.stderr)
+        raise SystemExit(1) from exc
+    except Exception as exc:
+        message = format_youtube_failure(exc, method="ytdlp")["message"]
+        print(json.dumps({"error": message}, ensure_ascii=False), file=sys.stderr)
+        raise SystemExit(1) from exc
     out = {**result, "segments": _segments_to_json(result["segments"])}
     print(json.dumps(out, ensure_ascii=False))
 

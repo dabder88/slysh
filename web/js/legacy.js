@@ -471,6 +471,56 @@ export function hideEditorJobBanner() {
   syncJobBanner(null);
 }
 
+function renderJobBannerYoutubeError(job) {
+  resetJobBannerDom();
+  jobBannerViewMode = "youtube-error";
+  const wrap = document.createElement("div");
+  wrap.className = "job-banner-error-body";
+  const title = document.createElement("p");
+  title.className = "job-banner-title";
+  title.textContent = jobStatusLabel(job);
+  wrap.appendChild(title);
+  const lead = document.createElement("p");
+  lead.className = "job-banner-lead hint";
+  lead.textContent = job.error_text || t("youtube.errorGeneric");
+  wrap.appendChild(lead);
+  const hints = job.youtube_error?.hints;
+  if (Array.isArray(hints) && hints.length) {
+    const ul = document.createElement("ul");
+    ul.className = "job-banner-hints";
+    for (const hint of hints) {
+      const li = document.createElement("li");
+      li.textContent = hint;
+      ul.appendChild(li);
+    }
+    wrap.appendChild(ul);
+  }
+  const detail = job.youtube_error?.detail;
+  if (detail && detail.length > 10) {
+    const details = document.createElement("details");
+    details.className = "job-banner-details";
+    const summary = document.createElement("summary");
+    summary.textContent = t("youtube.errorDetails");
+    details.appendChild(summary);
+    const body = document.createElement("p");
+    body.className = "hint";
+    body.textContent = detail.slice(0, 500);
+    details.appendChild(body);
+    wrap.appendChild(details);
+  }
+  jobBannerEl.appendChild(wrap);
+}
+
+function youtubeBannerProgressHint(job) {
+  const proc = Number(job.processing_s) || 0;
+  const prog = Number(job.progress) || 0;
+  const segCount = (job.segments || []).length;
+  if (proc > 180 && prog >= 0.7 && segCount === 0) {
+    return t("youtube.longRunningHint");
+  }
+  return jobStatusLabel(job);
+}
+
 function syncJobBanner(job) {
   if (!jobBannerEl) {
     return;
@@ -488,6 +538,10 @@ function syncJobBanner(job) {
   }`;
 
   if (!transcribing) {
+    if (job.status === "failed" && isYoutubeJob(job)) {
+      renderJobBannerYoutubeError(job);
+      return;
+    }
     if (jobBannerViewMode !== "text") {
       resetJobBannerDom();
       jobBannerViewMode = "text";
@@ -519,7 +573,7 @@ function syncJobBanner(job) {
   const indeterminate = isProgressIndeterminate(job);
   refs.stageText.textContent = progressStageLabel(job);
   refs.pctEl.textContent = jobProgressPctLabel(job);
-  refs.hint.textContent = jobStatusLabel(job);
+  refs.hint.textContent = isYoutubeJob(job) ? youtubeBannerProgressHint(job) : jobStatusLabel(job);
   updateProgressBarFill(refs.fill, pct, indeterminate, "primary", refs.track);
 }
 

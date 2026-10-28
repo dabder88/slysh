@@ -29,6 +29,7 @@ from slysh.youtube_ytdlp import (
 )
 
 YoutubeMethod = Literal["apify", "ytdlp"]
+INGEST_ERROR_META_KEY = "_ingest_error"
 
 _VIDEO_ID_RE = re.compile(r"^[A-Za-z0-9_-]{11}$")
 _meta_db: object | None = None
@@ -96,7 +97,50 @@ def load_job_youtube_video(job_id: int, *, db=None) -> dict | None:
     if not row:
         return None
     video = row.get("video")
-    return dict(video) if isinstance(video, dict) else None
+    if not isinstance(video, dict):
+        return None
+    payload = dict(video)
+    payload.pop(INGEST_ERROR_META_KEY, None)
+    return payload
+
+
+def load_youtube_ingest_error(job_id: int, *, db=None) -> dict | None:
+    row = _resolve_meta_db(db).get_job_youtube_meta(job_id)
+    if not row:
+        return None
+    video = row.get("video")
+    if not isinstance(video, dict):
+        return None
+    raw = video.get(INGEST_ERROR_META_KEY)
+    if not isinstance(raw, dict):
+        return None
+    return {
+        "code": str(raw.get("code") or "generic"),
+        "hints": [str(h) for h in (raw.get("hints") or []) if str(h).strip()],
+        "detail": str(raw.get("detail") or ""),
+    }
+
+
+def save_youtube_ingest_error(
+    job_id: int,
+    formatted: dict,
+    method: YoutubeMethod,
+    language: str,
+    *,
+    db=None,
+) -> None:
+    row = _resolve_meta_db(db).get_job_youtube_meta(job_id) or {}
+    video_payload = dict(row.get("video") or {})
+    if not video_payload:
+        existing = load_job_youtube_video(job_id, db=db)
+        if existing:
+            video_payload = dict(existing)
+    video_payload[INGEST_ERROR_META_KEY] = {
+        "code": formatted.get("code") or "generic",
+        "hints": list(formatted.get("hints") or []),
+        "detail": str(formatted.get("detail") or ""),
+    }
+    save_job_ingest_meta(job_id, method, language, video_payload, db=db)
 
 
 def fallback_youtube_video_from_job(job: dict) -> dict:
@@ -156,6 +200,9 @@ def attach_youtube_video(
     video.pop("metadata_enriched", None)
     video.pop("chapters_checked", None)
     job["youtube"] = video
+    err = load_youtube_ingest_error(job_id, db=db)
+    if err:
+        job["youtube_error"] = err
 
 
 def save_job_ingest_meta(
@@ -275,6 +322,26 @@ def normalize_youtube_url(raw: str) -> tuple[str, str]:
     return canonical, video_id
 
 
+def probe_youtube_reachable(*, timeout: float = 8.0) -> bool:
+    from slysh.http_proxy import opener_for_target
+
+    try:
+        import urllib.request
+
+        opener = opener_for_target("youtube")
+        request = urllib.request.Request(
+            "https://www.youtube.com/",
+            method="HEAD",
+            headers={"User-Agent": "Slysh/1.0"},
+        )
+        with opener.open(request, timeout=timeout) as response:
+            code = getattr(response, "status", None) or response.getcode()
+            return 200 <= int(code) < 500
+    except Exception:
+        logging.debug("youtube reachability probe failed", exc_info=True)
+        return False
+
+
 def youtube_status() -> dict:
     auth_mode = cookies_auth_mode()
     return {
@@ -285,40 +352,46 @@ def youtube_status() -> dict:
         "ytdlp_found": bool(find_ytdlp()),
         "browser_cookie3": browser_cookie3_available(),
         "transcript_api": transcript_api_available(),
+        "youtube_reachable": probe_youtube_reachable(),
     }
 
 
 def _fetch_ytdlp_with_fallbacks(url: str, language: str) -> dict:
+    from slysh.youtube_errors import format_youtube_failure
+
     ytdlp_error: YoutubeYtdlpError | None = None
     try:
         return fetch_transcript_ytdlp(url, language=language)
     except YoutubeYtdlpError as exc:
         ytdlp_error = exc
 
+    reachable = probe_youtube_reachable()
     api_message = ""
-    if transcript_api_available():
+    if transcript_api_available() and reachable:
         try:
             return fetch_transcript_api(url, language=language)
         except YoutubeTranscriptApiError as exc:
             api_message = str(exc)
+    elif transcript_api_available() and not reachable:
+        api_message = "YouTube недоступен из текущей сети (проверка перед fallback)."
 
     if apify_api_key():
         try:
             return fetch_transcript_apify(url, language=language)
         except YoutubeApifyError as apify_exc:
-            parts = [str(ytdlp_error)]
+            combined = str(ytdlp_error)
             if api_message:
-                parts.append(api_message)
-            parts.append(str(apify_exc))
-            raise YoutubeIngestError(". ".join(parts)) from apify_exc
+                combined = f"{combined}. {api_message}. {apify_exc}"
+            else:
+                combined = f"{combined}. {apify_exc}"
+            formatted = format_youtube_failure(combined, method="ytdlp")
+            raise YoutubeIngestError(formatted["message"]) from apify_exc
 
-    hint = str(ytdlp_error)
+    combined = str(ytdlp_error)
     if api_message:
-        hint = f"{hint}. {api_message}"
-    hint = (
-        f"{hint} Для таких видео часто помогает метод Apify (ключ в настройках)."
-    )
-    raise YoutubeIngestError(hint) from ytdlp_error
+        combined = f"{combined}. {api_message}"
+    formatted = format_youtube_failure(combined, method="ytdlp")
+    raise YoutubeIngestError(formatted["message"]) from ytdlp_error
 
 
 def fetch_transcript(
@@ -386,10 +459,20 @@ def run_youtube_job(
     *,
     cancel_event: threading.Event | None = None,
 ) -> None:
+    from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
+
     from slysh.asr_coordinator import job_run_active, job_run_id
     from slysh.models import JobStatus
+    from slysh.youtube_errors import format_youtube_failure
+    from slysh.youtube_ytdlp import YTDLP_FETCH_WALL_CLOCK_S
 
     run_id = job_run_id(db, job_id)
+
+    def fail_job(exc: BaseException) -> None:
+        formatted = format_youtube_failure(exc, method=method)
+        db.set_error(job_id, formatted["message"])
+        save_youtube_ingest_error(job_id, formatted, method, language, db=db)
+        db.set_status(job_id, JobStatus.FAILED)
 
     def cancelled() -> bool:
         if cancel_event is not None and cancel_event.is_set():
@@ -426,19 +509,34 @@ def run_youtube_job(
     ticker_thread.start()
     try:
         try:
-            result = fetch_transcript(url, method=method, language=language)
+            with ThreadPoolExecutor(max_workers=1) as pool:
+                future = pool.submit(
+                    fetch_transcript,
+                    url,
+                    method=method,
+                    language=language,
+                )
+                try:
+                    result = future.result(timeout=YTDLP_FETCH_WALL_CLOCK_S)
+                except FuturesTimeoutError as exc:
+                    if cancelled():
+                        return
+                    fail_job(
+                        TimeoutError(
+                            "Превышено время ожидания ответа от YouTube (wall-clock)."
+                        )
+                    )
+                    return
         except YoutubeIngestError as exc:
             if cancelled():
                 return
-            db.set_error(job_id, str(exc))
-            db.set_status(job_id, JobStatus.FAILED)
+            fail_job(exc)
             return
         except Exception as exc:
             if cancelled():
                 return
             logging.exception("youtube job %s failed", job_id)
-            db.set_error(job_id, str(exc))
-            db.set_status(job_id, JobStatus.FAILED)
+            fail_job(exc)
             return
     finally:
         stop_ticker.set()

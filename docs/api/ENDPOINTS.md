@@ -130,7 +130,7 @@
 | POST | `/api/meeting/resume` |
 | POST | `/api/meeting/stop` | Job payload + `recording_path` при `save_audio` |
 | POST | `/api/meeting/clear` | Сброс `job_id` на экране встречи (без удаления job из БД) |
-| GET | `/api/youtube/status` | Apify key, cookies, `cookies_auth_mode` (`file`/`browser`), yt-dlp, `batch_api`, `batch_resolve_api` |
+| GET | `/api/youtube/status` | Apify key, cookies, `cookies_auth_mode` (`file`/`browser`), yt-dlp, `youtube_reachable`, `batch_api`, `batch_resolve_api` |
 | GET | `/api/youtube/cookies/browsers` | Профили Firefox/Chrome/Edge |
 | POST | `/api/youtube/cookies/extract` | `{ browser, profile }` → cookies.txt; `profile: "__default__"` — быстрое извлечение |
 | POST | `/api/youtube/cookies/import` | `{ path }` — импорт cookies.txt |
