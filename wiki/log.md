@@ -4,7 +4,7 @@
 
 ## 2026-10-28
 
-- **v1.0.7:** короткие release notes в модалке обновления; English Summary на GitHub; import map + YouTube preflight/proxy (с 1.0.6).
+- **v1.0.7 (GitHub):** короткие release notes в модалке обновления; English Summary на GitHub; import map + YouTube preflight/proxy (с 1.0.6).
 
 ## 2026-10-21
 
